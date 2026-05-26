@@ -4,16 +4,24 @@
 
 ## 🧭 项目概况
 
-- **项目类型:** {Web 应用 / CLI 工具 / 库 / 数据处理管道 / ...}
-- **主要语言:** {TypeScript / Python / Go / ...}
+- **项目类型:** Web 应用 — 实时法律会谈 AI 辅助系统
+- **主要语言:** Python (后端) + TypeScript (前端)
 - **构建/运行:**
-  - 启动: `{命令}`
-  - 测试: `{命令}`
-  - 格式化/检查: `{命令}`
-  - 其他常用: `{命令}`
-- **目录结构:** {描述关键目录的用途, 例如: src/ 放源码, tests/ 放测试}
-- **命名约定:** {camelCase / snake_case / PascalCase 文件命名}
-- **外部依赖/文档:** {关键文档链接或设计说明}
+  - 后端启动: `cd backend && uv run uvicorn main:app --reload`
+  - 前端启动: `cd frontend && pnpm dev`
+  - 后端测试: `cd backend && uv run pytest`
+  - 前端测试: `cd frontend && pnpm test`
+  - 格式化/检查: `cd frontend && pnpm lint`
+- **目录结构:**
+  - `backend/` — Python FastAPI 后端（Agent 服务、音频管道、WebSocket）
+  - `frontend/` — Vite + React 前端（声纹注册、实时会谈页）
+  - `.gstack/` — gstack 设计文档和审查产物（不入 git）
+- **命名约定:**
+  - Python: snake_case 文件 + 函数
+  - TypeScript: PascalCase 组件, camelCase 函数/hooks
+- **外部依赖/文档:**
+  - 设计文档: `~/.gstack/projects/legal-agent/wwj-main-design-*.md`
+  - 千问 STT API, deepseek-v4-pro API, pyannote-audio, Agno
 
 ---
 
