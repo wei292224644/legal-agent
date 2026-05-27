@@ -18,31 +18,57 @@ class AudioPipeline:
     def __init__(
         self,
         lawyer_voiceprint: np.ndarray | None = None,
+        model_fn: ModelFn | None = None,
+        embedding_fn: EmbeddingFn | None = None,
     ):
+        # Streaming state — for process_segment
+        self._vad_model = None
+        self._asr_model = None
+        self._vad_cache: dict = {}
+        self._vad_pending_start: int | None = None
+        self._audio_buffer: list[np.ndarray] = []
+        self._returned_ends: set[int] = set()  # dedup by segment end_ms
+
         self._lawyer_vp = lawyer_voiceprint
-        self._model = None
-        self._emb_fn = None
-        self._spk_role_map: dict[str, str] = {}  # spk_label → 律师/客户
+        self._model_fn = model_fn or self._build_model()
+        self._embedding_fn = embedding_fn or (
+            self._build_embedding_fn() if lawyer_voiceprint is not None else None
+        )
+        self._embedding_cache: dict[str, str] = {}
 
-    # ── Lazy init ─────────────────────────────────────────────────────────────
+    # ── Model builders ───────────────────────────────────────────────────────────
 
-    def _ensure_model(self):
-        if self._model is not None:
-            return
+    def _build_model(self) -> ModelFn:
         from funasr import AutoModel
 
-        self._model = AutoModel(
-            model="paraformer-zh",
-            vad_model="fsmn-vad",
-            punc_model="ct-punc",
-            spk_model="cam++",
-            disable_update=True,
-        )
-        self._model.vad_model.vad_opts.max_single_segment_time = 10000
+        self._ensure_models()
 
-    def _ensure_emb_fn(self):
-        if self._emb_fn is not None or self._lawyer_vp is None:
-            return
+        def run(audio: np.ndarray) -> list[dict]:
+            sr = 16000
+            vad_res = self._vad_model.generate(input=audio)
+            if not vad_res:
+                return []
+            segs_ms: list[list[int]] = vad_res[0].get("value", [])
+            if not segs_ms:
+                return []
+
+            results: list[dict] = []
+            for start_ms, end_ms in segs_ms:
+                seg = audio[int(start_ms * sr / 1000) : int(end_ms * sr / 1000)]
+                if len(seg) < sr // 10:
+                    continue
+                asr_res = self._asr_model.generate(input=seg)
+                if asr_res and asr_res[0].get("text", "").strip():
+                    results.append({
+                        "text": asr_res[0]["text"],
+                        "start": start_ms,
+                        "end": end_ms,
+                    })
+            return results
+
+        return run
+
+    def _build_embedding_fn(self) -> EmbeddingFn:
         import torch
         from funasr import AutoModel
 
@@ -54,53 +80,71 @@ class AudioPipeline:
             arr = emb.numpy() if isinstance(emb, torch.Tensor) else np.array(emb)
             return arr.flatten()
 
-        self._emb_fn = get_embedding
+        return get_embedding
+
+    def _ensure_models(self):
+        if self._vad_model is not None:
+            return
+        from funasr import AutoModel
+
+        self._vad_model = AutoModel(
+            model="fsmn-vad", hub="hf", disable_update=True,
+        )
+        self._vad_model.model.vad_opts.max_single_segment_time = 10000
+
+        self._asr_model = AutoModel(
+            model="paraformer-zh", punc_model="ct-punc",
+            hub="hf", disable_update=True,
+        )
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
     async def process_segment(self, audio: np.ndarray) -> list[TranscriptResult]:
-        self._ensure_model()
-        self._ensure_emb_fn()
+        """Feed audio chunk. Accumulates audio; runs VAD → ASR → voiceprint
+        on the full buffer. Returns new sentences (dedup by end timestamp).
+        """
+        self._ensure_models()
+        sr = 16000
+        self._audio_buffer.append(audio)
+        full_audio = np.concatenate(self._audio_buffer)
 
-        loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, self._model.generate, audio)
+        # VAD
+        vad_res = self._vad_model.generate(input=full_audio)
+        if not vad_res:
+            return []
+        segs_ms: list[list[int]] = vad_res[0].get("value", [])
+        if not segs_ms:
+            return []
 
-        out: list[TranscriptResult] = []
-        for r in results:
-            text = r.get("text", "").strip()
-            if not text:
+        # ASR on new segments only
+        results: list[TranscriptResult] = []
+        for start_ms, end_ms in segs_ms:
+            if end_ms in self._returned_ends:
                 continue
-            spk_label = r.get("spk", "未知")
-            out.append(TranscriptResult(
-                text=text,
-                speaker=self._map_speaker(spk_label, audio, r),
-            ))
-        return out
+            self._returned_ends.add(end_ms)
+
+            seg = full_audio[int(start_ms * sr / 1000) : int(end_ms * sr / 1000)]
+            if len(seg) < sr // 10:
+                continue
+            asr_res = self._asr_model.generate(input=seg)
+            if not (asr_res and asr_res[0].get("text", "").strip()):
+                continue
+
+            speaker = self._identify_role(seg)
+            results.append(TranscriptResult(text=asr_res[0]["text"], speaker=speaker))
+
+        return results
 
     # ── Internal ───────────────────────────────────────────────────────────────
 
-    def _map_speaker(self, label: str, full_audio: np.ndarray, result: dict) -> str:
-        if self._lawyer_vp is None or self._emb_fn is None:
-            return label  # no voiceprint → return raw label
+    def _identify_role(self, audio: np.ndarray) -> str:
+        if self._embedding_fn is None or len(audio) < 4000:
+            return "客户"
+        embedding = self._embedding_fn(audio)
+        return self._compare_voiceprint(embedding)
 
-        if label in self._spk_role_map:
-            return self._spk_role_map[label]
-
-        # Extract this segment's audio for embedding
-        sr = 16000
-        start_ms = result.get("start", 0)
-        end_ms = result.get("end", len(full_audio) * 1000 // sr)
-        seg = full_audio[int(start_ms * sr / 1000) : int(end_ms * sr / 1000)]
-        if len(seg) < sr // 4:
-            seg = full_audio
-
-        embedding = self._emb_fn(seg)
-        role = self._compare_voiceprint(embedding)
-        self._spk_role_map[label] = role
-        return role
-
-    def _compare_voiceprint(self, embedding: np.ndarray) -> str:
-        if self._lawyer_vp is None:
+    def _compare_voiceprint(self, embedding: np.ndarray | None) -> str:
+        if self._lawyer_vp is None or embedding is None:
             return "客户"
         sim = float(
             np.dot(embedding, self._lawyer_vp)
