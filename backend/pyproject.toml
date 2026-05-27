@@ -30,3 +30,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = [
+    "slow: 真实对话场景全流程测试(>1 分钟),按需运行: pytest -m slow",
+]

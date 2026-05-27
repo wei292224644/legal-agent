@@ -64,6 +64,7 @@ def _build_model() -> OpenAIChat:
             "tool": "tool",
             "model": "assistant",
         },
+        extra_body={"thinking": {"type": "disabled"}},
     )
 
 
