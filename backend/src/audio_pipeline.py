@@ -39,7 +39,8 @@ class AudioPipeline:
         # fsmn-vad waits for silence to cut segments, but continuous speech
         # has no silence — max_single_segment_time forces a cut every 10s.
         vad_model = AutoModel(
-            model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+            model="fsmn-vad",
+            hub="hf",
             disable_update=True,
         )
         vad_model.model.vad_opts.max_single_segment_time = 10000  # 10s hard cap

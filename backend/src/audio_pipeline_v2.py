@@ -35,6 +35,7 @@ class AudioPipelineV2:
         from funasr.models.campplus.utils import sv_chunk, postprocess
 
         vad_model = AutoModel(model="fsmn-vad", hub="hf", disable_update=True)
+        vad_model.model.vad_opts.max_single_segment_time = 10000
         asr_model = AutoModel(
             model="paraformer-zh",
             punc_model="ct-punc",
@@ -57,18 +58,27 @@ class AudioPipelineV2:
 
             # Step 2: sv_chunk — 1.5s 滑窗
             vad_segs = [
-                [s[0] / 1000, s[1] / 1000, audio[int(s[0] * sr / 1000):int(s[1] * sr / 1000)]]
+                [
+                    s[0] / 1000,
+                    s[1] / 1000,
+                    audio[int(s[0] * sr / 1000) : int(s[1] * sr / 1000)],
+                ]
                 for s in segs_ms
             ]
             chunks = sv_chunk(vad_segs, fs=sr)
 
             # Step 3: cam++ 批量推理（一次）
             emb_res = emb_model.generate(input=[c[2] for c in chunks])
-            embeddings = np.stack([
-                (r["spk_embedding"].numpy() if isinstance(r["spk_embedding"], torch.Tensor)
-                 else np.array(r["spk_embedding"])).flatten()
-                for r in emb_res
-            ])
+            embeddings = np.stack(
+                [
+                    (
+                        r["spk_embedding"].numpy()
+                        if isinstance(r["spk_embedding"], torch.Tensor)
+                        else np.array(r["spk_embedding"])
+                    ).flatten()
+                    for r in emb_res
+                ]
+            )
 
             # Step 4: 聚类，固定 2 人
             labels = cluster(embeddings, oracle_num=2)
@@ -87,7 +97,7 @@ class AudioPipelineV2:
             # Step 7: ASR per VAD segment + 按时间戳匹配 spk_id
             sentences = []
             for start_ms, end_ms in segs_ms:
-                seg = audio[int(start_ms * sr / 1000):int(end_ms * sr / 1000)]
+                seg = audio[int(start_ms * sr / 1000) : int(end_ms * sr / 1000)]
                 if len(seg) < sr // 10:
                     continue
                 asr_res = asr_model.generate(input=seg)
@@ -95,12 +105,14 @@ class AudioPipelineV2:
                     continue
                 mid_s = (start_ms + end_ms) / 2000
                 spk_id = _find_speaker(mid_s, spk_segments)
-                sentences.append({
-                    "text": asr_res[0]["text"],
-                    "start": start_ms,
-                    "end": end_ms,
-                    "spk_id": spk_id,
-                })
+                sentences.append(
+                    {
+                        "text": asr_res[0]["text"],
+                        "start": start_ms,
+                        "end": end_ms,
+                        "spk_id": spk_id,
+                    }
+                )
 
             return sentences, spk_embeddings
 
@@ -110,7 +122,9 @@ class AudioPipelineV2:
 
     async def process_segment(self, audio: np.ndarray) -> list[TranscriptResult]:
         loop = asyncio.get_event_loop()
-        sentences, spk_embeddings = await loop.run_in_executor(None, self._model_fn, audio)
+        sentences, spk_embeddings = await loop.run_in_executor(
+            None, self._model_fn, audio
+        )
         for spk_id, emb in spk_embeddings.items():
             if spk_id not in self._spk_role_map:
                 self._spk_role_map[spk_id] = self._compare_voiceprint(emb)
