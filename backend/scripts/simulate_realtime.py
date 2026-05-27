@@ -43,7 +43,11 @@ def audio_to_wav_bytes(audio: np.ndarray) -> bytes:
 
 async def run(conv_path: str, lawyer_path: str | None, session_id: str) -> None:
     import voiceprint
-    from audio_pipeline_v2 import AudioPipelineV2
+    from audio_pipeline import AudioPipeline
+    # Real-time streaming uses v1 (per-segment voiceprint comparison).
+    # V2's ClusterBackend(oracle_num=2) is a batch algorithm that needs
+    # all audio upfront; it's used via validate_pipeline_v2.py for offline
+    # processing of complete recordings.
 
     if lawyer_path:
         print(f"[声纹] 注册: {lawyer_path}")
@@ -57,7 +61,7 @@ async def run(conv_path: str, lawyer_path: str | None, session_id: str) -> None:
     print(f"[配置] chunk={CHUNK_MS}ms  共 {len(audio) // CHUNK_SAMPLES + 1} 块")
     print(f"[提示] 首次加载模型需要几秒，之后每块应该很快\n")
 
-    pipeline = AudioPipelineV2(lawyer_voiceprint=lawyer_vp)
+    pipeline = AudioPipeline(lawyer_voiceprint=lawyer_vp)
 
     # 切块并逐块推入
     chunks = [

@@ -14,7 +14,10 @@ from audio_pipeline import TranscriptResult
 
 load_dotenv()
 
-AnalyzeFn = Callable[[list[TranscriptResult]], Awaitable[list[IntentResult | AnalysisResult]]]
+AnalyzeFn = Callable[
+    [dict[str, list[dict]], list[TranscriptResult]],
+    Awaitable[tuple[str, list[IntentResult | AnalysisResult]]],
+]
 ExecuteFn = Callable[[IntentResult, list[TranscriptResult]], Awaitable[list[AnalysisResult]]]
 
 
@@ -30,6 +33,10 @@ class ObserverItem(BaseModel):
 
 
 class ObserverOutput(BaseModel):
+    facts_summary: str = Field(
+        default="",
+        description="Updated structured summary of all identified legal facts from the entire conversation",
+    )
     items: list[ObserverItem] = Field(default_factory=list)
 
 
@@ -63,25 +70,31 @@ def _build_model() -> OpenAIChat:
 ANALYSIS_SYSTEM_PROMPT = """\
 你是一位中国执业律师的实时AI助手，正在旁听律师与客户的咨询会谈。
 
-你的任务：
-1. 分析客户每一句话，判断是否涉及法律需求
-2. 如果涉及法律需求，判断是简单需求（可直接回答）还是复杂需求（需要进一步分析）
+你的任务分为两个阶段：
 
-简单需求（intent=simple）：
-- 可以直接用法条原文回答的问题，例如「某个法条怎么规定的」
-- 输出 category/title/content/citation 直接推送给律师
+**阶段1：更新事实摘要**
+从对话中提取所有法律相关的事实信息，更新 facts_summary。采用 append-only 方式：
+- 每项事实格式：`[时间戳] 事实描述`
+- 如果新信息补充/修正了已有事实，追加新条目而非覆盖
+- 保留所有历史记录，新条目放在前面
+- 事实类型包括但不限于：入职日期、合同签订情况、社保公积金状态、加班情况、年假、
+  威胁/胁迫行为、证据持有情况、客户诉求等
 
-复杂需求（intent=complex）：
-- 需要深入分析的问题，例如审查合同、评估风险、出方案
-- 输出 question/context 作为意图卡片，由律师确认后再执行
+**阶段2：判断法律需求**
+基于事实摘要和最近对话，判断：
+- simple：可直接法条回答的简单问题 → 输出分析卡片
+- complex：需要深度分析的问题 → 输出意图卡片（需律师确认）
+- none：无法律需求
 
-无需求（intent=none）：
-- 闲聊、简单应答、不涉及法律的内容
-
-请以 JSON 格式输出。输出格式：{"items": [{...}, {...}]} 包裹的 JSON 数组，每项如下：
-- simple: {"intent":"simple","category":"statute","title":"...","content":"...","citation":"...","level":""}
-- complex: {"intent":"complex","question":"需要查...吗？","context":"...","category":"","title":"","content":"","citation":"","level":""}
-- none: {"intent":"none","question":"","context":"","category":"","title":"","content":"","citation":"","level":""}\
+请以 JSON 格式输出。输出格式：
+{
+  "facts_summary": "## 关键事实\\n[2024-03-15] 入职日期\\n[未签] 劳动合同未签订\\n...",
+  "items": [
+    {"intent":"simple","category":"statute","title":"...","content":"...","citation":"...","level":""},
+    {"intent":"complex","question":"需要查...吗？","context":"...","category":"","title":"","content":"","citation":"","level":""},
+    {"intent":"none","question":"","context":"","category":"","title":"","content":"","citation":"","level":""}
+  ]
+}\
 """
 
 EXECUTOR_SYSTEM_PROMPT = """\
@@ -101,35 +114,37 @@ level 仅 risk 类需要：高/中/低\
 
 def build_analyze_fn(
     model: OpenAIChat | None = None,
-    window_size: int = 10,
+    window_size: int = 15,
 ) -> AnalyzeFn:
-    """Build a real analyze_fn backed by an Agno analysis agent.
-
-    Uses a lightweight prompt and no tools — speed and cancelability over depth.
-    """
     agent = Agent(
         name="Legal Analysis Agent",
         model=model or _build_model(),
-        description="实时法律需求分析助手",
+        description="实时法律需求分析助手（事实提取 + 需求判断）",
         instructions=ANALYSIS_SYSTEM_PROMPT,
         system_message_role="system",
         output_schema=ObserverOutput,
         use_json_mode=True,
     )
 
-    async def analyze(context: list[TranscriptResult]) -> list[IntentResult | AnalysisResult]:
+    async def analyze(
+        profile: dict[str, list[dict]],
+        context: list[TranscriptResult],
+    ) -> tuple[str, list[IntentResult | AnalysisResult]]:
         recent = context[-window_size:]
         dialogue = "\n".join(f"{r.speaker}: {r.text}" for r in recent)
 
-        # Batch results from a single run
-        results: list[IntentResult | AnalysisResult] = []
-        response = await agent.arun(f"对话内容：\n{dialogue}")
+        # Format user profile for the prompt
+        profile_text = _format_profile(profile)
 
-        # Agno returns structured output via response.content or direct attribute
-        for item in _parse_observer_response(response):
-            results.append(item)
+        prompt = f"""## 已有事实记录
+{profile_text if profile_text else "（无，这是首次分析）"}
 
-        return results
+## 最近对话
+{dialogue}\
+"""
+        response = await agent.arun(prompt)
+        facts_summary, results = _parse_observer_response(response)
+        return facts_summary, results
 
     return analyze
 
@@ -137,27 +152,25 @@ def build_analyze_fn(
 def build_execute_fn(
     model: OpenAIChat | None = None,
 ) -> ExecuteFn:
-    """Build a real execute_fn backed by an Agno orchestration agent.
-
-    Uses full context + tools for deep analysis. Quality over speed.
-    """
     agent = Agent(
         name="Legal Orchestration Agent",
         model=model or _build_model(),
         description="法律深度分析执行引擎",
         instructions=EXECUTOR_SYSTEM_PROMPT,
+        system_message_role="system",
         output_schema=ExecutorOutput,
         use_json_mode=True,
     )
 
     async def execute(intent: IntentResult, context: list[TranscriptResult]) -> list[AnalysisResult]:
         dialogue = "\n".join(f"{r.speaker}: {r.text}" for r in context)
-        prompt = f"""\
-案情摘要：
-问题：{intent.question}
-触发原文：{intent.context}
+        prompt = f"""## 触发问题
+{intent.question}
 
-完整对话：
+## 触发原文
+{intent.context}
+
+## 完整对话
 {dialogue}
 
 请根据以上信息，提供法规引用、合同建议和风险评估。\
@@ -173,8 +186,22 @@ def build_execute_fn(
     return execute
 
 
-def _parse_observer_response(response) -> list[IntentResult | AnalysisResult]:
-    """Parse Agno structured output into domain types."""
+def _format_profile(profile: dict[str, list[dict]]) -> str:
+    """Format user profile as readable text for the prompt."""
+    if not profile:
+        return ""
+    lines = []
+    for key, records in profile.items():
+        for entry in records:
+            ts = entry.get("ts", "?")
+            val = entry.get("value", "?")
+            lines.append(f"[{ts}] {key}: {val}")
+    lines.sort()  # chronological
+    return "\n".join(lines)
+
+
+def _parse_observer_response(response) -> tuple[str, list[IntentResult | AnalysisResult]]:
+    facts_summary = ""
     results: list[IntentResult | AnalysisResult] = []
 
     try:
@@ -182,19 +209,22 @@ def _parse_observer_response(response) -> list[IntentResult | AnalysisResult]:
         content = response.content if hasattr(response, 'content') else response
 
         if isinstance(content, ObserverOutput):
+            facts_summary = content.facts_summary or ""
             items = content.items
         elif isinstance(content, dict):
+            facts_summary = content.get("facts_summary", "")
             items = content.get("items", [content])
         elif isinstance(content, list):
             items = content
         elif isinstance(content, str):
             import json
             parsed = json.loads(content)
+            facts_summary = parsed.get("facts_summary", "") if isinstance(parsed, dict) else ""
             items = parsed.get("items", [parsed]) if isinstance(parsed, dict) else parsed
         else:
-            return results
+            return facts_summary, results
     except Exception:
-        return results
+        return facts_summary, results
 
     for item in items:
         item_dict = item.model_dump() if isinstance(item, ObserverItem) else item
@@ -215,13 +245,11 @@ def _parse_observer_response(response) -> list[IntentResult | AnalysisResult]:
                 citation=item_dict.get("citation") or None,
                 level=item_dict.get("level") or None,
             ))
-        # intent == "none" → skip
 
-    return results
+    return facts_summary, results
 
 
 def _parse_executor_response(response) -> list[AnalysisResult]:
-    """Parse Agno executor output into AnalysisResult list."""
     results: list[AnalysisResult] = []
 
     try:

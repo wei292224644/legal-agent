@@ -103,8 +103,8 @@ def test_websocket_ping_pong(client):
 # ── Agent integration ─────────────────────────────────────────────────────────
 
 def fake_agent_factory(analyze_results=None, execute_results=None):
-    async def fake_analyze(_ctx):
-        return analyze_results or []
+    async def fake_analyze(_profile, _ctx):
+        return ("", analyze_results or [])
 
     async def fake_execute(_intent, _ctx):
         return execute_results or []
