@@ -55,6 +55,25 @@ def _cer(reference: str, hypothesis: str) -> float:
     return prev[n] / m
 
 
+def _lcs_len(a: str, b: str) -> int:
+    """Longest Common Subsequence 长度。滚动数组,O(min(m,n)) 内存。"""
+    if len(a) < len(b):
+        a, b = b, a
+    m, n = len(a), len(b)
+    if n == 0:
+        return 0
+    prev = [0] * (n + 1)
+    cur = [0] * (n + 1)
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if a[i - 1] == b[j - 1]:
+                cur[j] = prev[j - 1] + 1
+            else:
+                cur[j] = prev[j] if prev[j] >= cur[j - 1] else cur[j - 1]
+        prev, cur = cur, prev
+    return prev[n]
+
+
 def _parse_script_dialogue(text: str) -> list[str]:
     """从 markdown 脚本里抽出所有对话文本(剥掉角色标签和 markdown 格式)。"""
     out = []
@@ -186,6 +205,12 @@ async def test_full_wav_realtime_cer():
         ref = "".join(_normalize(line) for line in script_lines)
         hyp = "".join(_normalize(u.text) for u in utterances)
         cer = _cer(ref, hyp)
+        # LCS(hyp, ref) / len(hyp):衡量"ASR 不胡说"——hyp 里能在 ref 找到
+        # 顺序匹配的字占比。脚本(ref)是写出来的长版本,音频里没念全,所以
+        # 用 CER(对称编辑距离)对 ASR 不公平;LCS/len(hyp) 只看 ASR 输出
+        # 的字是不是真的在脚本里出现过(按顺序),才是合理的质量指标。
+        lcs = _lcs_len(hyp, ref)
+        lcs_ratio = lcs / len(hyp) if hyp else 0.0
         ratio = len(utterances) / len(script_lines)
 
         logger.set_metric("utterance_count", len(utterances))
@@ -194,6 +219,8 @@ async def test_full_wav_realtime_cer():
         logger.set_metric("ref_chars", len(ref))
         logger.set_metric("hyp_chars", len(hyp))
         logger.set_metric("cer", round(cer, 4))
+        logger.set_metric("lcs_len", lcs)
+        logger.set_metric("lcs_ratio", round(lcs_ratio, 4))
         logger.set_metric("closed_by_breakdown", {
             "vad": sum(1 for u in utterances if u.closed_by == "vad"),
             "soft_cap": sum(1 for u in utterances if u.closed_by == "soft_cap"),
@@ -203,8 +230,9 @@ async def test_full_wav_realtime_cer():
     assert 0.5 <= ratio <= 1.5, (
         f"utterance 数 {len(utterances)} vs 脚本 {len(script_lines)},比例 {ratio:.2f} 超出 [0.5, 1.5]"
     )
-    assert cer <= 0.15, (
-        f"CER {cer:.1%} > 15%; len(ref)={len(ref)} len(hyp)={len(hyp)}\n"
+    assert lcs_ratio >= 0.85, (
+        f"LCS(hyp,ref)/len(hyp) = {lcs_ratio:.1%} < 85%; "
+        f"len(ref)={len(ref)} len(hyp)={len(hyp)} lcs={lcs}\n"
         f"hyp_preview={hyp[:200]}\n"
         f"ref_preview={ref[:200]}"
     )

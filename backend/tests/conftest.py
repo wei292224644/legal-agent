@@ -7,6 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import soundfile as sf
+from unittest.mock import AsyncMock, MagicMock
 
 from tests.streaming_fixtures import (
     FIXTURE_DIR,
@@ -24,11 +25,18 @@ SR = 16000
 def _preload_models():
     """启动时预加载 FunASR 模型,避免延迟测试把 lazy load 算进去。
 
-    模拟生产环境"服务启动即模型就绪"的语义。
+    模拟生产环境"服务启动即模型就绪"的语义。同时做一次小推理 warm-up,
+    避免首段 ASR 把图编译耗时算进延迟。
     """
+    from diarization.voiceprint import extract_embedding  # noqa: PLC0415
     from stt.funasr_stream import _get_models  # noqa: PLC0415
 
-    _get_models()
+    vad_model, asr_model = _get_models()
+    warm_audio = np.zeros(SR, dtype=np.float32)  # 1s 静默,只触发图构建
+    vad_model.generate(input=warm_audio)
+    asr_model.generate(input=warm_audio)
+    # cam++ 也预热(Cycle 6 用)
+    extract_embedding(warm_audio, SR)
 
 
 def _load_main() -> np.ndarray:
@@ -74,3 +82,22 @@ def _ensure_fixtures():
         seg_b = audio[14 * SR : 17 * SR]
         synth = np.concatenate([seg_a, silence, seg_b])
         sf.write(str(LONG_MONOLOGUE_WAV), synth, SR, subtype="PCM_16")
+
+
+@pytest.fixture
+def mock_llm_client():
+    """Factory fixture: returns a function that creates mock AsyncOpenAI clients."""
+    def _make(response_content: str):
+        mock_message = MagicMock()
+        mock_message.content = response_content
+
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        return mock_client
+    return _make

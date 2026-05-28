@@ -46,15 +46,12 @@ async def stream_wav_realtime(
         yield audio[i : i + chunk_samples], time.monotonic() - t0
 
 
-TEST_DATA_ROOT = Path(
-    "/Users/wwj/Library/Mobile Documents/iCloud~md~obsidian/Documents/"
-    "我的知识库/01-项目/语音助手/测试数据"
-)
-MAIN_WAV = TEST_DATA_ROOT / "audio" / "劳动仲裁对话_完整版.wav"
-VOICEPRINT_WAV = TEST_DATA_ROOT / "audio" / "律师声纹注册.wav"
-SCRIPT_MD = TEST_DATA_ROOT / "劳动仲裁对话脚本_角色话版.md"
-
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+MAIN_WAV = FIXTURE_DIR / "劳动仲裁对话_完整版.wav"
+VOICEPRINT_WAV = FIXTURE_DIR / "律师声纹注册.wav"
+SCRIPT_MD = FIXTURE_DIR / "劳动仲裁对话脚本_角色话版.md"
+
 SHORT_CLIENT_WAV = FIXTURE_DIR / "short_client.wav"
 SHORT_LAWYER_WAV = FIXTURE_DIR / "short_lawyer.wav"
 TWO_UTTERANCES_WAV = FIXTURE_DIR / "two_utterances.wav"
