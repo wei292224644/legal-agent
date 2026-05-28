@@ -1,14 +1,13 @@
 """集中管理所有 LLM 提示词（Prompt）。
 
-所有 Agent 的系统提示、角色提示、任务提示统一在此定义，
-便于运营调整和产品迭代，不要在各 Agent 脚本中重复定义。
+所有 Agent 的系统提示、角色提示、任务提示统一在此封装为函数，
+便于运营调整和产品迭代，不要在各 Agent 脚本中重复定义或直接使用字符串常量。
 """
 
-# ═══════════════════════════════════════════════════════
-# IntentRouter — 角色感知意图分类
-# ═══════════════════════════════════════════════════════
 
-ROLE_AWARE_PROMPT = """\
+def build_role_aware_prompt(speaker: str, text: str) -> str:
+    """角色感知意图分类提示。"""
+    template = """\
 你正在旁听律师与客户的劳动法律咨询。
 
 ## 核心原则：角色优先于内容
@@ -82,13 +81,12 @@ ROLE_AWARE_PROMPT = """\
 当前说话人: {speaker}
 当前句子: {text}
 """
+    return template.format(speaker=speaker, text=text)
 
 
-# ═══════════════════════════════════════════════════════
-# ProfileAgent — 法律事实提取
-# ═══════════════════════════════════════════════════════
-
-PROFILE_PROMPT = """\
+def build_profile_prompt(speaker: str, text: str, existing_keys: str) -> str:
+    """法律事实提取提示。"""
+    template = """\
 你是一个法律事实提取器，正在旁听律师与客户的咨询会谈。
 
 你的任务是从**当前这句话**中提取所有与法律案件相关的事实信息。
@@ -108,13 +106,12 @@ PROFILE_PROMPT = """\
 
 当前句子（{speaker}）：{text}
 """
+    return template.format(speaker=speaker, text=text, existing_keys=existing_keys)
 
 
-# ═══════════════════════════════════════════════════════
-# HeavyAgent — 法律深度分析
-# ═══════════════════════════════════════════════════════
-
-SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
+def get_system_prompt() -> str:
+    """HeavyAgent 深度分析系统提示。"""
+    return """你是一名专业的劳动仲裁法律顾问。
 
 你的任务是根据用户提供的对话上下文和用户画像，对法律问题提供深度分析。
 
@@ -126,7 +123,10 @@ SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
 3. 建议行动
 """
 
-QUICK_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
+
+def get_quick_system_prompt() -> str:
+    """HeavyAgent 快速回答系统提示。"""
+    return """你是一名专业的劳动仲裁法律顾问。
 
 你的任务是对简单法律查询提供**快速、直接**的回答。只需1-3句话给出答案即可，不需要完整分析。
 

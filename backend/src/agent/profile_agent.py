@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 
 from agent.context_store import ProfileEntry
 from agent.llm_client import build_qwen_client
-from agent.prompts import PROFILE_PROMPT
+from agent.prompts import build_profile_prompt
 from agent.utils import extract_json_from_markdown
 from config import QWEN_MODEL
 
@@ -44,7 +44,7 @@ class ProfileAgent:
         """
         keys_str = "、".join(existing_keys) if existing_keys else "（无）"
         speaker_label = speaker or "unknown"
-        prompt = _PROFILE_PROMPT.format(
+        prompt = build_profile_prompt(
             text=text,
             speaker=speaker_label,
             existing_keys=keys_str,

@@ -11,7 +11,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from agent.llm_client import build_qwen_client
-from agent.prompts import ROLE_AWARE_PROMPT
+from agent.prompts import build_role_aware_prompt
 from config import QWEN_MODEL
 
 
@@ -58,7 +58,7 @@ class IntentRouter:
             结构化意图分类结果，包含严重程度、意图类型、法律领域、实体和判断依据。
         """
         speaker_label = speaker or "uncertain"
-        prompt = ROLE_AWARE_PROMPT.format(speaker=speaker_label, text=text)
+        prompt = build_role_aware_prompt(speaker=speaker_label, text=text)
 
         result = await self._client.chat.completions.create(
             model=self._model,

@@ -15,30 +15,9 @@ from agno.tools import tool
 
 from agent.context_store import ContextStore
 from agent.llm_client import build_deepseek_client
+from agent.prompts import get_quick_system_prompt, get_system_prompt
 from config import DEEPSEEK_MODEL
 from models.utterance import Utterance
-
-_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
-
-你的任务是根据用户提供的对话上下文和用户画像，对法律问题提供深度分析。
-
-当你需要查看用户完整上下文时，请调用 `get_user_context` 工具。
-
-请提供简洁、专业的法律分析，包括：
-1. 相关法律法规
-2. 计算方式（如涉及金额）
-3. 建议行动
-"""
-
-_QUICK_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
-
-你的任务是对简单法律查询提供**快速、直接**的回答。只需1-3句话给出答案即可，不需要完整分析。
-
-例如：
-- 法条查询 → 直接给出法条编号和内容
-- 金额计算 → 直接给出公式和结果
-- 模板推荐 → 直接给出模板名称和要点
-"""
 
 
 def _build_model() -> DeepSeek:
@@ -121,7 +100,7 @@ class HeavyAgent:
             trigger_utt,
             intent_type,
             generation,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=get_system_prompt(),
             with_skills=True,
         )
 
@@ -131,6 +110,6 @@ class HeavyAgent:
             trigger_utt,
             intent_type,
             generation,
-            system_prompt=_QUICK_SYSTEM_PROMPT,
+            system_prompt=get_quick_system_prompt(),
             check_stale=True,
         )
