@@ -41,7 +41,7 @@ class ProfileAgent:
     async def extract(
         self,
         text: str,
-        speaker: str,
+        speaker: str | None,
         existing_keys: list[str],
         utt_id: str = "",
     ) -> list[ProfileEntry]:
