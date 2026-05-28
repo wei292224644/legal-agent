@@ -1,7 +1,7 @@
 import asyncio
+from datetime import datetime
 
 import pytest
-from datetime import datetime
 
 from agent.context_store import ContextStore, ProfileEntry
 from models.utterance import Utterance
@@ -125,4 +125,3 @@ async def test_get_profile_keys_returns_unique_keys():
 
     keys = store.get_profile_keys()
     assert sorted(keys) == ["工龄", "月薪"]
-

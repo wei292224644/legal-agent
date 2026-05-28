@@ -2,6 +2,7 @@
 
 每次运行落到 tests/runs/<timestamp>/ 下,便于事后回放、对比、诊断。
 """
+
 from __future__ import annotations
 
 import json
@@ -49,8 +50,7 @@ class RunLogger:
             t_end = record.get("t_end", 0.0)
             text = record.get("text", "")
             print(
-                f"[t+{t:6.2f}s] [{cb:>8}] [{sp:>9}] "
-                f"audio[{t_start:6.2f}→{t_end:6.2f}] {text}",
+                f"[t+{t:6.2f}s] [{cb:>8}] [{sp:>9}] audio[{t_start:6.2f}→{t_end:6.2f}] {text}",
                 flush=True,
             )
         else:

@@ -1,8 +1,8 @@
 """Tests for Agno skills — verify SKILL.md files are valid and loadable."""
+
 from pathlib import Path
 
 from agno.skills import LocalSkills
-
 
 SKILLS_DIR = Path(__file__).parent.parent / "src" / "agent" / "skills"
 

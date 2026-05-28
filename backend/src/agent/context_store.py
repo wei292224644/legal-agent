@@ -1,12 +1,21 @@
+"""ContextStore — 对话上下文与画像的内存存储。
+
+线程安全：generation 和 utterances 用 asyncio.Lock 保护；
+profile 更新通过 asyncio.Queue 异步消费，避免阻塞主路径。
+"""
+
+import asyncio
+import contextlib
 from dataclasses import dataclass
 from datetime import datetime
-import asyncio
 
 from models.utterance import Utterance
 
 
 @dataclass
 class ProfileEntry:
+    """画像条目：从对话中提取的法律事实。"""
+
     key: str
     value: str
     timestamp: datetime
@@ -15,6 +24,8 @@ class ProfileEntry:
 
 
 class ContextStore:
+    """上下文存储器。管理 utterance 历史、generation 计数和画像条目。"""
+
     def __init__(self):
         self._utterances: list[Utterance] = []
         self._profile: list[ProfileEntry] = []
@@ -25,46 +36,59 @@ class ContextStore:
         self._shutdown = False
 
     async def append_utterance(self, utt: Utterance) -> int:
+        """追加发言，原子递增 generation，返回新的 generation 编号。"""
         async with self._lock:
             self._utterances.append(utt)
             self._generation += 1
             return self._generation
 
     def get_full_history(self) -> list[Utterance]:
+        """获取完整对话历史（浅拷贝）。"""
         return list(self._utterances)
 
     def get_recent_window(self, n: int = 8) -> list[Utterance]:
+        """获取最近 n 轮对话。"""
         return self._utterances[-n:]
 
     async def start_profile_worker(self) -> None:
+        """启动 profile worker 异步任务。幂等：已启动则跳过。"""
         if self._worker_task is None:
             self._worker_task = asyncio.create_task(self._profile_worker())
 
     async def enqueue_profile_update(self, utt_id: str, entries: list[ProfileEntry]) -> None:
+        """将画像更新放入队列，由 worker 异步消费。"""
         await self._profile_queue.put((utt_id, entries))
 
     def get_profile(self) -> list[ProfileEntry]:
+        """获取全部画像条目（浅拷贝）。"""
         return list(self._profile)
 
     def get_profile_keys(self) -> list[str]:
+        """获取已提取的 key 列表（去重且保持顺序）。"""
         return list(dict.fromkeys(e.key for e in self._profile))
 
     async def stop_profile_worker(self) -> None:
+        """优雅关闭 profile worker：标记关闭、取消任务、等待退出。"""
         self._shutdown = True
         if self._worker_task:
             self._worker_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
             self._worker_task = None
 
     async def _profile_worker(self) -> None:
+        """后台 worker：从队列消费画像更新并写入 self._profile。"""
         while not self._shutdown:
             try:
                 utt_id, entries = await asyncio.wait_for(self._profile_queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
-            for entry in entries:
-                self._profile.append(entry)
+            except asyncio.CancelledError:
+                break
+            try:
+                for entry in entries:
+                    self._profile.append(entry)
+            except Exception:
+                # 单条解析失败不影响队列，继续消费下一条
+                pass
             self._profile_queue.task_done()

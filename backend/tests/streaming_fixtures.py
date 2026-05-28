@@ -2,6 +2,7 @@
 
 Sprint 1 只用到 stream_wav_realtime;后续模块会再加 stream_script_realtime。
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -16,6 +16,7 @@ Cycle 7 双声纹自举:
   失败可回滚:删 Enrollment.client_embedding/margin/seed_threshold + 这里的
   双声纹分支,行为退回单声纹纯阈值。
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -44,10 +45,7 @@ def match_speaker(
             return "client"
         # uncertain 区间: 时长足够且 cos 偏低 → 取为 client seed
         duration_s = len(audio) / sr
-        if (
-            duration_s >= enrollment.seed_min_duration_s
-            and s_l < enrollment.seed_threshold
-        ):
+        if duration_s >= enrollment.seed_min_duration_s and s_l < enrollment.seed_threshold:
             enrollment.client_embedding = emb
             return "client"
         return "uncertain"

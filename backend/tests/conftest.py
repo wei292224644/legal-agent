@@ -2,12 +2,14 @@
 
 避免把二进制 fixture 文件 commit 进 git。
 """
+
 from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock
 
 import numpy as np
 import pytest
 import soundfile as sf
-from unittest.mock import AsyncMock, MagicMock
 
 from tests.streaming_fixtures import (
     FIXTURE_DIR,
@@ -109,6 +111,7 @@ def mock_ir_client():
 @pytest.fixture
 def mock_llm_client():
     """Factory fixture: returns a function that creates mock AsyncOpenAI clients."""
+
     def _make(response_content: str):
         mock_message = MagicMock()
         mock_message.content = response_content
@@ -122,4 +125,5 @@ def mock_llm_client():
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
         return mock_client
+
     return _make

@@ -33,28 +33,29 @@ async def test_routes_simple_intent_to_quick(store, mock_ir_client):
     ir_stub = mock_ir_client(severity="simple", intent_type="query_law")
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
     )
 
     ha = HeavyAgent(store)
     with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = AsyncMock(content="根据劳动法第87条，应支付2N赔偿金。")
 
-        orch = Orchestrator(
-            store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-        )
+        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
 
         hw_results = []
+
         async def on_suggestion(text, meta):
             hw_results.append((text, meta))
 
         orch.set_suggestion_callback(on_suggestion)
 
         utt = Utterance(
-            id="u_1", text="违法解除赔多少？", speaker="client",
-            t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+            id="u_1",
+            text="违法解除赔多少？",
+            speaker="client",
+            t_start=0.0,
+            t_end=1.0,
+            timestamp=datetime.now(),
         )
         await orch.handle_utterance(utt)
         await asyncio.sleep(0.1)
@@ -67,33 +68,71 @@ async def test_routes_simple_intent_to_quick(store, mock_ir_client):
 
 
 @pytest.mark.asyncio
-async def test_complex_emits_pending_not_ready(store, mock_ir_client):
-    """complex → 发出 pending 建议（text=None），不触发 analyze。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
+async def test_simple_record_only_skips_quick_analysis(store, mock_ir_client):
+    """simple + record_only 应跳过 analyze_quick：record_only 字面语义就是打点不响应。"""
+    ir_stub = mock_ir_client(severity="simple", intent_type="record_only")
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
     )
 
     ha = HeavyAgent(store)
-    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
-        mock_full.return_value = AsyncMock(content="分析结果")
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = AsyncMock(content="不该被调用")
 
-        orch = Orchestrator(
-            store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-        )
+        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
 
         suggestions = []
+
         async def on_suggestion(text, meta):
             suggestions.append((text, meta))
 
         orch.set_suggestion_callback(on_suggestion)
 
         utt = Utterance(
-            id="u_1", text="能赢吗", speaker="client",
-            t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+            id="u_1",
+            text="两年三个月。",
+            speaker="client",
+            t_start=0.0,
+            t_end=1.0,
+            timestamp=datetime.now(),
+        )
+        await orch.handle_utterance(utt)
+        await asyncio.sleep(0.1)
+
+        assert len(suggestions) == 0, "record_only 不应触发任何建议"
+        mock_run.assert_not_called(), "record_only 不应触达 HeavyAgent"
+
+
+@pytest.mark.asyncio
+async def test_complex_emits_pending_not_ready(store, mock_ir_client):
+    """complex → 发出 pending 建议（text=None），不触发 analyze。"""
+    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
+    pa_client = MagicMock()
+    pa_client.chat.completions.create = AsyncMock(
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
+    )
+
+    ha = HeavyAgent(store)
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
+        mock_full.return_value = AsyncMock(content="分析结果")
+
+        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
+
+        suggestions = []
+
+        async def on_suggestion(text, meta):
+            suggestions.append((text, meta))
+
+        orch.set_suggestion_callback(on_suggestion)
+
+        utt = Utterance(
+            id="u_1",
+            text="能赢吗",
+            speaker="client",
+            t_start=0.0,
+            t_end=1.0,
+            timestamp=datetime.now(),
         )
         await orch.handle_utterance(utt)
         await asyncio.sleep(0.1)
@@ -112,28 +151,29 @@ async def test_confirm_analysis_triggers_heavy_agent(store, mock_ir_client):
     ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
     )
 
     ha = HeavyAgent(store)
     with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
         mock_full.return_value = AsyncMock(content="根据案情分析，建议收集证据后申请劳动仲裁。")
 
-        orch = Orchestrator(
-            store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-        )
+        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
 
         suggestions = []
+
         async def on_suggestion(text, meta):
             suggestions.append((text, meta))
 
         orch.set_suggestion_callback(on_suggestion)
 
         utt = Utterance(
-            id="u_1", text="能赢吗", speaker="client",
-            t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+            id="u_1",
+            text="能赢吗",
+            speaker="client",
+            t_start=0.0,
+            t_end=1.0,
+            timestamp=datetime.now(),
         )
         await orch.handle_utterance(utt)
         await asyncio.sleep(0.1)
@@ -155,24 +195,26 @@ async def test_dismiss_pending_removes_request(store, mock_ir_client):
     ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
     )
 
     ha = HeavyAgent(store)
-    orch = Orchestrator(
-        store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-    )
+    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
 
     suggestions = []
+
     async def on_suggestion(text, meta):
         suggestions.append((text, meta))
+
     orch.set_suggestion_callback(on_suggestion)
 
     utt = Utterance(
-        id="u_1", text="能赢吗", speaker="client",
-        t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+        id="u_1",
+        text="能赢吗",
+        speaker="client",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
     )
     await orch.handle_utterance(utt)
     await asyncio.sleep(0.1)
@@ -189,24 +231,26 @@ async def test_ignore_does_not_trigger_suggestion(store, mock_ir_client):
     ir_stub = mock_ir_client(severity="ignore", intent_type="none")
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
     )
 
     ha = HeavyAgent(store)
-    orch = Orchestrator(
-        store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-    )
+    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
 
     suggestions = []
+
     async def on_suggestion(text, meta):
         suggestions.append(text)
+
     orch.set_suggestion_callback(on_suggestion)
 
     utt = Utterance(
-        id="u_1", text="律师你好", speaker="client",
-        t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+        id="u_1",
+        text="律师你好",
+        speaker="client",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
     )
     await orch.handle_utterance(utt)
     await asyncio.sleep(0.1)
@@ -220,21 +264,21 @@ async def test_pa_extracts_facts_to_profile(store, mock_ir_client):
     pa_client = MagicMock()
     pa_client.chat.completions.create = AsyncMock(
         return_value=MagicMock(
-            choices=[MagicMock(
-                message=MagicMock(content='{"entries": [{"key": "月薪", "value": "两万五"}]}')
-            )]
+            choices=[MagicMock(message=MagicMock(content='{"entries": [{"key": "月薪", "value": "两万五"}]}'))]
         )
     )
 
     ha = HeavyAgent(store)
-    orch = Orchestrator(
-        store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-    )
+    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
     orch.set_suggestion_callback(lambda text, meta: None)
 
     utt = Utterance(
-        id="u_1", text="月薪两万五，税前", speaker="client",
-        t_start=0.0, t_end=1.0, timestamp=datetime.now(),
+        id="u_1",
+        text="月薪两万五，税前",
+        speaker="client",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
     )
     await orch.handle_utterance(utt)
     await asyncio.sleep(0.1)
@@ -298,15 +342,16 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
     )
 
     suggestions = []
+
     async def on_suggestion(text, meta):
         suggestions.append((text, meta))
+
     orch.set_suggestion_callback(on_suggestion)
 
     generations = []
     for utt_id, text, speaker, _ in turns:
         generation = await orch.handle_utterance(
-            Utterance(id=utt_id, text=text, speaker=speaker,
-                      t_start=0.0, t_end=1.0, timestamp=datetime.now())
+            Utterance(id=utt_id, text=text, speaker=speaker, t_start=0.0, t_end=1.0, timestamp=datetime.now())
         )
         generations.append(generation)
 
@@ -317,10 +362,11 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
     ready_suggestions = [(t, m) for t, m in suggestions if m["kind"] == "ready"]
     pending_suggestions = [(t, m) for t, m in suggestions if m["kind"] == "pending"]
 
-    simple_count = sum(1 for _, _, _, (s, _) in turns if s == "simple")
+    # simple/record_only 走"打点不响应"分支，不应进入 quick 路径
+    simple_actionable_count = sum(1 for _, _, _, (s, it) in turns if s == "simple" and it != "record_only")
     complex_count = sum(1 for _, _, _, (s, _) in turns if s == "complex")
 
-    assert len(ready_suggestions) == simple_count
+    assert len(ready_suggestions) == simple_actionable_count
     assert len(pending_suggestions) == complex_count
     assert all(t is not None for t, _ in ready_suggestions)
     assert all(t is None for t, _ in pending_suggestions)
@@ -330,7 +376,7 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
         await orch.confirm_analysis(meta["request_id"])
     await asyncio.sleep(0.1)
     total_ready = sum(1 for t, m in suggestions if m["kind"] == "ready")
-    assert total_ready == simple_count + complex_count
+    assert total_ready == simple_actionable_count + complex_count
 
     profile_keys = set(store.get_profile_keys())
     assert {"月薪", "工龄", "解除通知时间"}.issubset(profile_keys)

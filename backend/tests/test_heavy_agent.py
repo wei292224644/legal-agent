@@ -43,8 +43,12 @@ async def test_analyze_returns_analysis_text(populated_store):
         mock_run.return_value = AsyncMock(content="根据劳动法第87条，违法解除应支付2N赔偿金。")
 
         trigger = Utterance(
-            id="u_2", text="违法解除赔多少？", speaker="client",
-            t_start=2.0, t_end=3.0, timestamp=datetime.now(),
+            id="u_2",
+            text="违法解除赔多少？",
+            speaker="client",
+            t_start=2.0,
+            t_end=3.0,
+            timestamp=datetime.now(),
         )
         # generation=1（stale），但 analyze 不检查 generation
         result = await agent.analyze(trigger, intent_type="query_law", generation=1)
@@ -60,8 +64,12 @@ async def test_analyze_quick_skips_when_stale(populated_store):
     agent = HeavyAgent(populated_store)
 
     trigger = Utterance(
-        id="u_2", text="违法解除赔多少？", speaker="client",
-        t_start=2.0, t_end=3.0, timestamp=datetime.now(),
+        id="u_2",
+        text="违法解除赔多少？",
+        speaker="client",
+        t_start=2.0,
+        t_end=3.0,
+        timestamp=datetime.now(),
     )
     # generation=1，ctx 是 2 → stale，应跳过
     result = await agent.analyze_quick(trigger, intent_type="query_law", generation=1)
@@ -78,8 +86,12 @@ async def test_analyze_quick_returns_short_response(populated_store):
         mock_run.return_value = AsyncMock(content="N+1补偿：工作每满一年支付一个月工资。")
 
         trigger = Utterance(
-            id="u_2", text="N+1怎么算", speaker="client",
-            t_start=2.0, t_end=3.0, timestamp=datetime.now(),
+            id="u_2",
+            text="N+1怎么算",
+            speaker="client",
+            t_start=2.0,
+            t_end=3.0,
+            timestamp=datetime.now(),
         )
         result = await agent.analyze_quick(trigger, intent_type="compute_compensation", generation=2)
 

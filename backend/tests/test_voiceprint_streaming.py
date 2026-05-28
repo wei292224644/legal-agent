@@ -2,6 +2,7 @@
 
 每个 cycle 一个测试,RED → GREEN 渐进。
 """
+
 from __future__ import annotations
 
 import re
@@ -13,7 +14,7 @@ import soundfile as sf
 from diarization.enrollment import Enrollment, enroll_speaker
 from diarization.matcher import match_speaker
 from diarization.voiceprint import extract_embedding
-from stt.funasr_stream import SR, stream_stt
+from stt.funasr_stream import stream_stt
 from tests.streaming_fixtures import MAIN_WAV, SCRIPT_MD, VOICEPRINT_WAV, stream_wav_realtime
 from tests.test_stt_streaming import _lcs_len, _normalize
 
@@ -41,10 +42,7 @@ def test_enrollment_stable():
     assert e1.shape == e2.shape
 
     cos = _cosine(e1, e2)
-    assert cos >= 0.98, (
-        f"同音频两次 embedding 余弦相似度 {cos:.4f} < 0.98 — "
-        f"cam++ 应是确定性的,推理路径有非确定噪声"
-    )
+    assert cos >= 0.98, f"同音频两次 embedding 余弦相似度 {cos:.4f} < 0.98 — cam++ 应是确定性的,推理路径有非确定噪声"
 
 
 def test_match_speaker_self_is_lawyer():
@@ -60,9 +58,7 @@ def test_match_speaker_self_is_lawyer():
     enrollment = enroll_speaker(audio, sr)
     label = match_speaker(audio, sr, enrollment)
 
-    assert label == "lawyer", (
-        f"注册音频自匹配应是 lawyer, 实际 {label!r}"
-    )
+    assert label == "lawyer", f"注册音频自匹配应是 lawyer, 实际 {label!r}"
 
 
 def _parse_script_with_roles(text: str) -> list[tuple[str, str]]:
@@ -146,9 +142,7 @@ async def test_streaming_match_accuracy():
     """
     from tests.run_logger import RunLogger  # noqa: PLC0415
 
-    lawyer_audio, lawyer_sr = sf.read(
-        str(VOICEPRINT_WAV), dtype="float32", always_2d=False
-    )
+    lawyer_audio, lawyer_sr = sf.read(str(VOICEPRINT_WAV), dtype="float32", always_2d=False)
     if lawyer_audio.ndim == 2:
         lawyer_audio = lawyer_audio.mean(axis=1)
     enrollment = enroll_speaker(lawyer_audio, lawyer_sr)
@@ -157,11 +151,14 @@ async def test_streaming_match_accuracy():
     assert len(script_lines) > 20
 
     with RunLogger("voiceprint_accuracy") as logger:
-        logger.event("enroll.done", {
-            "tau_high": enrollment.tau_high,
-            "tau_low": enrollment.tau_low,
-            "embedding_dim": int(enrollment.embedding.shape[0]),
-        })
+        logger.event(
+            "enroll.done",
+            {
+                "tau_high": enrollment.tau_high,
+                "tau_low": enrollment.tau_low,
+                "embedding_dim": int(enrollment.embedding.shape[0]),
+            },
+        )
 
         audio_stream = stream_wav_realtime(MAIN_WAV, chunk_ms=100, speed=1.0)
         labeled: list[tuple[object, str, str | None]] = []  # (utt, predicted, truth)
@@ -172,14 +169,17 @@ async def test_streaming_match_accuracy():
             )
             truth = _attribute_speaker(utt.text, script_lines)
             labeled.append((utt, predicted, truth))
-            logger.event("speaker.match", {
-                "utt_id": utt.id,
-                "t_start": utt.t_start,
-                "t_end": utt.t_end,
-                "text_preview": utt.text[:40],
-                "predicted": predicted,
-                "truth": truth,
-            })
+            logger.event(
+                "speaker.match",
+                {
+                    "utt_id": utt.id,
+                    "t_start": utt.t_start,
+                    "t_end": utt.t_end,
+                    "text_preview": utt.text[:40],
+                    "predicted": predicted,
+                    "truth": truth,
+                },
+            )
 
         scored = [(p, t) for _, p, t in labeled if t is not None and p != "uncertain"]
         if scored:
@@ -188,12 +188,8 @@ async def test_streaming_match_accuracy():
         else:
             accuracy = 0.0
 
-        uncertain_pct = sum(1 for _, p, _ in labeled if p == "uncertain") / max(
-            len(labeled), 1
-        )
-        cross_count = sum(
-            1 for u, _, _ in labeled if _is_cross_speaker(u.text, script_lines)
-        )
+        uncertain_pct = sum(1 for _, p, _ in labeled if p == "uncertain") / max(len(labeled), 1)
+        cross_count = sum(1 for u, _, _ in labeled if _is_cross_speaker(u.text, script_lines))
         cross_pct = cross_count / max(len(labeled), 1)
 
         logger.set_metric("utterance_count", len(labeled))
@@ -230,7 +226,7 @@ def test_match_speaker_three_states(monkeypatch):
 
     def fake_embed_factory(target_dot: float):
         # 返回跟 e_lawyer 内积 = target_dot 的单位向量
-        v = np.array([target_dot, float(np.sqrt(1 - target_dot ** 2)), 0.0], dtype=np.float32)
+        v = np.array([target_dot, float(np.sqrt(1 - target_dot**2)), 0.0], dtype=np.float32)
         return lambda audio, sr: v
 
     dummy_audio = np.zeros(16000, dtype=np.float32)

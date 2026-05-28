@@ -1,37 +1,23 @@
-"""Profile Agent — qwen3.5-flash legal fact extraction."""
+"""ProfileAgent — 基于 qwen3.5-flash 的法律事实提取器。
+
+从单句发言中提取与案件相关的事实信息（key-value），自动过滤疑问句和重复项。
+"""
+
 import json
 from datetime import datetime
 
 from openai import AsyncOpenAI
 
 from agent.context_store import ProfileEntry
-from agent.llm_client import build_qwen_client, QWEN_MODEL
+from agent.llm_client import build_qwen_client
+from agent.prompts import PROFILE_PROMPT
 from agent.utils import extract_json_from_markdown
-
-
-PROFILE_PROMPT = """\
-你是一个法律事实提取器，正在旁听律师与客户的咨询会谈。
-
-你的任务是从**当前这句话**中提取所有与法律案件相关的事实信息。
-已有的事实（不要重复提取）：
-{existing_keys}
-
-提取规则：
-1. 只提取**客户陈述的事实**，不提取律师的提问或引导语
-2. 如果当前句子是疑问句（包含"吗"、"？"、"多少"、"多久"等），直接输出空数组
-3. 如果与已有事实重复，不要输出
-4. key 用简洁的中文（如"月薪"、"工龄"、"入职日期"）
-5. value 必须是原文中的**具体值**，不能是疑问词或模糊词
-6. 如果没有新事实，输出空数组
-
-只输出 JSON，不要任何解释：
-{{"entries": [{{"key": "...", "value": "..."}}]}}
-
-当前句子（{speaker}）：{text}
-"""
+from config import QWEN_MODEL
 
 
 class ProfileAgent:
+    """法律事实提取 Agent。"""
+
     def __init__(self, client: AsyncOpenAI | None = None, model: str | None = None):
         self._client = client or build_qwen_client()
         if self._client is None:
@@ -45,10 +31,22 @@ class ProfileAgent:
         existing_keys: list[str],
         utt_id: str = "",
     ) -> list[ProfileEntry]:
+        """从单句发言中提取事实条目。
+
+        Args:
+            text: 发言原文。
+            speaker: 说话人角色（lawyer/client/uncertain），None 时按 unknown 处理。
+            existing_keys: 已提取的 key 列表，用于去重提示。
+            utt_id: 关联的 utterance ID，用于溯源。
+
+        Returns:
+            新提取的 ProfileEntry 列表（已过滤疑问词和无效值）。
+        """
         keys_str = "、".join(existing_keys) if existing_keys else "（无）"
-        prompt = PROFILE_PROMPT.format(
+        speaker_label = speaker or "unknown"
+        prompt = _PROFILE_PROMPT.format(
             text=text,
-            speaker=speaker,
+            speaker=speaker_label,
             existing_keys=keys_str,
         )
 
@@ -66,6 +64,7 @@ class ProfileAgent:
     _QUESTION_WORDS = frozenset(("多久", "多少", "什么", "哪里", "谁", "怎么", "怎样", "如何", "吗", "么"))
 
     def _is_valid_value(self, value: str) -> bool:
+        """校验 value 是否为有效事实值（非空、非纯疑问词、含数字优先）。"""
         if not value or len(value.strip()) < 2:
             return False
         stripped = value.strip()
@@ -74,11 +73,10 @@ class ProfileAgent:
             return False
         # Reject values that are mostly question words without numbers
         has_digit = any(c.isdigit() or c in "两二三四五六七八九十百千万亿零" for c in stripped)
-        if not has_digit and any(w in stripped for w in ("多少", "多久", "什么")):
-            return False
-        return True
+        return has_digit or not any(w in stripped for w in ("多少", "多久", "什么"))
 
     def _parse_response(self, content: str, utt_id: str = "") -> list[ProfileEntry]:
+        """解析 LLM 返回的 JSON，提取 ProfileEntry 列表。"""
         content = extract_json_from_markdown(content)
 
         try:
@@ -87,17 +85,19 @@ class ProfileAgent:
             now = datetime.now()
             entries = []
             for e in entries_data:
-                if "key" in e and "value" in e:
+                if isinstance(e, dict) and "key" in e and "value" in e:
                     val = str(e["value"])
                     if not self._is_valid_value(val):
                         continue
-                    entries.append(ProfileEntry(
-                        key=e["key"],
-                        value=val,
-                        timestamp=now,
-                        source_utt_id=utt_id or "llm",
-                        confidence=0.9,
-                    ))
+                    entries.append(
+                        ProfileEntry(
+                            key=e["key"],
+                            value=val,
+                            timestamp=now,
+                            source_utt_id=utt_id or "llm",
+                            confidence=0.9,
+                        )
+                    )
             return entries
         except (json.JSONDecodeError, KeyError):
             return []

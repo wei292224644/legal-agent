@@ -1,4 +1,8 @@
-"""Intent Router — role-aware intent classification with instructor structured output."""
+"""IntentRouter — 角色感知的意图分类器。
+
+使用 instructor + Pydantic 结构化输出，根据说话人角色（lawyer/client）
+和语义内容判断意图严重程度与类型。
+"""
 
 from typing import Literal
 
@@ -6,7 +10,9 @@ import instructor
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from agent.llm_client import build_qwen_client, QWEN_MODEL
+from agent.llm_client import build_qwen_client
+from agent.prompts import ROLE_AWARE_PROMPT
+from config import QWEN_MODEL
 
 
 class IntentResult(BaseModel):
@@ -21,62 +27,36 @@ class IntentResult(BaseModel):
         "draft_clause",
         "summarize",
         "record_only",
+        "strategy_advice",
+        "risk_evaluation",
         "none",
     ] = Field(description="意图类型")
-    law_domain: str | None = Field(
-        default=None, description="法律领域，如'劳动法'、'合同法'"
-    )
-    entities: list[str] = Field(
-        default_factory=list, description="关键法律实体，如['竞业限制', 'N+1补偿']"
-    )
+    law_domain: str | None = Field(default=None, description="法律领域，如'劳动法'、'合同法'")
+    entities: list[str] = Field(default_factory=list, description="关键法律实体，如['竞业限制', 'N+1补偿']")
     rationale: str = Field(description="一句话判断依据，≤50字")
 
 
-ROLE_AWARE_PROMPT = """\
-你正在旁听律师与客户的劳动法律咨询。根据**说话人角色**判断当前这句话的意图。
-
-## 角色判断规则
-
-### 当说话人是 client（客户）：
-- ignore: 寒暄、确认、应答（"好的"、"嗯"、"谢谢"）、无法律信息
-- simple: 明确的法条查询或金额计算需求。例如："N+1怎么算"、"加班费按什么标准"、"竞业限制最长多久"
-- complex: 需要策略判断、风险评估、多步骤综合分析。例如："能赢吗"、"该怎么谈判"、"风险有多大"
-
-### 当说话人是 lawyer（律师）：
-- ignore: 常规事实询问（"签合同了吗"、"月薪多少"、"工作多久了"）、流程性引导、确认性应答
-- simple: 律师询问某个具体法条或计算，系统可以直接补充。例如：律师问"第47条是什么来着"
-- complex: 律师的分析存在明显遗漏或需要补充。例如：律师引用法条但漏了关键补偿标准，或律师给出的建议缺少风险提示
-
-### 当说话人是 uncertain（不确定）：
-- 按 client 规则判断
-
-## 意图类型说明
-- query_law: 需要引用法条/判例
-- compute_compensation: 需要按法律公式计算（赔偿、加班费、年假折算等）
-- draft_clause: 需要起草或推荐合同条款
-- summarize: 需要归纳当前对话中的事实或诉求
-- record_only: 关键信息打点，不主动推送建议
-- none: 无具体法律需求
-
-当前说话人: {speaker}
-当前句子: {text}
-"""
-
-
 class IntentRouter:
+    """意图路由器：根据说话人角色和文本内容返回结构化分类结果。"""
+
     def __init__(self, client: AsyncOpenAI | None = None, model: str | None = None):
+        """初始化。未提供 client 时自动从环境变量构造千问客户端。"""
         raw_client = client or build_qwen_client()
         if raw_client is None:
-            raise RuntimeError(
-                "IntentRouter requires a valid LLM client. "
-                "Set DASHSCOPE_API_KEY or pass a client."
-            )
+            raise RuntimeError("IntentRouter requires a valid LLM client. Set DASHSCOPE_API_KEY or pass a client.")
         self._client = instructor.from_openai(raw_client, mode=instructor.Mode.MD_JSON)
         self._model = model or QWEN_MODEL
 
-    async def classify(
-        self, text: str, speaker: str | None = None
-    ) -> IntentResult:
+    async def classify(self, text: str, speaker: str | None = None) -> IntentResult:
+        """对单句发言进行意图分类。
+
+        Args:
+            text: 发言原文。
+            speaker: 说话人角色（lawyer/client/uncertain/None），None 时按 uncertain 处理。
+
+        Returns:
+            结构化意图分类结果，包含严重程度、意图类型、法律领域、实体和判断依据。
+        """
         speaker_label = speaker or "uncertain"
         prompt = ROLE_AWARE_PROMPT.format(speaker=speaker_label, text=text)
 

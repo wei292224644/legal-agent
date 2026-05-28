@@ -2,14 +2,15 @@
 
 模块单例 AutoModel,L2 归一化的 1D float32 输出,供下游做余弦相似度比对。
 """
+
 from __future__ import annotations
 
 import numpy as np
 import torch
-import torchaudio.functional as taF
+import torchaudio.functional as torchaudio_f
 from funasr import AutoModel
 
-CAMPP_SR = 16000
+from config import SR as CAMPP_SR
 
 _model: AutoModel | None = None
 
@@ -35,7 +36,7 @@ def extract_embedding(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
     """
     if sr != CAMPP_SR:
         x = torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32))
-        audio = taF.resample(x, sr, CAMPP_SR).numpy()
+        audio = torchaudio_f.resample(x, sr, CAMPP_SR).numpy()
 
     result = _get_model().generate(input=audio)
     raw = result[0]["spk_embedding"]

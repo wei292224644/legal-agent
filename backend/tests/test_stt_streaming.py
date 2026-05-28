@@ -2,6 +2,7 @@
 
 每个测试都按真实时间节奏喂音频,断言流式产出 utterance。
 """
+
 from __future__ import annotations
 
 import re
@@ -10,7 +11,7 @@ import time
 import pytest
 import soundfile as sf
 
-from stt.funasr_stream import VAD_SILENCE_MS, stream_stt
+from stt.funasr_stream import stream_stt
 from tests.streaming_fixtures import (
     LONG_MONOLOGUE_WAV,
     MAIN_WAV,
@@ -29,9 +30,7 @@ def _normalize(s: str) -> str:
     """
     out = []
     for c in s:
-        if c.isalnum():
-            out.append(c)
-        elif "一" <= c <= "鿿":
+        if c.isalnum() or "一" <= c <= "鿿":
             out.append(c)
     return "".join(out)
 
@@ -109,9 +108,7 @@ async def test_vad_segmentation():
     audio = stream_wav_realtime(TWO_UTTERANCES_WAV, chunk_ms=100, speed=10.0)
     utterances = [u async for u in stream_stt(audio)]
 
-    assert len(utterances) >= 2, (
-        f"中间 3s 静默应触发 VAD 切分,实际 {len(utterances)} 段"
-    )
+    assert len(utterances) >= 2, f"中间 3s 静默应触发 VAD 切分,实际 {len(utterances)} 段"
     for u in utterances:
         assert u.closed_by == "vad", f"应由 VAD 关闭: {u}"
 
@@ -188,11 +185,14 @@ async def test_full_wav_realtime_cer():
     assert len(script_lines) > 20, f"应解析出 ≥ 20 行脚本对话,实际 {len(script_lines)}"
 
     with RunLogger("full_wav_cer") as logger:
-        logger.event("stream.start", {
-            "wav": str(MAIN_WAV.name),
-            "speed": SPEED,
-            "script_lines": len(script_lines),
-        })
+        logger.event(
+            "stream.start",
+            {
+                "wav": str(MAIN_WAV.name),
+                "speed": SPEED,
+                "script_lines": len(script_lines),
+            },
+        )
 
         audio = stream_wav_realtime(MAIN_WAV, chunk_ms=100, speed=SPEED)
         utterances = []
@@ -221,10 +221,13 @@ async def test_full_wav_realtime_cer():
         logger.set_metric("cer", round(cer, 4))
         logger.set_metric("lcs_len", lcs)
         logger.set_metric("lcs_ratio", round(lcs_ratio, 4))
-        logger.set_metric("closed_by_breakdown", {
-            "vad": sum(1 for u in utterances if u.closed_by == "vad"),
-            "soft_cap": sum(1 for u in utterances if u.closed_by == "soft_cap"),
-        })
+        logger.set_metric(
+            "closed_by_breakdown",
+            {
+                "vad": sum(1 for u in utterances if u.closed_by == "vad"),
+                "soft_cap": sum(1 for u in utterances if u.closed_by == "soft_cap"),
+            },
+        )
 
     assert utterances, "应产出 utterance"
     assert 0.5 <= ratio <= 1.5, (
@@ -248,14 +251,8 @@ async def test_soft_cap_8s():
     audio = stream_wav_realtime(LONG_MONOLOGUE_WAV, chunk_ms=100, speed=10.0)
     utterances = [u async for u in stream_stt(audio)]
 
-    assert len(utterances) >= 2, (
-        f"soft cap 应在 8s 后切出至少 2 段,实际 {len(utterances)} 段"
-    )
+    assert len(utterances) >= 2, f"soft cap 应在 8s 后切出至少 2 段,实际 {len(utterances)} 段"
     soft_capped = [u for u in utterances if u.closed_by == "soft_cap"]
-    assert len(soft_capped) >= 1, (
-        f"至少 1 段应由 soft cap 关闭,实际 closed_by: {[u.closed_by for u in utterances]}"
-    )
+    assert len(soft_capped) >= 1, f"至少 1 段应由 soft cap 关闭,实际 closed_by: {[u.closed_by for u in utterances]}"
     for u in soft_capped:
-        assert u.t_end - u.t_start <= 9.5, (
-            f"soft cap utterance 不应远超 8s 上限: {u.t_end - u.t_start:.2f}s"
-        )
+        assert u.t_end - u.t_start <= 9.5, f"soft cap utterance 不应远超 8s 上限: {u.t_end - u.t_start:.2f}s"

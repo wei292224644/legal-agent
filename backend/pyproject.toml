@@ -24,8 +24,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "mypy>=2.1.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.15",
 ]
 
 [tool.pytest.ini_options]
@@ -34,3 +36,50 @@ testpaths = ["tests"]
 markers = [
     "slow: 真实对话场景全流程测试(>1 分钟),按需运行: pytest -m slow",
 ]
+
+# ═══════════════════════════════════════════════════════
+# Ruff: lint + format (替代 flake8 / black / isort)
+# ═══════════════════════════════════════════════════════
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "N",    # pep8-naming
+]
+ignore = ["E501"]  # 行宽由 formatter 处理
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件需要 sys.path.insert 后才能 import 本地模块
+"tests/**" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ═══════════════════════════════════════════════════════
+# mypy: 严格类型检查
+# ═══════════════════════════════════════════════════════
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

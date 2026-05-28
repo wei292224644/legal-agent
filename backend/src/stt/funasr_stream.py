@@ -8,6 +8,7 @@
 
 VAD / ASR 用 asyncio.to_thread 跑,不阻塞事件循环。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,13 +18,18 @@ from collections.abc import AsyncIterator
 import numpy as np
 from funasr import AutoModel
 
-from models.utterance import ClosedBy, Utterance
+from config import (
+    ENERGY_THRESHOLD_RATIO,
+    FRAME_MS,
+    MICROPAUSE_MS,
+    SOFT_CAP_MS,
+    SR,
+    VAD_RECHECK_INTERVAL_MS,
+    VAD_SILENCE_MS,
+)
 from diarization.enrollment import Enrollment
 from diarization.matcher import match_speaker
-
-SR = 16000
-VAD_SILENCE_MS = 400
-SOFT_CAP_MS = 8000
+from models.utterance import ClosedBy, Utterance
 
 _vad_model: AutoModel | None = None
 _asr_model: AutoModel | None = None
@@ -53,11 +59,6 @@ def _vad_segments_ms(vad_result) -> list[tuple[int, int]]:
         if len(seg) >= 2 and seg[0] >= 0 and seg[1] > seg[0]:
             out.append((int(seg[0]), int(seg[1])))
     return out
-
-
-FRAME_MS = 30
-MICROPAUSE_MS = 150
-ENERGY_THRESHOLD_RATIO = 0.10
 
 
 def _frame_energy(audio: np.ndarray, frame_ms: int = FRAME_MS) -> np.ndarray:
@@ -154,9 +155,6 @@ def merge_with_close_reason(
     return result
 
 
-VAD_RECHECK_INTERVAL_MS = 100
-
-
 async def _asr_one(asr_model: AutoModel, seg_audio: np.ndarray) -> str:
     if len(seg_audio) < SR // 10:  # < 100ms,FunASR 不稳
         return ""
@@ -232,9 +230,7 @@ async def stream_stt(
     # 投机 ASR 缓存:(s_ms, e_ms) → Task[str]
     spec_asr: dict[tuple[int, int], asyncio.Task] = {}
 
-    def _spec_key_match(
-        s_ms: int, e_ms: int, tol_ms: int = 100
-    ) -> tuple[int, int] | None:
+    def _spec_key_match(s_ms: int, e_ms: int, tol_ms: int = 100) -> tuple[int, int] | None:
         """已有 cache 中匹配 (s±tol, e±tol) 的键。"""
         for k_s, k_e in spec_asr:
             if abs(k_s - s_ms) <= tol_ms and abs(k_e - e_ms) <= tol_ms:
@@ -272,21 +268,13 @@ async def stream_stt(
 
             matched_key = _spec_key_match(s_ms, e_ms)
             if matched_key is None:
-                seg_audio = snapshot[
-                    int(s_ms * SR / 1000) : int(e_ms * SR / 1000)
-                ].copy()
-                spec_asr[(s_ms, e_ms)] = asyncio.create_task(
-                    _asr_one(asr_model, seg_audio)
-                )
+                seg_audio = snapshot[int(s_ms * SR / 1000) : int(e_ms * SR / 1000)].copy()
+                spec_asr[(s_ms, e_ms)] = asyncio.create_task(_asr_one(asr_model, seg_audio))
                 matched_key = (s_ms, e_ms)
 
             # soft_cap 立即 yield(不等 silence)——切分点已经由能量微停顿确定,
             # 等静默无意义。vad 关闭需等 silence 满 VAD_SILENCE_MS。
-            stable = (
-                final
-                or closed_by == "soft_cap"
-                or (silence_after_ms >= VAD_SILENCE_MS)
-            )
+            stable = final or closed_by == "soft_cap" or (silence_after_ms >= VAD_SILENCE_MS)
             if not stable:
                 continue
 
@@ -305,9 +293,7 @@ async def stream_stt(
                 speaker_audio = snapshot[
                     int(s_ms * SR / 1000) : int(e_ms * SR / 1000)
                 ].copy()  # 跟 spec_asr 的 seg_audio 一致,防御后续并发改写
-                speaker = await asyncio.to_thread(
-                    match_speaker, speaker_audio, SR, enrollment
-                )
+                speaker = await asyncio.to_thread(match_speaker, speaker_audio, SR, enrollment)
             yield Utterance(
                 id=_utt_id(t_start, text),
                 text=text,
