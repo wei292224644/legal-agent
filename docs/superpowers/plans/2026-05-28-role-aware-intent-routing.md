@@ -530,7 +530,7 @@ async def test_routes_simple_intent_to_quick(store, mock_ir_client):
     )
 
     ha = HeavyAgent(store)
-    with patch.object(ha._quick_agent, "arun", new_callable=AsyncMock) as mock_run:
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = AsyncMock(content="根据劳动法第87条，应支付2N赔偿金。")
 
         orch = Orchestrator(
@@ -569,7 +569,7 @@ async def test_complex_emits_pending_not_ready(store, mock_ir_client):
     )
 
     ha = HeavyAgent(store)
-    with patch.object(ha._full_agent, "arun", new_callable=AsyncMock) as mock_full:
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
         mock_full.return_value = AsyncMock(content="分析结果")
 
         orch = Orchestrator(
@@ -610,7 +610,7 @@ async def test_confirm_analysis_triggers_heavy_agent(store, mock_ir_client):
     )
 
     ha = HeavyAgent(store)
-    with patch.object(ha._full_agent, "arun", new_callable=AsyncMock) as mock_full:
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
         mock_full.return_value = AsyncMock(content="根据案情分析，建议收集证据后申请劳动仲裁。")
 
         orch = Orchestrator(
@@ -910,18 +910,42 @@ git commit -m "feat: add severity-based routing with complex confirmation flow"
 
 ---
 
-### Task 4: HeavyAgent 双模式 — analyze_quick
+### Task 4: HeavyAgent 双模式 — 每次调用独立 Agent 实例
 
 **Files:**
 - Modify: `backend/src/agent/heavy_agent.py`
 - Modify: `backend/tests/test_heavy_agent.py`
 
-- [ ] **Step 1: 更新 heavy_agent.py**
+- [ ] **Step 1: 重写 heavy_agent.py**
 
-在 `HeavyAgent.__init__` 中添加 `_quick_agent`，新增 `analyze_quick()` 方法：
+`analyze()` 和 `analyze_quick()` 都单开 Agent 实例，不支持共享。`__init__` 只保持 `_ctx` 和 `_model`。
 
 ```python
-# heavy_agent.py — 在 SYSTEM_PROMPT 后面添加
+"""HeavyAgent — Agno-based legal analysis agent with skills."""
+
+from pathlib import Path
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+from agno.skills import LocalSkills, Skills
+from agno.tools import tool
+
+from agent.context_store import ContextStore
+from agent.llm_client import build_deepseek_client, DEEPSEEK_MODEL
+from models.utterance import Utterance
+
+
+SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
+
+你的任务是根据用户提供的对话上下文和用户画像，对法律问题提供深度分析。
+
+当你需要查看用户完整上下文时，请调用 `get_user_context` 工具。
+
+请提供简洁、专业的法律分析，包括：
+1. 相关法律法规
+2. 计算方式（如涉及金额）
+3. 建议行动
+"""
 
 QUICK_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
 
@@ -932,59 +956,88 @@ QUICK_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
 - 金额计算 → 直接给出公式和结果
 - 模板推荐 → 直接给出模板名称和要点
 """
-```
 
-`__init__` 中将 `self._agent` 改为 `self._full_agent`，新增 `self._quick_agent`：
 
-```python
+def _build_model() -> OpenAIChat:
+    client = build_deepseek_client()
+    if client is None:
+        raise RuntimeError(
+            "HeavyAgent requires a valid LLM client. "
+            "Set DEEPSEEK_API_KEY or pass a model."
+        )
+    return OpenAIChat(
+        id=DEEPSEEK_MODEL,
+        api_key=client.api_key,
+        base_url=str(client.base_url),
+        role_map={
+            "system": "system",
+            "user": "user",
+            "assistant": "assistant",
+            "tool": "tool",
+            "model": "assistant",
+        },
+    )
+
+
+def _load_skills() -> Skills:
+    skills_dir = Path(__file__).parent / "skills"
+    return Skills(loaders=[LocalSkills(str(skills_dir))])
+
+
 class HeavyAgent:
     def __init__(self, ctx: ContextStore, model=None):
         self._ctx = ctx
         self._model = model or _build_model()
 
-        self._full_agent = Agent(
+    def _make_get_context_tool(self):
+        ctx = self._ctx
+
+        @tool
+        def get_user_context() -> str:
+            """读取用户的完整对话历史和画像信息。"""
+            profile = ctx.get_profile()
+            history = ctx.get_full_history()
+
+            lines = ["=== 用户画像 ==="]
+            for e in profile:
+                lines.append(f"- {e.key}: {e.value}")
+
+            lines.append("\n=== 对话历史 ===")
+            for u in history[-10:]:
+                lines.append(f"[{u.speaker}] {u.text}")
+
+            return "\n".join(lines)
+
+        return get_user_context
+
+    async def analyze(
+        self, trigger_utt: Utterance, intent_type: str, generation: int
+    ) -> str | None:
+        """深度分析（complex 确认后调用），每次新建 Agent 实例，不做 generation 检查。"""
+        agent = Agent(
             model=self._model,
             instructions=SYSTEM_PROMPT,
             skills=_load_skills(),
             tools=[self._make_get_context_tool()],
         )
+        prompt = f"用户问题：{trigger_utt.text}\n意图类型：{intent_type}"
+        response = await agent.arun(prompt)
+        return response.content if hasattr(response, "content") else str(response)
 
-        self._quick_agent = Agent(
+    async def analyze_quick(
+        self, trigger_utt: Utterance, intent_type: str, generation: int
+    ) -> str | None:
+        """快速回答（simple 自动触发），每次新建 Agent 实例，带 generation 检查防止 stale。"""
+        if self._ctx._generation != generation:
+            return None
+
+        agent = Agent(
             model=self._model,
             instructions=QUICK_SYSTEM_PROMPT,
             tools=[self._make_get_context_tool()],
         )
-```
-
-`analyze()` 中用 `self._full_agent` 替代 `self._agent`，intent 参数改为 intent_type：
-
-```python
-    async def analyze(
-        self, trigger_utt: Utterance, intent_type: str, generation: int
-    ) -> str | None:
-        if self._ctx._generation != generation:
-            return None
-
-        prompt = f"用户问题：{trigger_utt.text}\n意图类型：{intent_type}"
-        response = await self._full_agent.arun(prompt)
-
-        if self._ctx._generation != generation:
-            return None
-
-        return response.content if hasattr(response, "content") else str(response)
-```
-
-新增 `analyze_quick()`：
-
-```python
-    async def analyze_quick(
-        self, trigger_utt: Utterance, intent_type: str, generation: int
-    ) -> str | None:
-        if self._ctx._generation != generation:
-            return None
-
         prompt = f"用户问题：{trigger_utt.text}\n意图类型：{intent_type}\n请用1-3句话直接回答。"
-        response = await self._quick_agent.arun(prompt)
+        response = await agent.arun(prompt)
 
         if self._ctx._generation != generation:
             return None
@@ -992,9 +1045,9 @@ class HeavyAgent:
         return response.content if hasattr(response, "content") else str(response)
 ```
 
-- [ ] **Step 2: 更新 test_heavy_agent.py**
+- [ ] **Step 2: 重写 test_heavy_agent.py**
 
-将 `agent._agent` 改为 `agent._full_agent`，新增 `analyze_quick` 测试：
+Agent 不再作为实例属性，改为 patch `agno.agent.Agent.arun`：
 
 ```python
 """Tests for HeavyAgent — Agno-based analysis agent."""
@@ -1035,16 +1088,18 @@ def populated_store(store):
 
 @pytest.mark.asyncio
 async def test_analyze_returns_analysis_text(populated_store):
+    """complex 确认后 analyze 返回结果，不受 generation 影响。"""
     agent = HeavyAgent(populated_store)
 
-    with patch.object(agent._full_agent, "arun", new_callable=AsyncMock) as mock_run:
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = AsyncMock(content="根据劳动法第87条，违法解除应支付2N赔偿金。")
 
         trigger = Utterance(
             id="u_2", text="违法解除赔多少？", speaker="client",
             t_start=2.0, t_end=3.0, timestamp=datetime.now(),
         )
-        result = await agent.analyze(trigger, intent_type="query_law", generation=2)
+        # generation=1（stale），但 analyze 不检查 generation
+        result = await agent.analyze(trigger, intent_type="query_law", generation=1)
 
         assert result is not None
         assert "劳动法" in result
@@ -1052,23 +1107,26 @@ async def test_analyze_returns_analysis_text(populated_store):
 
 
 @pytest.mark.asyncio
-async def test_analyze_returns_none_when_generation_stale(populated_store):
+async def test_analyze_quick_skips_when_stale(populated_store):
+    """simple 自动触发时如果 generation 过期则跳过。"""
     agent = HeavyAgent(populated_store)
 
     trigger = Utterance(
         id="u_2", text="违法解除赔多少？", speaker="client",
         t_start=2.0, t_end=3.0, timestamp=datetime.now(),
     )
-    result = await agent.analyze(trigger, intent_type="query_law", generation=1)
+    # generation=1，ctx 是 2 → stale，应跳过
+    result = await agent.analyze_quick(trigger, intent_type="query_law", generation=1)
 
     assert result is None
 
 
 @pytest.mark.asyncio
 async def test_analyze_quick_returns_short_response(populated_store):
+    """simple 触发快速分析。"""
     agent = HeavyAgent(populated_store)
 
-    with patch.object(agent._quick_agent, "arun", new_callable=AsyncMock) as mock_run:
+    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = AsyncMock(content="N+1补偿：工作每满一年支付一个月工资。")
 
         trigger = Utterance(
@@ -1094,7 +1152,7 @@ cd backend && uv run pytest tests/test_heavy_agent.py -v
 
 ```bash
 git add backend/src/agent/heavy_agent.py backend/tests/test_heavy_agent.py
-git commit -m "feat: add analyze_quick mode to HeavyAgent for simple queries"
+git commit -m "feat: per-call Agent instances — analyze always proceeds, analyze_quick checks generation"
 ```
 
 ---
