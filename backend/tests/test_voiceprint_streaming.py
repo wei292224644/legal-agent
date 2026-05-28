@@ -153,11 +153,6 @@ async def test_streaming_match_accuracy():
         lawyer_audio = lawyer_audio.mean(axis=1)
     enrollment = enroll_speaker(lawyer_audio, lawyer_sr)
 
-    main_audio, main_sr = sf.read(str(MAIN_WAV), dtype="float32", always_2d=False)
-    if main_audio.ndim == 2:
-        main_audio = main_audio.mean(axis=1)
-    assert main_sr == SR, f"main WAV 应是 {SR}Hz, 实际 {main_sr}"
-
     script_lines = _parse_script_with_roles(SCRIPT_MD.read_text(encoding="utf-8"))
     assert len(script_lines) > 20
 
@@ -170,9 +165,11 @@ async def test_streaming_match_accuracy():
 
         audio_stream = stream_wav_realtime(MAIN_WAV, chunk_ms=100, speed=1.0)
         labeled: list[tuple[object, str, str | None]] = []  # (utt, predicted, truth)
-        async for utt in stream_stt(audio_stream):
-            seg = main_audio[int(utt.t_start * SR) : int(utt.t_end * SR)]
-            predicted = match_speaker(seg, SR, enrollment)
+        async for utt in stream_stt(audio_stream, enrollment=enrollment):
+            predicted = utt.speaker  # 由 stream_stt 内部同步打标
+            assert predicted is not None, (
+                f"enrollment 已传入 stream_stt,speaker 不应为 None: utt={utt}"
+            )
             truth = _attribute_speaker(utt.text, script_lines)
             labeled.append((utt, predicted, truth))
             logger.event("speaker.match", {

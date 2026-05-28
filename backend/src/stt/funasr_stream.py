@@ -18,6 +18,8 @@ import numpy as np
 from funasr import AutoModel
 
 from models.utterance import ClosedBy, Utterance
+from diarization.enrollment import Enrollment
+from diarization.matcher import match_speaker
 
 SR = 16000
 VAD_SILENCE_MS = 400
@@ -209,6 +211,7 @@ async def _detect_and_transcribe(
 
 async def stream_stt(
     audio_chunks: AsyncIterator[tuple[np.ndarray, float]],
+    enrollment: Enrollment | None = None,
 ) -> AsyncIterator[Utterance]:
     """消费音频块流,在 utterance 稳定关闭时产出 Utterance。
 
@@ -297,11 +300,20 @@ async def stream_stt(
                 continue
             t_start = (t0 or 0.0) + s_ms / 1000.0
             t_end = (t0 or 0.0) + e_ms / 1000.0
+            speaker = None
+            if enrollment is not None:
+                speaker_audio = snapshot[
+                    int(s_ms * SR / 1000) : int(e_ms * SR / 1000)
+                ]
+                speaker = await asyncio.to_thread(
+                    match_speaker, speaker_audio, SR, enrollment
+                )
             yield Utterance(
                 id=_utt_id(t_start, text),
                 text=text,
                 t_start=t_start,
                 t_end=t_end,
+                speaker=speaker,
                 closed_by=closed_by,
             )
             yielded_until_ms = max(yielded_until_ms, e_ms)
