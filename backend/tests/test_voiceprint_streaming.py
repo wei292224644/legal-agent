@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from diarization.enrollment import enroll_speaker
+from diarization.enrollment import Enrollment, enroll_speaker
 from diarization.matcher import match_speaker
 from diarization.voiceprint import extract_embedding
 from stt.funasr_stream import SR, stream_stt
@@ -217,3 +217,32 @@ async def test_streaming_match_accuracy():
         f"scored {len(scored)} of {len(labeled)} utts, "
         f"cross-speaker {cross_pct:.1%}, uncertain {uncertain_pct:.1%}"
     )
+
+
+def test_match_speaker_three_states(monkeypatch):
+    """Cycle 6: matcher 三态分支按双阈值正确切换。
+
+    用 monkeypatch 让 extract_embedding 返回受控向量,
+    cos sim 落在三个区间分别期望 lawyer / uncertain / client。
+    """
+    from diarization import matcher
+
+    # enrollment 用 [1, 0, 0],τ_high=0.6,τ_low=0.3
+    e_lawyer = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    enrollment = Enrollment(embedding=e_lawyer, tau_high=0.6, tau_low=0.3)
+
+    def fake_embed_factory(target_dot: float):
+        # 返回跟 e_lawyer 内积 = target_dot 的单位向量
+        v = np.array([target_dot, float(np.sqrt(1 - target_dot ** 2)), 0.0], dtype=np.float32)
+        return lambda audio, sr: v
+
+    dummy_audio = np.zeros(16000, dtype=np.float32)
+
+    monkeypatch.setattr(matcher, "extract_embedding", fake_embed_factory(0.8))
+    assert matcher.match_speaker(dummy_audio, 16000, enrollment) == "lawyer"
+
+    monkeypatch.setattr(matcher, "extract_embedding", fake_embed_factory(0.45))
+    assert matcher.match_speaker(dummy_audio, 16000, enrollment) == "uncertain"
+
+    monkeypatch.setattr(matcher, "extract_embedding", fake_embed_factory(0.1))
+    assert matcher.match_speaker(dummy_audio, 16000, enrollment) == "client"
