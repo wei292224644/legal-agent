@@ -10,6 +10,98 @@
 
 ---
 
+### Task 0: 统一 Utterance 类
+
+**问题:** `models/utterance.py` 和 `agent/context_store.py` 各有一个 `Utterance` 类，字段不完全一致。Orchestrator 消费 context_store 版本，STT 产出 models 版本，main.py 中需要手动转换。
+
+**方案:** 合并到 `models/utterance.py`，`context_store.py` 改为 import。
+
+**Files:**
+- Modify: `backend/src/models/utterance.py`（新增 timestamp 字段）
+- Modify: `backend/src/agent/context_store.py`（删除重复类，改为 import）
+- Modify: `backend/tests/test_context_store.py`（更新 import）
+- Modify: `backend/tests/test_orchestrator.py`（更新 import）
+- Modify: `backend/tests/test_heavy_agent.py`（更新 import）
+
+合并后的类（`models/utterance.py`）：
+
+```python
+"""Utterance 数据模型:一段说话事件。
+
+speaker 4 态(语义两两不同):
+- None       — 初始态,声纹尚未算完(异步过程中)
+- "lawyer"   — 终态:相似度 ≥ τ_high
+- "client"   — 终态:相似度 ≤ τ_low
+- "uncertain"— 终态:算完了但拿不准(音频过短或落在双阈值之间)
+"""
+from __future__ import annotations
+
+import hashlib
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from typing import Literal
+
+Speaker = Literal["lawyer", "client", "uncertain"]
+ClosedBy = Literal["vad", "soft_cap"]
+
+
+@dataclass
+class Utterance:
+    id: str
+    text: str
+    t_start: float
+    t_end: float
+    speaker: Speaker | None = None
+    closed_by: ClosedBy = "vad"
+    timestamp: datetime = field(default_factory=datetime.now)
+    content_hash: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.content_hash = hashlib.sha1(self.text.encode("utf-8")).hexdigest()[:12]
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+```
+
+`context_store.py` 改动：删除 `class Utterance`，改为 `from models.utterance import Utterance`。ProfileEntry 保留不动。
+
+- [ ] **Step 1: 更新 models/utterance.py**
+
+添加 `timestamp` 字段（`field(default_factory=datetime.now)`）。
+
+- [ ] **Step 2: 更新 context_store.py**
+
+删除第 7-13 行的 `class Utterance`，在文件顶部添加 `from models.utterance import Utterance`。
+
+- [ ] **Step 3: 更新所有测试文件的 import**
+
+```bash
+# 把 tests/ 下所有 from agent.context_store import ... Utterance ... 
+# 改为 from models.utterance import Utterance
+```
+
+具体文件：
+- `tests/test_context_store.py` — `from models.utterance import Utterance`（替换原有 import）
+- `tests/test_orchestrator.py` — 同上
+- `tests/test_heavy_agent.py` — 同上
+
+- [ ] **Step 4: 运行测试确认无回归**
+
+```bash
+cd backend && uv run pytest tests/test_context_store.py tests/test_orchestrator.py tests/test_heavy_agent.py -v
+```
+
+预期: 全部 PASS（约 10 个测试）
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/src/models/utterance.py backend/src/agent/context_store.py backend/tests/
+git commit -m "refactor: unify Utterance classes into models/utterance.py"
+```
+
+---
+
 ### Task 1: 添加 instructor 依赖
 
 **Files:**
@@ -158,7 +250,7 @@ class IntentRouter:
                 "IntentRouter requires a valid LLM client. "
                 "Set DASHSCOPE_API_KEY or pass a client."
             )
-        self._client = instructor.from_openai(raw_client, mode=instructor.Mode.JSON)
+        self._client = instructor.from_openai(raw_client, mode=instructor.Mode.MD_JSON)
         self._model = model or QWEN_MODEL
 
     async def classify(
@@ -243,6 +335,7 @@ git commit -m "feat: rewrite IntentRouter with role-aware prompt and instructor 
 
 **Files:**
 - Modify: `backend/src/agent/orchestrator.py`
+- Modify: `backend/src/agent/profile_agent.py`（`extract()` 的 `speaker` 参数类型改为 `str | None`）
 - Modify: `backend/tests/test_orchestrator.py`
 
 - [ ] **Step 1: 重写 orchestrator.py**
@@ -255,10 +348,11 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from agent.context_store import ContextStore, Utterance
+from agent.context_store import ContextStore
 from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentRouter
 from agent.profile_agent import ProfileAgent
+from models.utterance import Utterance
 
 PENDING_TIMEOUT = 30
 
@@ -293,6 +387,7 @@ class Orchestrator:
         self._suggestion_callback = callback
 
     async def handle_utterance(self, utt: Utterance) -> int:
+        self.cleanup_expired()
         generation = await self._ctx.append_utterance(utt)
 
         ir_task = asyncio.create_task(
@@ -380,6 +475,11 @@ class Orchestrator:
             del self._pending[rid]
         return len(expired)
 
+    async def shutdown(self) -> None:
+        """清理资源：取消 profile worker，清空 pending。"""
+        await self._ctx.stop_profile_worker()
+        self._pending.clear()
+
     async def _emit_suggestion(self, text: str | None, meta: dict) -> None:
         cb_result = self._suggestion_callback(text, meta)
         if asyncio.iscoroutine(cb_result):
@@ -398,11 +498,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
-from agent.context_store import ContextStore, Utterance
+from agent.context_store import ContextStore
 from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentResult
 from agent.orchestrator import Orchestrator, PENDING_TIMEOUT
 from agent.profile_agent import ProfileAgent
+from models.utterance import Utterance
 
 
 @pytest.fixture(autouse=True)
@@ -903,8 +1004,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent.context_store import ContextStore, Utterance, ProfileEntry
+from agent.context_store import ContextStore, ProfileEntry
 from agent.heavy_agent import HeavyAgent
+from models.utterance import Utterance
 
 
 @pytest.fixture(autouse=True)
@@ -1010,9 +1112,8 @@ git commit -m "feat: add analyze_quick mode to HeavyAgent for simple queries"
 
 ```python
 # main.py — 在 import 区新增
-from agent.context_store import ContextStore, Utterance as AgentUtterance
+from agent.context_store import ContextStore
 from agent.orchestrator import Orchestrator
-from datetime import datetime
 
 # 在 legal_session 内，stt_task 启动后添加
 ctx = ContextStore()
@@ -1049,19 +1150,11 @@ async def on_suggestion(text, meta):
 orch.set_suggestion_callback(on_suggestion)
 ```
 
-在 `consume_stt` 中每条 utterance 关闭后 feed 给 Orchestrator：
+在 `consume_stt` 中每条 utterance 关闭后 feed 给 Orchestrator（`stream_stt()` 产出的 `utt` 已经是统一的 `Utterance`，直接传入即可）：
 
 ```python
 # consume_stt 内，await ws.send_json(transcript) 后添加
-agent_utt = AgentUtterance(
-    id=utt.id,
-    text=utt.text,
-    speaker=utt.speaker,
-    t_start=utt.t_start,
-    t_end=utt.t_end,
-    timestamp=datetime.now(),
-)
-asyncio.create_task(orch.handle_utterance(agent_utt))
+asyncio.create_task(orch.handle_utterance(utt))
 ```
 
 在 text 消息处理中新增 confirm/dismiss：
@@ -1088,6 +1181,18 @@ elif "text" in data:
 ```bash
 git add backend/main.py
 git commit -m "feat: wire Orchestrator into WebSocket with confirm/dismiss support"
+```
+
+在 `finally` 块中添加 `asyncio.create_task(orch.shutdown())`：
+
+```python
+    finally:
+        await audio_q.put(None)
+        asyncio.create_task(orch.shutdown())
+        try:
+            await stt_task
+        except Exception:
+            pass
 ```
 
 ---
