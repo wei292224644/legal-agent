@@ -5,7 +5,8 @@ import pytest_asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from agent.context_store import ContextStore, Utterance
+from agent.context_store import ContextStore
+from models.utterance import Utterance
 from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentRouter
 from agent.orchestrator import Orchestrator

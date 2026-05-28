@@ -2,7 +2,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from agent.context_store import ContextStore, Utterance, ProfileEntry
+from agent.context_store import ContextStore, ProfileEntry
+from models.utterance import Utterance
 from agent.heavy_agent import HeavyAgent
 from datetime import datetime
 

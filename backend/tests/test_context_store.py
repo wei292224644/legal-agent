@@ -3,7 +3,8 @@ import asyncio
 import pytest
 from datetime import datetime
 
-from agent.context_store import ContextStore, Utterance, ProfileEntry
+from agent.context_store import ContextStore, ProfileEntry
+from models.utterance import Utterance
 
 
 @pytest.mark.asyncio
