@@ -37,7 +37,8 @@ def _get_lawyer_enrollment() -> Enrollment:
 async def legal_session(ws: WebSocket, session_id: str):
     await ws.accept()
 
-    enrollment = _get_lawyer_enrollment()
+    # 首次加载会跑 cam++ 推理,放线程池避免阻塞 event loop(后续 session 是缓存命中,几乎 0 成本)
+    enrollment = await asyncio.to_thread(_get_lawyer_enrollment)
     audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] = asyncio.Queue()
     t0 = time.monotonic()
 
