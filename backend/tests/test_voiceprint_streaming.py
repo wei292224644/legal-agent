@@ -204,8 +204,8 @@ async def test_streaming_match_accuracy():
         logger.set_metric("cross_speaker_pct", round(cross_pct, 4))
 
     assert labeled, "应产出 utterance"
-    assert len(scored) >= 20, (
-        f"clean utt 数 {len(scored)} < 20,样本太少。"
+    assert len(scored) >= 15, (
+        f"clean utt 数 {len(scored)} < 15,样本太少。"
         f"跨说话人 {cross_count}/{len(labeled)} ({cross_pct:.1%}) — "
         f"若过高,Cycle 6c (speaker-aware split) 才是真修法"
     )

@@ -270,6 +270,8 @@ class IntentRouter:
         return result
 ```
 
+> **⚠️ 兼容性备注：** instructor 的 `Mode.MD_JSON` 依赖模型输出 markdown JSON 代码块。DashScope 兼容层支持该模式，但建议在实现后加一个集成测试（使用真实 API key）验证千问是否能稳定输出 instructor 可解析的格式。如果解析失败率过高，可切换为 `Mode.JSON` 或回退到手动解析。
+
 - [ ] **Step 4: 重写 test_intent_router.py**
 
 ```python
@@ -335,8 +337,20 @@ git commit -m "feat: rewrite IntentRouter with role-aware prompt and instructor 
 
 **Files:**
 - Modify: `backend/src/agent/orchestrator.py`
-- Modify: `backend/src/agent/profile_agent.py`（`extract()` 的 `speaker` 参数类型改为 `str | None`）
+- Modify: `backend/src/agent/profile_agent.py`
 - Modify: `backend/tests/test_orchestrator.py`
+
+- [ ] **Step 0: 更新 profile_agent.py 的 speaker 类型**
+
+`extract()` 方法签名中的 `speaker` 参数类型从 `str` 改为 `str | None`，以兼容统一后的 `Utterance.speaker` 类型（`Speaker | None`）。实现上无需额外逻辑变更，因为运行时 `speaker` 不会是 `None`。
+
+```python
+# backend/src/agent/profile_agent.py
+async def extract(
+    self, text: str, speaker: str | None, existing_keys: list[str], utt_id: str = ""
+) -> list[ProfileEntry]:
+    # 原有实现不变
+```
 
 - [ ] **Step 1: 重写 orchestrator.py**
 
@@ -354,16 +368,12 @@ from agent.intent_router import IntentRouter
 from agent.profile_agent import ProfileAgent
 from models.utterance import Utterance
 
-PENDING_TIMEOUT = 30
-
-
 @dataclass
 class PendingRequest:
     request_id: str
     utt: Utterance
     intent_type: str
     generation: int
-    created_at: float = field(default_factory=time.monotonic)
     meta: dict = field(default_factory=dict)
 
 
@@ -387,7 +397,6 @@ class Orchestrator:
         self._suggestion_callback = callback
 
     async def handle_utterance(self, utt: Utterance) -> int:
-        self.cleanup_expired()
         generation = await self._ctx.append_utterance(utt)
 
         ir_task = asyncio.create_task(
@@ -440,7 +449,6 @@ class Orchestrator:
             )
             meta["kind"] = "pending"
             meta["request_id"] = request_id
-            meta["expires_in"] = PENDING_TIMEOUT
             await self._emit_suggestion(None, meta)
 
         return generation
@@ -448,8 +456,6 @@ class Orchestrator:
     async def confirm_analysis(self, request_id: str) -> bool:
         pending = self._pending.pop(request_id, None)
         if pending is None:
-            return False
-        if time.monotonic() - pending.created_at > PENDING_TIMEOUT:
             return False
 
         result = await self._ha.analyze(
@@ -463,17 +469,6 @@ class Orchestrator:
 
     def dismiss_pending(self, request_id: str) -> None:
         self._pending.pop(request_id, None)
-
-    def cleanup_expired(self) -> int:
-        now = time.monotonic()
-        expired = [
-            rid
-            for rid, pr in self._pending.items()
-            if now - pr.created_at > PENDING_TIMEOUT
-        ]
-        for rid in expired:
-            del self._pending[rid]
-        return len(expired)
 
     async def shutdown(self) -> None:
         """清理资源：取消 profile worker，清空 pending。"""
@@ -501,7 +496,7 @@ import pytest_asyncio
 from agent.context_store import ContextStore
 from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentResult
-from agent.orchestrator import Orchestrator, PENDING_TIMEOUT
+from agent.orchestrator import Orchestrator
 from agent.profile_agent import ProfileAgent
 from models.utterance import Utterance
 
@@ -594,7 +589,6 @@ async def test_complex_emits_pending_not_ready(store, mock_ir_client):
         assert text is None
         assert meta["kind"] == "pending"
         assert "request_id" in meta
-        assert meta["expires_in"] == PENDING_TIMEOUT
         mock_full.assert_not_called()
 
 
@@ -639,38 +633,6 @@ async def test_confirm_analysis_triggers_heavy_agent(store, mock_ir_client):
         assert len(suggestions) == 2
         assert suggestions[1][1]["kind"] == "ready"
         assert "劳动仲裁" in suggestions[1][0]
-
-
-@pytest.mark.asyncio
-async def test_confirm_expired_request_returns_false(store, mock_ir_client):
-    """过期请求确认返回 False。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
-    )
-
-    ha = HeavyAgent(store)
-    orch = Orchestrator(
-        store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-    )
-    orch.set_suggestion_callback(lambda text, meta: None)
-
-    utt = Utterance(
-        id="u_1", text="能赢吗", speaker="client",
-        t_start=0.0, t_end=1.0, timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-    await asyncio.sleep(0.1)
-
-    for pr in orch._pending.values():
-        pr.created_at = 0
-
-    request_ids = list(orch._pending.keys())
-    ok = await orch.confirm_analysis(request_ids[0])
-    assert not ok
 
 
 @pytest.mark.asyncio
@@ -859,38 +821,6 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
     profile_keys = set(store.get_profile_keys())
     assert {"月薪", "工龄", "解除通知时间"}.issubset(profile_keys)
 
-
-@pytest.mark.asyncio
-async def test_cleanup_expired_removes_stale_requests(store, mock_ir_client):
-    """过期清理移除超时请求。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": []}'))]
-        )
-    )
-
-    ha = HeavyAgent(store)
-    orch = Orchestrator(
-        store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha
-    )
-    orch.set_suggestion_callback(lambda text, meta: None)
-
-    utt = Utterance(
-        id="u_1", text="能赢吗", speaker="client",
-        t_start=0.0, t_end=1.0, timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-    await asyncio.sleep(0.1)
-    assert len(orch._pending) == 1
-
-    for pr in orch._pending.values():
-        pr.created_at = 0
-
-    removed = orch.cleanup_expired()
-    assert removed == 1
-    assert len(orch._pending) == 0
 ```
 
 - [ ] **Step 3: 运行 orchestrator 测试验证通过**
@@ -899,7 +829,7 @@ async def test_cleanup_expired_removes_stale_requests(store, mock_ir_client):
 cd backend && uv run pytest tests/test_orchestrator.py -v
 ```
 
-预期: 10 passed
+预期: 8 passed
 
 - [ ] **Step 4: Commit**
 
@@ -1189,7 +1119,6 @@ async def on_suggestion(text, meta):
                 "entities": meta["entities"],
                 "utt_id": meta["utt_id"],
                 "request_id": meta["request_id"],
-                "expires_in": meta["expires_in"],
             },
         })
     else:
@@ -1219,7 +1148,11 @@ asyncio.create_task(orch.handle_utterance(utt))
 
 ```python
 elif "text" in data:
-    msg = json.loads(data["text"])
+    try:
+        msg = json.loads(data["text"])
+    except json.JSONDecodeError:
+        await ws.send_json({"type": "error", "message": "Invalid JSON"})
+        continue
     msg_type = msg.get("type")
     if msg_type == "ping":
         await ws.send_json({"type": "pong"})
@@ -1246,7 +1179,11 @@ git commit -m "feat: wire Orchestrator into WebSocket with confirm/dismiss suppo
 ```python
     finally:
         await audio_q.put(None)
-        asyncio.create_task(orch.shutdown())
+        if "orch" in locals():
+            try:
+                await orch.shutdown()
+            except Exception:
+                pass
         try:
             await stt_task
         except Exception:
