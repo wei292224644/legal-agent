@@ -2,15 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import asyncio
 
-
-@dataclass
-class Utterance:
-    id: str
-    text: str
-    speaker: str
-    t_start: float
-    t_end: float
-    timestamp: datetime
+from models.utterance import Utterance
 
 
 @dataclass

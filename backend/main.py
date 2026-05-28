@@ -9,6 +9,8 @@ import soundfile as sf
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+from agent.context_store import ContextStore  # noqa: E402
+from agent.orchestrator import Orchestrator  # noqa: E402
 from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
 
@@ -61,6 +63,39 @@ async def legal_session(ws: WebSocket, session_id: str):
                 "closed_by": utt.closed_by,
                 "is_final": True,
             })
+            asyncio.create_task(orch.handle_utterance(utt))
+
+    ctx = ContextStore()
+    orch = Orchestrator(ctx)
+
+    async def on_suggestion(text, meta):
+        if meta.get("kind") == "pending":
+            await ws.send_json({
+                "type": "suggestion.pending",
+                "text": None,
+                "meta": {
+                    "severity": meta["severity"],
+                    "intent_type": meta["intent_type"],
+                    "law_domain": meta["law_domain"],
+                    "entities": meta["entities"],
+                    "utt_id": meta["utt_id"],
+                    "request_id": meta["request_id"],
+                },
+            })
+        else:
+            await ws.send_json({
+                "type": "suggestion.ready",
+                "text": text,
+                "meta": {
+                    "severity": meta["severity"],
+                    "intent_type": meta["intent_type"],
+                    "law_domain": meta["law_domain"],
+                    "entities": meta["entities"],
+                    "utt_id": meta["utt_id"],
+                },
+            })
+
+    orch.set_suggestion_callback(on_suggestion)
 
     stt_task = asyncio.create_task(consume_stt())
 
@@ -76,16 +111,32 @@ async def legal_session(ws: WebSocket, session_id: str):
                 await audio_q.put((audio, time.monotonic() - t0))
 
             elif "text" in data:
-                msg = json.loads(data["text"])
+                try:
+                    msg = json.loads(data["text"])
+                except json.JSONDecodeError:
+                    await ws.send_json({"type": "error", "message": "Invalid JSON"})
+                    continue
                 msg_type = msg.get("type")
                 if msg_type == "ping":
                     await ws.send_json({"type": "pong"})
-                # intent confirm/dismiss 待 Sprint 3 Orchestrator 接入
+                elif msg_type == "confirm":
+                    request_id = msg.get("request_id")
+                    if request_id:
+                        ok = await orch.confirm_analysis(request_id)
+                        await ws.send_json({"type": "confirm_ack", "request_id": request_id, "ok": ok})
+                elif msg_type == "dismiss":
+                    request_id = msg.get("request_id")
+                    if request_id:
+                        orch.dismiss_pending(request_id)
 
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         await audio_q.put(None)
+        try:
+            await orch.shutdown()
+        except Exception:
+            pass
         try:
             await stt_task
         except Exception:

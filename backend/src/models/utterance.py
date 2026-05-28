@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from typing import Literal
 
 Speaker = Literal["lawyer", "client", "uncertain"]
@@ -24,6 +25,7 @@ class Utterance:
     t_end: float
     speaker: Speaker | None = None
     closed_by: ClosedBy = "vad"
+    timestamp: datetime = field(default_factory=datetime.now)
     content_hash: str = field(init=False)
 
     def __post_init__(self) -> None:
