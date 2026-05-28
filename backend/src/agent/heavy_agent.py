@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
+from agno.models.deepseek import DeepSeek
 from agno.skills import LocalSkills, Skills
 from agno.tools import tool
 
@@ -35,24 +35,16 @@ QUICK_SYSTEM_PROMPT = """你是一名专业的劳动仲裁法律顾问。
 """
 
 
-def _build_model() -> OpenAIChat:
+def _build_model() -> DeepSeek:
     client = build_deepseek_client()
     if client is None:
         raise RuntimeError(
             "HeavyAgent requires a valid LLM client. "
             "Set DEEPSEEK_API_KEY or pass a model."
         )
-    return OpenAIChat(
+    return DeepSeek(
         id=DEEPSEEK_MODEL,
         api_key=client.api_key,
-        base_url=str(client.base_url),
-        role_map={
-            "system": "system",
-            "user": "user",
-            "assistant": "assistant",
-            "tool": "tool",
-            "model": "assistant",
-        },
     )
 
 
@@ -97,7 +89,7 @@ class HeavyAgent:
             skills=_load_skills(),
             tools=[self._make_get_context_tool()],
         )
-        prompt = f"用户问题：{trigger_utt.text}\n意图类型：{intent_type}"
+        prompt = f"意图类型: {intent_type}\n\n用户问题: {trigger_utt.text}"
         response = await agent.arun(prompt)
         return response.content if hasattr(response, "content") else str(response)
 
@@ -113,7 +105,7 @@ class HeavyAgent:
             instructions=QUICK_SYSTEM_PROMPT,
             tools=[self._make_get_context_tool()],
         )
-        prompt = f"用户问题：{trigger_utt.text}\n意图类型：{intent_type}\n请用1-3句话直接回答。"
+        prompt = f"意图类型: {intent_type}\n\n用户问题: {trigger_utt.text}"
         response = await agent.arun(prompt)
 
         if self._ctx._generation != generation:
