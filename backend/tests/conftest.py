@@ -85,6 +85,28 @@ def _ensure_fixtures():
 
 
 @pytest.fixture
+def mock_ir_client():
+    """Factory fixture: returns a function that creates stub IntentRouter instances."""
+    from agent.intent_router import IntentResult  # noqa: PLC0415
+
+    def _make(**kwargs):
+        result = IntentResult(
+            severity=kwargs.pop("severity", "ignore"),
+            intent_type=kwargs.pop("intent_type", "none"),
+            rationale=kwargs.pop("rationale", ""),
+            **kwargs,
+        )
+
+        class StubIR:
+            async def classify(self, text: str, speaker: str | None = None) -> IntentResult:
+                return result
+
+        return StubIR()
+
+    return _make
+
+
+@pytest.fixture
 def mock_llm_client():
     """Factory fixture: returns a function that creates mock AsyncOpenAI clients."""
     def _make(response_content: str):
