@@ -304,7 +304,7 @@ async def stream_stt(
             if enrollment is not None:
                 speaker_audio = snapshot[
                     int(s_ms * SR / 1000) : int(e_ms * SR / 1000)
-                ]
+                ].copy()  # 跟 spec_asr 的 seg_audio 一致,防御后续并发改写
                 speaker = await asyncio.to_thread(
                     match_speaker, speaker_audio, SR, enrollment
                 )

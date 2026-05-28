@@ -167,8 +167,8 @@ async def test_streaming_match_accuracy():
         labeled: list[tuple[object, str, str | None]] = []  # (utt, predicted, truth)
         async for utt in stream_stt(audio_stream, enrollment=enrollment):
             predicted = utt.speaker  # 由 stream_stt 内部同步打标
-            assert predicted is not None, (
-                f"enrollment 已传入 stream_stt,speaker 不应为 None: utt={utt}"
+            assert predicted in ("lawyer", "client", "uncertain"), (
+                f"speaker 应是三态之一, 实际 {predicted!r}: utt={utt}"
             )
             truth = _attribute_speaker(utt.text, script_lines)
             labeled.append((utt, predicted, truth))
