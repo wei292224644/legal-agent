@@ -3,6 +3,9 @@ import os
 
 from openai import AsyncOpenAI
 
+QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3.5-flash")
+# `deepseek-chat` is broadly available; `deepseek-reasoner` may require extra access.
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
 def build_qwen_client() -> AsyncOpenAI | None:
     key = os.getenv("DASHSCOPE_API_KEY")
@@ -28,5 +31,3 @@ def build_deepseek_client() -> AsyncOpenAI | None:
     )
 
 
-QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3.5-flash")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-reasoner")
