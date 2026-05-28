@@ -17,7 +17,7 @@ _model: AutoModel | None = None
 def _get_model() -> AutoModel:
     global _model
     if _model is None:
-        _model = AutoModel(model="cam++", disable_update=True)
+        _model = AutoModel(model="cam++", hub="hf", disable_update=True)
     return _model
 
 

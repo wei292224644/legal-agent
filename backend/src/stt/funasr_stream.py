@@ -32,9 +32,9 @@ _asr_model: AutoModel | None = None
 def _get_models() -> tuple[AutoModel, AutoModel]:
     global _vad_model, _asr_model
     if _vad_model is None:
-        _vad_model = AutoModel(model="fsmn-vad", disable_update=True)
+        _vad_model = AutoModel(model="fsmn-vad", hub="hf", disable_update=True)
     if _asr_model is None:
-        _asr_model = AutoModel(model="paraformer-zh", disable_update=True)
+        _asr_model = AutoModel(model="paraformer-zh", hub="hf", disable_update=True)
     return _vad_model, _asr_model
 
 
