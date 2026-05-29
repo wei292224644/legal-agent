@@ -1,241 +1,481 @@
-import { useState, useCallback, memo } from 'react'
-import { useWebSocket, type SuggestionData } from '@/hooks/useWebSocket'
-import { Card } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
-import AudioControls from '@/components/AudioControls'
+import { useState, useCallback, memo } from "react";
+import { useWebSocket, type SuggestionData } from "@/hooks/useWebSocket";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import AudioControls from "@/components/AudioControls";
+import {
+  Activity,
+  MessageSquare,
+  ChevronUp,
+  ChevronDown,
+  BookOpen,
+  FileText,
+  ShieldAlert,
+  User,
+  Users,
+  HelpCircle,
+  CheckCircle2,
+  Circle,
+} from "lucide-react";
 
-type TranscriptLine = { speaker: string; text: string }
+type TranscriptLine = { speaker: string; text: string };
 type Analysis = {
-  id: string
-  category: 'statute' | 'contract' | 'risk'
-  title: string
-  content: string
-  citation?: string
-  level?: string
-}
+  id: string;
+  category: "statute" | "contract" | "risk";
+  title: string;
+  content: string;
+  citation?: string;
+  level?: string;
+};
 
 type Suggestion =
-  | { kind: 'pending'; requestId: string; intentType: string; lawDomain: string | null }
-  | { kind: 'ready'; id: string; requestId?: string; text: string; intentType: string }
+  | {
+      kind: "pending";
+      requestId: string;
+      intentType: string;
+      lawDomain: string | null;
+    }
+  | {
+      kind: "ready";
+      id: string;
+      requestId?: string;
+      text: string;
+      intentType: string;
+    };
 
-type TranscriptData = { text: string; speaker: string; is_final: boolean }
-type AnalysisData = { category: string; title: string; content: string; citation?: string; level?: string }
+type TranscriptData = {
+  text: string;
+  speaker: string;
+  is_final: boolean;
+};
+type AnalysisData = {
+  category: string;
+  title: string;
+  content: string;
+  citation?: string;
+  level?: string;
+};
 
 const categoryConfig = {
-  statute: { label: '法规引用', emoji: '📋', border: 'border-amber-500/30', bg: 'bg-amber-500/5' },
-  contract: { label: '合同条款', emoji: '📝', border: 'border-blue-400/30', bg: 'bg-blue-400/5' },
-  risk: { label: '风险提示', emoji: '⚠️', border: 'border-red-400/40', bg: 'bg-red-400/5' },
-} as const
+  statute: {
+    label: "法规引用",
+    icon: BookOpen,
+    border: "border-[#d4a853]/30",
+    bg: "bg-[#d4a853]/5",
+  },
+  contract: {
+    label: "合同条款",
+    icon: FileText,
+    border: "border-[#6b8ec4]/30",
+    bg: "bg-[#6b8ec4]/5",
+  },
+  risk: {
+    label: "风险提示",
+    icon: ShieldAlert,
+    border: "border-[#c45c5c]/40",
+    bg: "bg-[#c45c5c]/5",
+  },
+} as const;
 
 const riskLevelClass = {
-  '高': 'border-red-500/50 text-red-400',
-  '中': 'border-amber-500/50 text-amber-400',
-  '低': 'border-zinc-500/50 text-zinc-400',
-} as const
+  高: "border-[#c45c5c]/50 text-[#c45c5c]",
+  中: "border-[#d4a853]/50 text-[#d4a853]",
+  低: "border-[#6b8f6b]/50 text-[#6b8f6b]",
+} as const;
 
-const riskLevelEmoji = { '高': '🔴', '中': '🟡', '低': '🟢' } as const
-
-// Hoisted static JSX (rendering-hoist-jsx)
-const emptyTranscript = (
-  <div className="flex items-center justify-center h-full text-zinc-600 font-serif italic">
-    开始说话，转写文本将实时显示在这里...
-  </div>
-)
+const riskLevelIcon = { 高: Circle, 中: Circle, 低: Circle } as const;
+const riskLevelColor = { 高: "text-[#c45c5c]", 中: "text-[#d4a853]", 低: "text-[#6b8f6b]" } as const;
 
 const emptyAnalysis = (
-  <div className="flex items-center justify-center h-full text-zinc-600 font-serif italic text-sm">
-    AI 正在实时分析对话内容...
+  <div className="flex flex-col items-center justify-center h-full text-[#525252] gap-2">
+    <Activity className="w-8 h-8 opacity-20" />
+    <p className="text-sm italic">系统正在监听并分析对话内容…</p>
+    <p className="text-xs text-[#525252]">分析结果将随对话自动呈现</p>
   </div>
-)
+);
 
-// Memoized sub-components (rerender-memo)
-const TranscriptItem = memo(function TranscriptItem({ line }: { line: TranscriptLine }) {
-  const isLawyer = line.speaker === '律师'
+const emptyTranscript = (
+  <div className="flex flex-col items-center justify-center h-full text-[#525252] gap-2">
+    <MessageSquare className="w-6 h-6 opacity-20" />
+    <p className="text-xs italic">开始说话，转写文本将实时显示…</p>
+    <p className="text-[10px] text-[#525252]">录音开始后，对话内容将出现在此处</p>
+  </div>
+);
+
+const TranscriptItem = memo(function TranscriptItem({
+  line,
+}: {
+  line: TranscriptLine;
+}) {
+  const isLawyer = line.speaker === "律师";
   return (
     <div className="flex gap-3">
-      <span className={`shrink-0 text-xs font-mono mt-1 px-2 py-0.5 rounded ${
-        isLawyer
-          ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-          : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-      }`}>
-        {isLawyer ? '🧑‍⚖️' : '👤'} {line.speaker}
+      <span
+        className={`shrink-0 text-xs font-mono mt-1 px-2 py-0.5 rounded ${
+          isLawyer
+            ? "bg-[#d4a853]/10 text-[#d4a853] border border-[#d4a853]/20"
+            : "bg-[#1e1b15] text-[#8a8a8a] border border-[rgba(255,255,255,0.08)]"
+        }`}
+      >
+        {isLawyer ? <User className="w-3 h-3" /> : <Users className="w-3 h-3" />} {line.speaker}
       </span>
-      <p className="text-zinc-300 leading-relaxed">{line.text}</p>
+      <p className="text-[#a3a3a3] leading-relaxed text-sm">{line.text}</p>
     </div>
-  )
-})
+  );
+});
 
 const AnalysisCard = memo(function AnalysisCard({ a }: { a: Analysis }) {
-  const cfg = categoryConfig[a.category]
+  const cfg = categoryConfig[a.category];
   return (
-    <Card className={`p-4 ${cfg.bg} ${cfg.border} border transition-all duration-300`}>
+    <Card
+      className={`p-4 ${cfg.bg} ${cfg.border} border rounded-lg transition-all duration-300`}
+    >
       <div className="flex items-center gap-2 mb-2">
-        <Badge variant="outline" className={`text-xs ${cfg.border} text-zinc-300`}>
-          {cfg.emoji} {cfg.label}
+        <Badge
+          variant="outline"
+          className={`text-xs ${cfg.border} text-[#e5e5e5] rounded`}
+        >
+          <cfg.icon className="w-3 h-3" /> {cfg.label}
         </Badge>
-        {a.category === 'risk' && a.level && (
-          <Badge variant="outline" className={`text-xs ${riskLevelClass[a.level as keyof typeof riskLevelClass] ?? ''}`}>
-            {riskLevelEmoji[a.level as keyof typeof riskLevelEmoji] ?? ''} {a.level}
+        {a.category === "risk" && a.level && (
+          <Badge
+            variant="outline"
+            className={`text-xs ${
+              riskLevelClass[a.level as keyof typeof riskLevelClass] ?? ""
+            } rounded`}
+          >
+            {a.level && (() => {
+              const Icon = riskLevelIcon[a.level as keyof typeof riskLevelIcon];
+              const color = riskLevelColor[a.level as keyof typeof riskLevelColor];
+              return <Icon className={`w-3 h-3 ${color}`} />;
+            })()}{" "}
+            {a.level}
           </Badge>
         )}
       </div>
-      <h3 className="font-serif text-sm font-medium text-zinc-200 mb-1">{a.title}</h3>
-      <p className="text-xs text-zinc-400 leading-relaxed">{a.content}</p>
+      <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">
+        {a.title}
+      </h3>
+      <p className="text-xs text-[#8a8a8a] leading-relaxed">{a.content}</p>
       {a.citation && (
-        <p className="text-xs text-amber-500/70 mt-2 font-mono">{a.citation}</p>
+        <p className="text-xs text-[#d4a853]/70 mt-2 font-mono">{a.citation}</p>
       )}
     </Card>
-  )
-})
+  );
+});
 
 const SuggestionCard = memo(function SuggestionCard({
   s,
   onConfirm,
   onDismiss,
 }: {
-  s: Suggestion
-  onConfirm: (requestId: string) => void
-  onDismiss: (requestId: string) => void
+  s: Suggestion;
+  onConfirm: (requestId: string) => void;
+  onDismiss: (requestId: string) => void;
 }) {
-  if (s.kind === 'pending') {
+  if (s.kind === "pending") {
     return (
-      <Card className="p-4 bg-amber-500/5 border-amber-500/30 border transition-all duration-300">
-        <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-300 mb-2">
-          💡 需要深度分析？
+      <Card className="p-4 bg-[#d4a853]/5 border-[#d4a853]/30 border rounded-lg transition-all duration-300">
+        <Badge
+          variant="outline"
+          className="text-xs border-[#d4a853]/30 text-[#d4a853] mb-2 rounded"
+        >
+          <HelpCircle className="w-3 h-3" /> 检测到可分析意图
         </Badge>
-        <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-          {s.intentType}{s.lawDomain ? ` · ${s.lawDomain}` : ''}
+        <p className="text-xs text-[#8a8a8a] leading-relaxed mb-3">
+          {s.intentType}
+          {s.lawDomain ? ` · ${s.lawDomain}` : ""}
         </p>
         <div className="flex gap-2">
-          <Button size="sm" className="bg-amber-600 hover:bg-amber-500 text-zinc-900" onClick={() => onConfirm(s.requestId)}>
-            确认分析
+          <Button
+            size="sm"
+            className="bg-[#d4a853] hover:bg-[#e0b86a] text-[#0d0b08]"
+            onClick={() => onConfirm(s.requestId)}
+          >
+            生成深度分析
           </Button>
-          <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-400" onClick={() => onDismiss(s.requestId)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-[rgba(255,255,255,0.08)] text-[#8a8a8a]"
+            onClick={() => onDismiss(s.requestId)}
+          >
             忽略
           </Button>
         </div>
       </Card>
-    )
+    );
   }
   return (
-    <Card className="p-4 bg-blue-400/5 border-blue-400/30 border transition-all duration-300">
-      <Badge variant="outline" className="text-xs border-blue-400/30 text-zinc-300 mb-2">
-        ✅ {s.intentType}
+    <Card className="p-4 bg-[#6b8ec4]/5 border-[#6b8ec4]/30 border rounded-lg transition-all duration-300">
+      <Badge
+        variant="outline"
+        className="text-xs border-[#6b8ec4]/30 text-[#e5e5e5] mb-2 rounded"
+      >
+        <CheckCircle2 className="w-3 h-3" /> {s.intentType}
       </Badge>
-      <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{s.text}</p>
+      <p className="text-xs text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
+        {s.text}
+      </p>
     </Card>
-  )
-})
+  );
+});
 
 export default function LiveSession() {
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
-  const [analyses, setAnalyses] = useState<Analysis[]>([])
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [status, setStatus] = useState('待连接...')
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [status, setStatus] = useState("待连接…");
+  const [activeTab, setActiveTab] = useState<"analysis" | "transcript">(
+    "analysis"
+  );
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
 
   const onTranscript = useCallback((data: TranscriptData) => {
-    setTranscript(prev => [...prev, { speaker: data.speaker, text: data.text }])
-    setStatus('正在听...')
-  }, [])
+    setTranscript((prev) => [
+      ...prev,
+      { speaker: data.speaker, text: data.text },
+    ]);
+    setStatus("正在听…");
+  }, []);
 
   const onAnalysis = useCallback((data: AnalysisData) => {
-    setAnalyses(prev => [{
-      id: crypto.randomUUID(),
-      category: data.category as Analysis['category'],
-      title: data.title,
-      content: data.content,
-      citation: data.citation,
-      level: data.level,
-    }, ...prev])
-  }, [])
+    setAnalyses((prev) => [
+      {
+        id: crypto.randomUUID(),
+        category: data.category as Analysis["category"],
+        title: data.title,
+        content: data.content,
+        citation: data.citation,
+        level: data.level,
+      },
+      ...prev,
+    ]);
+  }, []);
 
   const onSuggestion = useCallback((data: SuggestionData) => {
-    setSuggestions(prev => {
-      if (data.type === 'suggestion.pending') {
+    setSuggestions((prev) => {
+      if (data.type === "suggestion.pending") {
         const pending: Suggestion = {
-          kind: 'pending',
-          requestId: data.meta.request_id ?? '',
+          kind: "pending",
+          requestId: data.meta.request_id ?? "",
           intentType: data.meta.intent_type,
           lawDomain: data.meta.law_domain,
-        }
-        return [pending, ...prev]
+        };
+        return [pending, ...prev];
       }
       const ready: Suggestion = {
-        kind: 'ready',
+        kind: "ready",
         id: crypto.randomUUID(),
         requestId: data.meta.request_id,
-        text: data.text ?? '',
+        text: data.text ?? "",
         intentType: data.meta.intent_type,
-      }
-      // 确认后的 ready 带 request_id：替换对应 pending 卡片；否则（simple 快速回答）直接插入
+      };
       if (data.meta.request_id) {
-        return prev.map(s => (s.kind === 'pending' && s.requestId === data.meta.request_id ? ready : s))
+        return prev.map((s) =>
+          s.kind === "pending" && s.requestId === data.meta.request_id
+            ? ready
+            : s
+        );
       }
-      return [ready, ...prev]
-    })
-  }, [])
+      return [ready, ...prev];
+    });
+  }, []);
 
-  const { isConnected, sendAudioChunk, confirmIntent, dismissIntent } = useWebSocket(
-    'ws://localhost:8000/ws/demo-session',
-    { onTranscript, onAnalysis, onSuggestion }
-  )
+  const { isConnected, sendAudioChunk, confirmIntent, dismissIntent } =
+    useWebSocket("ws://localhost:8000/ws/demo-session", {
+      onTranscript,
+      onAnalysis,
+      onSuggestion,
+    });
 
-  const handleDismiss = useCallback((requestId: string) => {
-    dismissIntent(requestId)
-    setSuggestions(prev => prev.filter(s => !(s.kind === 'pending' && s.requestId === requestId)))
-  }, [dismissIntent])
+  const handleDismiss = useCallback(
+    (requestId: string) => {
+      dismissIntent(requestId);
+      setSuggestions((prev) =>
+        prev.filter(
+          (s) => !(s.kind === "pending" && s.requestId === requestId)
+        )
+      );
+    },
+    [dismissIntent]
+  );
+
+  const recentTranscript = transcript.slice(-3);
+
+  const analysisContent =
+    suggestions.length === 0 && analyses.length === 0 ? (
+      emptyAnalysis
+    ) : (
+      <div className="space-y-3">
+        {suggestions.map((s) => (
+          <SuggestionCard
+            key={s.kind === "pending" ? s.requestId : s.id}
+            s={s}
+            onConfirm={confirmIntent}
+            onDismiss={handleDismiss}
+          />
+        ))}
+        {analyses.map((a) => (
+          <AnalysisCard key={a.id} a={a} />
+        ))}
+      </div>
+    );
+
+  const transcriptContent =
+    transcript.length === 0 ? (
+      emptyTranscript
+    ) : (
+      <div className="space-y-4">
+        {(isTranscriptExpanded ? transcript : recentTranscript).map(
+          (line, i) => (
+            <TranscriptItem
+              key={isTranscriptExpanded ? i : `recent-${i}`}
+              line={line}
+            />
+          )
+        )}
+        {!isTranscriptExpanded && transcript.length > 3 && (
+          <button
+            onClick={() => setIsTranscriptExpanded(true)}
+            className="w-full py-2 text-xs text-[#525252] hover:text-[#8a8a8a] transition-colors flex items-center justify-center gap-1"
+          >
+            <ChevronDown className="w-3 h-3" />
+            展开全部 {transcript.length} 条记录
+          </button>
+        )}
+        {isTranscriptExpanded && (
+          <button
+            onClick={() => setIsTranscriptExpanded(false)}
+            className="w-full py-2 text-xs text-[#525252] hover:text-[#8a8a8a] transition-colors flex items-center justify-center gap-1"
+          >
+            <ChevronUp className="w-3 h-3" />
+            收起
+          </button>
+        )}
+      </div>
+    );
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-200">
-      {/* 左侧：转写区域 */}
-      <div className="flex-1 flex flex-col border-r border-zinc-800">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <div>
-            <h1 className="font-serif text-xl tracking-wide text-amber-200/90">实时会谈</h1>
-            <p className="text-xs text-zinc-500 mt-0.5 font-mono">
-              {isConnected ? '🟢 已连接' : '🟡 连接中...'} · {status}
+    <div className="flex flex-col h-screen bg-[#0d0b08] text-[#e5e5e5]">
+      {/* Desktop header */}
+      <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-[rgba(255,255,255,0.08)] bg-[#0d0b08] shrink-0">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-medium tracking-wide text-[#525252]">
+            实时会谈
+          </h1>
+          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-[#6b8f6b]" : "bg-[#d4a853]"
+              }`}
+            />
+            <span className={isConnected ? "text-[#6b8f6b]" : "text-[#d4a853]"}>
+              {isConnected ? "已连接" : "连接中…"}
+            </span>
+            <span className="text-[#525252]">·</span>
+            <span className="text-[#8a8a8a]">{status}</span>
+          </div>
+        </div>
+        <AudioControls onChunk={sendAudioChunk} />
+      </header>
+
+      {/* Mobile header */}
+      <header className="flex md:hidden items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)] bg-[#0d0b08] shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-medium tracking-wide text-[#525252]">
+            实时会谈
+          </h1>
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isConnected ? "bg-[#6b8f6b]" : "bg-[#d4a853]"
+            }`}
+          />
+        </div>
+        <AudioControls onChunk={sendAudioChunk} />
+      </header>
+
+      {/* Desktop layout: Analysis left, Transcript right */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
+        {/* Left: Analysis (dominant, 40%) */}
+        <div className="w-[40%] flex flex-col border-r border-[rgba(255,255,255,0.08)]">
+          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.08)] shrink-0">
+            <h2 className="text-lg font-medium tracking-wide text-[#d4a853]">
+              实时洞察
+            </h2>
+            <p className="text-xs text-[#525252] mt-0.5 font-mono uppercase tracking-wide">
+              {suggestions.length + analyses.length} 条分析结果
             </p>
           </div>
-          <AudioControls onChunk={sendAudioChunk} />
-        </header>
-        <ScrollArea className="flex-1 px-6 py-4">
-          {transcript.length === 0
-            ? emptyTranscript
-            : (
-              <div className="space-y-4">
-                {transcript.map((line, i) => (
-                  <TranscriptItem key={i} line={line} />
-                ))}
-              </div>
-            )}
-        </ScrollArea>
+          <ScrollArea className="flex-1 px-4 py-4">{analysisContent}</ScrollArea>
+        </div>
+
+        {/* Right: Transcript (secondary, 60%) */}
+        <div className="flex-1 flex flex-col">
+          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.08)] shrink-0 flex items-center justify-between">
+            <h2 className="text-lg font-medium tracking-wide text-[#8a8a8a]">
+              转写记录
+            </h2>
+            <span className="text-xs text-[#525252] font-mono uppercase tracking-wide">
+              {transcript.length} 条
+            </span>
+          </div>
+          <ScrollArea className="flex-1 px-4 py-4">
+            {transcriptContent}
+          </ScrollArea>
+        </div>
       </div>
 
-      {/* 右侧：AI 分析侧边栏 */}
-      <aside className="w-[380px] flex flex-col bg-zinc-900/50">
-        <header className="px-6 py-4 border-b border-zinc-800">
-          <h2 className="font-serif text-lg tracking-wide text-amber-200/90">AI 分析</h2>
-          <p className="text-xs text-zinc-500 mt-0.5 font-mono">{suggestions.length + analyses.length} 条分析结果</p>
-        </header>
-        <ScrollArea className="flex-1 px-4 py-4">
-          {suggestions.length === 0 && analyses.length === 0
-            ? emptyAnalysis
-            : (
-              <div className="space-y-3">
-                {suggestions.map((s) => (
-                  <SuggestionCard
-                    key={s.kind === 'pending' ? s.requestId : s.id}
-                    s={s}
-                    onConfirm={confirmIntent}
-                    onDismiss={handleDismiss}
-                  />
-                ))}
-                {analyses.map((a) => <AnalysisCard key={a.id} a={a} />)}
-              </div>
+      {/* Mobile layout: Tab-based */}
+      <div className="flex md:hidden flex-1 flex-col overflow-hidden">
+        <div className="flex-1 overflow-hidden">
+          {activeTab === "analysis" ? (
+            <ScrollArea className="h-full px-4 py-4">{analysisContent}</ScrollArea>
+          ) : (
+            <ScrollArea className="h-full px-4 py-4">
+              {transcriptContent}
+            </ScrollArea>
+          )}
+        </div>
+
+        {/* Mobile bottom tab bar */}
+        <nav className="flex border-t border-[rgba(255,255,255,0.08)] bg-[#17140f] shrink-0">
+          <button
+            onClick={() => setActiveTab("analysis")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${
+              activeTab === "analysis"
+                ? "text-[#d4a853] bg-[#1e1b15]"
+                : "text-[#525252] hover:text-[#8a8a8a]"
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            洞察
+            {suggestions.length + analyses.length > 0 && (
+              <span className="text-xs bg-[#d4a853]/20 text-[#d4a853] px-1.5 py-0.5 rounded">
+                {suggestions.length + analyses.length}
+              </span>
             )}
-        </ScrollArea>
-      </aside>
+          </button>
+          <button
+            onClick={() => setActiveTab("transcript")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${
+              activeTab === "transcript"
+                ? "text-[#d4a853] bg-[#1e1b15]"
+                : "text-[#525252] hover:text-[#8a8a8a]"
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            转写
+            {transcript.length > 0 && (
+              <span className="text-xs bg-[#1e1b15] text-[#8a8a8a] px-1.5 py-0.5 rounded">
+                {transcript.length}
+              </span>
+            )}
+          </button>
+        </nav>
+      </div>
     </div>
-  )
+  );
 }

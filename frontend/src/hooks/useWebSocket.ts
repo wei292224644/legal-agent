@@ -46,17 +46,32 @@ type WsFactory = (url: string) => WsLike
 
 const defaultFactory: WsFactory = (u) => new WebSocket(u) as unknown as WsLike
 
+function getOrCreateSessionId(): string {
+  const key = 'legal_session_id'
+  const stored = localStorage.getItem(key)
+  if (stored) return stored
+  const id = crypto.randomUUID()
+  localStorage.setItem(key, id)
+  return id
+}
+
 export function useWebSocket(
   url: string,
   callbacks: Callbacks = {},
   factory: WsFactory = defaultFactory,
+  sessionId?: string,
 ) {
   const [isConnected, setIsConnected] = useState(false)
+  const [sessionIdState] = useState<string>(() => sessionId ?? getOrCreateSessionId())
   const wsRef = useRef<WsLike | null>(null)
-  const pingRef = useRef<ReturnType<typeof setInterval>>()
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>()
+  const pingRef = useRef<ReturnType<typeof setInterval>>(null)
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(null)
   const callbacksRef = useRef(callbacks)
   const connectRef = useRef<() => void>(() => {})
+
+  // 把 url 最后一段替换为 sessionId，保持 host/path 不变
+  const baseUrl = url.replace(/\/[^/]*$/, '')
+  const wsUrl = `${baseUrl}/${sessionIdState}`
 
   const cleanup = useCallback(() => {
     clearTimeout(reconnectRef.current)
@@ -67,7 +82,7 @@ export function useWebSocket(
 
   const connect = useCallback(() => {
     cleanup()
-    const ws = factory(url)
+    const ws = factory(wsUrl)
 
     ws.onopen = () => {
       setIsConnected(true)
@@ -112,7 +127,7 @@ export function useWebSocket(
     }
 
     wsRef.current = ws
-  }, [url, factory, cleanup])
+  }, [wsUrl, factory, cleanup])
 
   // Ref sync pattern (advanced-event-handler-refs / advanced-use-latest)
   useEffect(() => {
@@ -137,5 +152,5 @@ export function useWebSocket(
     wsRef.current?.send(JSON.stringify({ type: 'dismiss', request_id: requestId }))
   }, [])
 
-  return { isConnected, sendAudioChunk, confirmIntent, dismissIntent }
+  return { isConnected, sendAudioChunk, confirmIntent, dismissIntent, sessionId: sessionIdState }
 }

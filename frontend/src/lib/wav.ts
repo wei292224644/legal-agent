@@ -9,19 +9,14 @@ function writeString(view: DataView, offset: number, str: string) {
   }
 }
 
-function float32ToInt16Bytes(samples: Float32Array): Uint8Array {
+export function encodePcmChunk(samples: Float32Array): Uint8Array {
   const buffer = new ArrayBuffer(samples.length * 2)
   const view = new DataView(buffer)
   for (let i = 0; i < samples.length; i++) {
     const clamped = Math.max(-1, Math.min(1, samples[i]))
-    const int16 = Math.round(clamped * 32767)
-    view.setInt16(i * 2, int16, true)
+    view.setInt16(i * 2, Math.round(clamped * 32767), true)
   }
   return new Uint8Array(buffer)
-}
-
-export function encodePcmChunk(samples: Float32Array): Uint8Array {
-  return float32ToInt16Bytes(samples)
 }
 
 export function encodeWavChunk(
@@ -29,8 +24,7 @@ export function encodeWavChunk(
   options: WavOptions,
 ): Uint8Array {
   const { sampleRate, channels } = options
-  const bitsPerSample = 16
-  const bytesPerSample = bitsPerSample / 8
+  const bytesPerSample = 2
   const byteRate = sampleRate * channels * bytesPerSample
   const blockAlign = channels * bytesPerSample
   const dataSize = samples.length * channels * bytesPerSample
@@ -52,15 +46,14 @@ export function encodeWavChunk(
   view.setUint32(24, sampleRate, true)
   view.setUint32(28, byteRate, true)
   view.setUint16(32, blockAlign, true)
-  view.setUint16(34, bitsPerSample, true)
+  view.setUint16(34, 16, true)          // bits per sample
 
   // data sub-chunk
   writeString(view, 36, 'data')
   view.setUint32(40, dataSize, true)
 
-  // PCM samples: Float32 [-1, 1] -> Int16
-  const pcmBytes = float32ToInt16Bytes(samples)
-  bytes.set(pcmBytes, headerSize)
+  // PCM samples
+  bytes.set(encodePcmChunk(samples), headerSize)
 
   return bytes
 }

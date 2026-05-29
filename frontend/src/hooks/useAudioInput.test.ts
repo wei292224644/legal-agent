@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useAudioInput } from './useAudioInput'
 
 // Mock Web Audio API
-global.AudioContext = vi.fn().mockImplementation(function () {
+globalThis.AudioContext = vi.fn().mockImplementation(function () {
   return {
     audioWorklet: {
       addModule: vi.fn().mockResolvedValue(undefined),
@@ -31,7 +31,7 @@ global.AudioContext = vi.fn().mockImplementation(function () {
   }
 }) as unknown as typeof AudioContext
 
-global.AudioWorkletNode = vi.fn().mockImplementation(function () {
+globalThis.AudioWorkletNode = vi.fn().mockImplementation(function () {
   return {
     port: {
       onmessage: null,

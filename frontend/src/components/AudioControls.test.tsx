@@ -6,6 +6,7 @@ import AudioControls from './AudioControls'
 const mockStartRecording = vi.fn()
 const mockStartFile = vi.fn()
 const mockStop = vi.fn()
+const mockClearError = vi.fn()
 
 vi.mock('@/hooks/useAudioInput', () => ({
   useAudioInput: vi.fn(() => ({
@@ -16,6 +17,7 @@ vi.mock('@/hooks/useAudioInput', () => ({
     startRecording: mockStartRecording,
     startFile: mockStartFile,
     stop: mockStop,
+    clearError: mockClearError,
   })),
 }))
 
@@ -34,18 +36,19 @@ describe('AudioControls', () => {
       startRecording: mockStartRecording,
       startFile: mockStartFile,
       stop: mockStop,
+      clearError: mockClearError,
     })
   })
 
   it('renders record and upload buttons in idle state', () => {
     render(<AudioControls onChunk={vi.fn()} />)
-    expect(screen.getByText('🎤 开始录音')).toBeDefined()
-    expect(screen.getByText('📁 上传音频')).toBeDefined()
+    expect(screen.getByText('开始录音')).toBeDefined()
+    expect(screen.getByText('上传音频')).toBeDefined()
   })
 
   it('calls startRecording when record button clicked', () => {
     render(<AudioControls onChunk={vi.fn()} />)
-    fireEvent.click(screen.getByText('🎤 开始录音'))
+    fireEvent.click(screen.getByText('开始录音'))
     expect(mockStartRecording).toHaveBeenCalledTimes(1)
   })
 
@@ -58,11 +61,12 @@ describe('AudioControls', () => {
       startRecording: mockStartRecording,
       startFile: mockStartFile,
       stop: mockStop,
+      clearError: mockClearError,
     })
 
     render(<AudioControls onChunk={vi.fn()} />)
-    expect(screen.getByText('⏹ 停止')).toBeDefined()
-    expect(screen.queryByText('🎤 开始录音')).toBeNull()
+    expect(screen.getByText('停止')).toBeDefined()
+    expect(screen.queryByText('开始录音')).toBeNull()
   })
 
   it('shows progress in file mode', () => {
@@ -74,11 +78,12 @@ describe('AudioControls', () => {
       startRecording: mockStartRecording,
       startFile: mockStartFile,
       stop: mockStop,
+      clearError: mockClearError,
     })
 
     render(<AudioControls onChunk={vi.fn()} />)
-    expect(screen.getByText('⏹ 停止')).toBeDefined()
-    expect(screen.getByText('▶️ 播放中...')).toBeDefined()
+    expect(screen.getByText('停止')).toBeDefined()
+    expect(screen.getByText('播放中…')).toBeDefined()
     expect(screen.getByText('45%')).toBeDefined()
   })
 
@@ -91,6 +96,7 @@ describe('AudioControls', () => {
       startRecording: mockStartRecording,
       startFile: mockStartFile,
       stop: mockStop,
+      clearError: mockClearError,
     })
 
     render(<AudioControls onChunk={vi.fn()} />)
@@ -106,10 +112,11 @@ describe('AudioControls', () => {
       startRecording: mockStartRecording,
       startFile: mockStartFile,
       stop: mockStop,
+      clearError: mockClearError,
     })
 
     render(<AudioControls onChunk={vi.fn()} />)
-    fireEvent.click(screen.getByText('⏹ 停止'))
+    fireEvent.click(screen.getByText('停止'))
     expect(mockStop).toHaveBeenCalledTimes(1)
   })
 })

@@ -13,6 +13,7 @@ export interface UseAudioInputReturn {
   isActive: boolean
   progress: number | null
   error: string | null
+  clearError: () => void
   startRecording: () => Promise<void>
   startFile: (file: File) => Promise<void>
   stop: () => void
@@ -21,7 +22,6 @@ export interface UseAudioInputReturn {
 const DEFAULT_CHUNK_MS = 300
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 const SAMPLE_RATE = 16000
-const CHANNELS = 1
 
 export function useAudioInput(
   options: UseAudioInputOptions,
@@ -30,7 +30,6 @@ export function useAudioInput(
   const [mode, setMode] = useState<AudioMode>('idle')
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const modeRef = useRef(mode)
   const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -39,7 +38,7 @@ export function useAudioInput(
   const streamRef = useRef<MediaStream | null>(null)
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const samplesRef = useRef<Float32Array[]>([])
-  const sentSamplesRef = useRef(0)
+  const readIdxRef = useRef(0)
   const totalSamplesRef = useRef(0)
   const onChunkRef = useRef(onChunk)
 
@@ -52,32 +51,27 @@ export function useAudioInput(
   }, [onChunk])
 
   const reset = useCallback(() => {
-    if (chunkTimerRef.current) {
-      clearInterval(chunkTimerRef.current)
-      chunkTimerRef.current = null
-    }
-    if (errorTimerRef.current) {
-      clearTimeout(errorTimerRef.current)
-      errorTimerRef.current = null
-    }
+    if (chunkTimerRef.current) clearInterval(chunkTimerRef.current)
+    chunkTimerRef.current = null
+
     if (sourceNodeRef.current) {
-      try { sourceNodeRef.current.stop() } catch { /* already stopped */ }
+      try { sourceNodeRef.current.stop() } catch { /* noop */ }
       sourceNodeRef.current = null
     }
     if (workletNodeRef.current) {
-      try { workletNodeRef.current.disconnect() } catch { /* already disconnected */ }
+      try { workletNodeRef.current.disconnect() } catch { /* noop */ }
       workletNodeRef.current = null
     }
     if (audioContextRef.current) {
-      try { audioContextRef.current.close() } catch { /* already closed */ }
+      try { audioContextRef.current.close() } catch { /* noop */ }
       audioContextRef.current = null
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
-    samplesRef.current = []
-    sentSamplesRef.current = 0
+    samplesRef.current.length = 0
+    readIdxRef.current = 0
     totalSamplesRef.current = 0
     setProgress(null)
     setError(null)
@@ -95,23 +89,12 @@ export function useAudioInput(
     }
   }, [reset])
 
-  const assertIdle = useCallback(() => {
-    if (modeRef.current !== 'idle') {
-      throw new Error('Audio input already active')
-    }
+  const clearError = useCallback(() => {
+    setError(null)
   }, [])
 
   const setErrorAndAutoClear = useCallback((message: string | null) => {
-    if (errorTimerRef.current) {
-      clearTimeout(errorTimerRef.current)
-      errorTimerRef.current = null
-    }
     setError(message)
-    if (message) {
-      errorTimerRef.current = setTimeout(() => {
-        setError(null)
-      }, 3000)
-    }
   }, [])
 
   const emitWavChunk = useCallback(
@@ -123,7 +106,7 @@ export function useAudioInput(
   )
 
   const startRecording = useCallback(async () => {
-    assertIdle()
+    if (modeRef.current !== 'idle') throw new Error('Audio input already active')
     setErrorAndAutoClear(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -155,8 +138,7 @@ export function useAudioInput(
       workletNodeRef.current = workletNode
 
       workletNode.port.onmessage = (e) => {
-        const float32 = new Float32Array(e.data)
-        samplesRef.current.push(float32)
+        samplesRef.current.push(e.data)
       }
 
       source.connect(workletNode)
@@ -165,47 +147,50 @@ export function useAudioInput(
       const chunkSamples = Math.floor((SAMPLE_RATE * chunkIntervalMs) / 1000)
       chunkTimerRef.current = setInterval(() => {
         const allSamples = samplesRef.current
-        if (allSamples.length === 0) return
+        const startIdx = readIdxRef.current
+        if (allSamples.length === 0 || startIdx >= allSamples.length) return
 
         // Flatten accumulated samples
         let totalLen = 0
-        for (const s of allSamples) totalLen += s.length
+        for (let i = startIdx; i < allSamples.length; i++) totalLen += allSamples[i].length
         if (totalLen < chunkSamples) return
 
         const flat = new Float32Array(chunkSamples)
         let written = 0
-        while (written < chunkSamples && allSamples.length > 0) {
-          const s = allSamples[0]
+        let readIdx = startIdx
+        while (written < chunkSamples && readIdx < allSamples.length) {
+          const s = allSamples[readIdx]
           const need = chunkSamples - written
           const take = Math.min(need, s.length)
           flat.set(s.subarray(0, take), written)
           written += take
           if (take === s.length) {
-            allSamples.shift()
+            readIdx++
           } else {
-            allSamples[0] = s.subarray(take)
+            allSamples[readIdx] = s.subarray(take)
           }
         }
+        readIdxRef.current = readIdx
         emitWavChunk(flat)
       }, chunkIntervalMs)
 
       setMode('mic')
     } catch (err) {
       reset()
-      const message =
-        err instanceof DOMException && err.name === 'NotAllowedError'
-          ? '麦克风权限被拒绝，请在浏览器设置中允许访问'
-          : err instanceof Error
-            ? err.message
-            : '启动录音失败'
+      let message = '启动录音失败'
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        message = '麦克风权限被拒绝，请在浏览器设置中允许访问'
+      } else if (err instanceof Error) {
+        message = err.message
+      }
       setErrorAndAutoClear(message)
       throw err
     }
-  }, [assertIdle, chunkIntervalMs, emitWavChunk, reset, setErrorAndAutoClear])
+  }, [chunkIntervalMs, emitWavChunk, reset, setErrorAndAutoClear])
 
   const startFile = useCallback(
     async (file: File) => {
-      assertIdle()
+      if (modeRef.current !== 'idle') throw new Error('Audio input already active')
       setErrorAndAutoClear(null)
 
       if (file.size > MAX_FILE_SIZE) {
@@ -243,7 +228,6 @@ export function useAudioInput(
           const slice = channelData.slice(offset, end)
           emitWavChunk(slice)
           offset = end
-          sentSamplesRef.current = offset
           setProgress(Math.round((offset / channelData.length) * 100))
         }, chunkIntervalMs)
 
@@ -257,17 +241,17 @@ export function useAudioInput(
         setMode('file')
       } catch (err) {
         reset()
-        const message =
-          err instanceof Error && err.name === 'NotSupportedError'
-            ? '无法解析该音频文件，请尝试 MP3 或 WAV 格式'
-            : err instanceof Error
-              ? err.message
-              : '文件处理失败'
+        let message = '文件处理失败'
+        if (err instanceof DOMException && err.name === 'NotSupportedError') {
+          message = '无法解析该音频文件，请尝试 MP3 或 WAV 格式'
+        } else if (err instanceof Error) {
+          message = err.message
+        }
         setErrorAndAutoClear(message)
         throw err
       }
     },
-    [assertIdle, chunkIntervalMs, emitWavChunk, reset, stop, setErrorAndAutoClear],
+    [chunkIntervalMs, emitWavChunk, reset, stop, setErrorAndAutoClear],
   )
 
   return {
@@ -278,5 +262,6 @@ export function useAudioInput(
     startRecording,
     startFile,
     stop,
+    clearError,
   }
 }
