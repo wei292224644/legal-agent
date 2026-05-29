@@ -7,7 +7,6 @@ profile 更新通过 asyncio.Queue 异步消费，避免阻塞主路径。
 import asyncio
 import contextlib
 from dataclasses import dataclass
-from datetime import datetime
 
 from models.utterance import Utterance
 
@@ -18,9 +17,10 @@ class ProfileEntry:
 
     key: str
     value: str
-    timestamp: datetime
+    timestamp: float  # 用 utt.t_start（相对音频秒数），非 datetime
     source_utt_id: str
     confidence: float = 1.0
+    category: str | None = None
 
 
 class ContextStore:
@@ -46,8 +46,14 @@ class ContextStore:
         """获取完整对话历史（浅拷贝）。"""
         return list(self._utterances)
 
+    def get_generation(self) -> int:
+        """返回当前 generation 编号。"""
+        return self._generation
+
     def get_recent_window(self, n: int = 8) -> list[Utterance]:
-        """获取最近 n 轮对话。"""
+        """获取最近 n 轮对话。n <= 0 时返回空列表。"""
+        if n <= 0:
+            return []
         return self._utterances[-n:]
 
     async def start_profile_worker(self) -> None:
@@ -60,15 +66,22 @@ class ContextStore:
         await self._profile_queue.put((utt_id, entries))
 
     def get_profile(self) -> list[ProfileEntry]:
-        """获取全部画像条目（浅拷贝）。"""
-        return list(self._profile)
+        """获取全部画像条目（浅拷贝），按 timestamp 升序排列。"""
+        return sorted(self._profile, key=lambda e: e.timestamp)
 
     def get_profile_keys(self) -> list[str]:
-        """获取已提取的 key 列表（去重且保持顺序）。"""
-        return list(dict.fromkeys(e.key for e in self._profile))
+        """获取已提取的 key 列表，按 timestamp 降序去重，保留每个 key 的最新出现。"""
+        sorted_profile = sorted(self._profile, key=lambda e: e.timestamp, reverse=True)
+        return list(dict.fromkeys(e.key for e in sorted_profile))
 
     async def stop_profile_worker(self) -> None:
-        """优雅关闭 profile worker：标记关闭、取消任务、等待退出。"""
+        """优雅关闭 profile worker：drain 队列、标记关闭、取消任务、等待退出。"""
+        while not self._profile_queue.empty():
+            try:
+                self._profile_queue.get_nowait()
+                self._profile_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
         self._shutdown = True
         if self._worker_task:
             self._worker_task.cancel()

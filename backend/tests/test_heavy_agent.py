@@ -27,8 +27,8 @@ def populated_store(store):
         Utterance(id="u_1", text="月薪两万五", speaker="client", t_start=1.0, t_end=2.0, timestamp=datetime.now()),
     ]
     store._profile = [
-        ProfileEntry(key="月薪", value="25000", timestamp=datetime.now(), source_utt_id="u_1"),
-        ProfileEntry(key="工龄", value="2年3个月", timestamp=datetime.now(), source_utt_id="u_1"),
+        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u_1"),
+        ProfileEntry(key="工龄", value="2年3个月", timestamp=1.0, source_utt_id="u_1"),
     ]
     store._generation = 2
     return store
@@ -98,3 +98,17 @@ async def test_analyze_quick_returns_short_response(populated_store):
         assert result is not None
         assert "N+1" in result
         mock_run.assert_called_once()
+
+
+def test_heavy_agent_uses_window(populated_store):
+    """HeavyAgent 的 get_user_context tool 应调用 get_recent_window(10) 而非切片。"""
+    from unittest.mock import patch
+
+    with patch.object(populated_store, "get_recent_window") as mock_window:
+        mock_window.return_value = populated_store.get_full_history()
+        agent = HeavyAgent(populated_store)
+        tool = agent._make_get_context_tool()
+        # Agno 的 @tool 返回 Function 对象，原始函数在 .entrypoint
+        result = tool.entrypoint()
+        mock_window.assert_called_once_with(10)
+        assert "律师你好" in result

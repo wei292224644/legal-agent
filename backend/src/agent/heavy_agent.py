@@ -53,14 +53,14 @@ class HeavyAgent:
         def get_user_context() -> str:
             """读取用户的完整对话历史和画像信息。"""
             profile = ctx.get_profile()
-            history = ctx.get_full_history()
+            history = ctx.get_recent_window(10)
 
             lines = ["=== 用户画像 ==="]
             for e in profile:
                 lines.append(f"- {e.key}: {e.value}")
 
             lines.append("\n=== 对话历史 ===")
-            for u in history[-10:]:
+            for u in history:
                 lines.append(f"[{u.speaker}] {u.text}")
 
             return "\n".join(lines)
@@ -77,7 +77,7 @@ class HeavyAgent:
         with_skills: bool = False,
     ) -> str | None:
         """公共分析逻辑：构造 Agent、调用 LLM、可选 stale 检查。"""
-        if check_stale and self._ctx._generation != generation:
+        if check_stale and self._ctx.get_generation() != generation:
             return None
 
         agent = Agent(
@@ -89,7 +89,7 @@ class HeavyAgent:
         prompt = f"意图类型: {intent_type}\n\n用户问题: {trigger_utt.text}"
         response = await agent.arun(prompt)
 
-        if check_stale and self._ctx._generation != generation:
+        if check_stale and self._ctx.get_generation() != generation:
             return None
 
         return getattr(response, "content", None) or str(response)

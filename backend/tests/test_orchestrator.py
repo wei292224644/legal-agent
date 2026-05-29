@@ -290,6 +290,37 @@ async def test_pa_extracts_facts_to_profile(store, mock_ir_client):
 
 
 @pytest.mark.asyncio
+async def test_profile_timestamp_from_utt(store, mock_ir_client):
+    """PA entries 的 timestamp 应被 Orchestrator 覆盖为 utt.t_start。"""
+    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
+    pa_client = MagicMock()
+    pa_client.chat.completions.create = AsyncMock(
+        return_value=MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"entries": [{"key": "月薪", "value": "两万五"}]}'))]
+        )
+    )
+
+    ha = HeavyAgent(store)
+    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
+    orch.set_suggestion_callback(lambda text, meta: None)
+
+    utt = Utterance(
+        id="u_1",
+        text="月薪两万五，税前",
+        speaker="client",
+        t_start=12.5,
+        t_end=13.0,
+        timestamp=datetime.now(),
+    )
+    await orch.handle_utterance(utt)
+    await asyncio.sleep(0.1)
+
+    profile = store.get_profile()
+    assert len(profile) == 1
+    assert profile[0].timestamp == 12.5
+
+
+@pytest.mark.asyncio
 async def test_ten_turn_dialogue_stability_and_completeness(store):
     """10轮短对话回归: simple 直推, complex 挂起, ignore 不触发。"""
 

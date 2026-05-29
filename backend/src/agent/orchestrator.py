@@ -51,10 +51,18 @@ class Orchestrator:
         self._ha = ha or HeavyAgent(ctx)
         self._suggestion_callback = None
         self._pending: dict[str, PendingRequest] = {}
+        self._bus = None
+        self._bus_task = None
+
+    def attach_bus(self, bus) -> None:
+        """附加事件总线。start() 后会自动启动 consumer task。"""
+        self._bus = bus
 
     async def start(self) -> None:
-        """启动内部 worker（如 profile worker）。应在事件循环中显式调用。"""
+        """启动内部 worker（如 profile worker、bus consumer）。应在事件循环中显式调用。"""
         await self._ctx.start_profile_worker()
+        if self._bus is not None and self._bus_task is None:
+            self._bus_task = asyncio.create_task(self._consume_bus())
 
     def set_suggestion_callback(self, callback) -> None:
         """设置建议回调。callback(text: str | None, meta: dict)。"""
@@ -79,6 +87,8 @@ class Orchestrator:
 
         pa_entries = await pa_task
         if pa_entries:
+            for entry in pa_entries:
+                entry.timestamp = utt.t_start
             await self._ctx.enqueue_profile_update(utt.id, pa_entries)
 
         ir_result = await ir_task
@@ -136,9 +146,24 @@ class Orchestrator:
         self._pending.pop(request_id, None)
 
     async def shutdown(self) -> None:
-        """清理资源：取消 profile worker，清空 pending。"""
+        """清理资源：取消 profile worker、bus consumer，清空 pending。"""
         await self._ctx.stop_profile_worker()
+        if self._bus_task is not None:
+            self._bus_task.cancel()
+            try:
+                await self._bus_task
+            except asyncio.CancelledError:
+                pass
         self._pending.clear()
+
+    async def _consume_bus(self) -> None:
+        """事件总线消费者：循环 get utterance 并交给 handle_utterance 处理。"""
+        while True:
+            try:
+                utt = await self._bus.get()
+                await self.handle_utterance(utt)
+            except asyncio.CancelledError:
+                break
 
     async def _emit_suggestion(self, text: str | None, meta: dict) -> None:
         """调用 suggestion_callback，自动兼容同步/异步回调。"""

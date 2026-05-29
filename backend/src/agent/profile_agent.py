@@ -4,7 +4,6 @@
 """
 
 import json
-from datetime import datetime
 
 from openai import AsyncOpenAI
 
@@ -82,7 +81,6 @@ class ProfileAgent:
         try:
             parsed = json.loads(content)
             entries_data = parsed.get("entries", [])
-            now = datetime.now()
             entries = []
             for e in entries_data:
                 if isinstance(e, dict) and "key" in e and "value" in e:
@@ -93,7 +91,7 @@ class ProfileAgent:
                         ProfileEntry(
                             key=e["key"],
                             value=val,
-                            timestamp=now,
+                            timestamp=0.0,
                             source_utt_id=utt_id or "llm",
                             confidence=0.9,
                         )

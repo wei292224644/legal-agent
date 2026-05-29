@@ -63,7 +63,7 @@ async def test_profile_worker_appends_entries():
     entry = ProfileEntry(
         key="月薪",
         value="25000",
-        timestamp=datetime.now(),
+        timestamp=0.0,
         source_utt_id="u_1",
         confidence=1.0,
     )
@@ -88,7 +88,7 @@ async def test_profile_worker_preserves_order_under_concurrent_enqueue():
             entry = ProfileEntry(
                 key=f"batch_{batch_id}",
                 value=f"item_{i}",
-                timestamp=datetime.now(),
+                timestamp=float(batch_id * 5 + i),
                 source_utt_id=f"u_{batch_id}_{i}",
                 confidence=1.0,
             )
@@ -114,9 +114,9 @@ async def test_get_profile_keys_returns_unique_keys():
     await store.start_profile_worker()
 
     entries = [
-        ProfileEntry(key="月薪", value="25000", timestamp=datetime.now(), source_utt_id="u_1"),
-        ProfileEntry(key="工龄", value="2年", timestamp=datetime.now(), source_utt_id="u_2"),
-        ProfileEntry(key="月薪", value="30000", timestamp=datetime.now(), source_utt_id="u_3"),
+        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u_1"),
+        ProfileEntry(key="工龄", value="2年", timestamp=2.0, source_utt_id="u_2"),
+        ProfileEntry(key="月薪", value="30000", timestamp=3.0, source_utt_id="u_3"),
     ]
     for e in entries:
         await store.enqueue_profile_update(e.source_utt_id, [e])
@@ -125,3 +125,66 @@ async def test_get_profile_keys_returns_unique_keys():
 
     keys = store.get_profile_keys()
     assert sorted(keys) == ["工龄", "月薪"]
+
+
+def test_get_profile_sorted():
+    """get_profile() 应按 timestamp 升序返回。"""
+    store = ContextStore()
+    store._profile = [
+        ProfileEntry(key="a", value="1", timestamp=3.0, source_utt_id="u3"),
+        ProfileEntry(key="b", value="2", timestamp=1.0, source_utt_id="u1"),
+        ProfileEntry(key="c", value="3", timestamp=2.0, source_utt_id="u2"),
+    ]
+    profile = store.get_profile()
+    timestamps = [e.timestamp for e in profile]
+    assert timestamps == [1.0, 2.0, 3.0]
+
+
+def test_get_profile_keys_sorted():
+    """get_profile_keys() 应按 timestamp 降序去重，保留每个 key 的最新出现。"""
+    store = ContextStore()
+    store._profile = [
+        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u1"),
+        ProfileEntry(key="工龄", value="2年", timestamp=2.0, source_utt_id="u2"),
+        ProfileEntry(key="月薪", value="30000", timestamp=3.0, source_utt_id="u3"),
+    ]
+    keys = store.get_profile_keys()
+    assert keys == ["月薪", "工龄"]
+
+
+def test_get_generation():
+    """get_generation() 应返回当前 generation 编号。"""
+    store = ContextStore()
+    assert store.get_generation() == 0
+    store._generation = 5
+    assert store.get_generation() == 5
+
+
+@pytest.mark.asyncio
+async def test_get_recent_window_zero_returns_empty():
+    """n <= 0 时 get_recent_window() 应返回空列表。"""
+    store = ContextStore()
+    utt = Utterance(
+        id="u_1",
+        text="hello",
+        speaker="client",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
+    )
+    await store.append_utterance(utt)
+    assert store.get_recent_window(n=0) == []
+    assert store.get_recent_window(n=-1) == []
+
+
+def test_profile_entry_category():
+    """ProfileEntry 应支持 category 字段。"""
+    entry = ProfileEntry(
+        key="月薪", value="25000", timestamp=0.0, source_utt_id="u1", category="收入"
+    )
+    assert entry.category == "收入"
+
+    entry_default = ProfileEntry(
+        key="工龄", value="2年", timestamp=0.0, source_utt_id="u1"
+    )
+    assert entry_default.category is None

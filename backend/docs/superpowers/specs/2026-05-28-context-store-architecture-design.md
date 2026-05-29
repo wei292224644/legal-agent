@@ -195,3 +195,16 @@ def get_profile_keys(self) -> list[str]:
 | `src/agent/context_store.py` | 新增 `get_generation()`、改 `get_profile()` 排序、改 `get_profile_keys()` 排序、增加 `category` 字段 |
 | `src/agent/heavy_agent.py` | `self._ctx._generation` → `get_generation()`、`get_full_history()[-10:]` → `get_recent_window(10)` |
 | `src/agent/orchestrator.py` | PA entries timestamp 覆盖为 `utt.t_start` |
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES_OPEN (PLAN) | 9 issues, 1 critical gap |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0
+- **VERDICT:** ENG CLEARED — 9 issues fixed, 26 tests passing
