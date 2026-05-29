@@ -5,6 +5,31 @@
 """
 
 
+def build_relevance_prompt(speaker: str, text: str) -> str:
+    """二分类相关性提示:判断这句话是否值得唤醒 HeavyAgent。
+
+    设计契约:输出只是一个布尔。不要标签、不要 severity、不要 intent_type。
+    标注者只看"法律/需求相关",产品策略变了不用重训。
+    """
+    return f"""你正在旁听律师与客户的劳动法律咨询。
+
+判断当前这句话是否需要 AI 法律助手参与(法律问题、案件需求、需要法条/计算/策略)。
+
+## 规则
+- 寒暄、应答("好的""嗯""谢谢")→ false
+- 律师的科普、引用法条、安慰客户、事实询问 → false(律师是专业人士,默认不打扰)
+- 律师以第一人称显式求助("系统帮我…""AI 查一下…")→ true
+- 客户陈述事实(月薪、工龄、入职日期等)→ false(交给画像提取,无需唤醒)
+- 客户的法律提问("赔多少""能赢吗""怎么算")→ true
+- 客户的转述("公司说我不胜任")→ false
+
+只输出一个词:true 或 false。不要解释。
+
+speaker: {speaker}
+text: {text}
+"""
+
+
 def build_role_aware_prompt(speaker: str, text: str) -> str:
     """角色感知意图分类提示。"""
     template = """\
