@@ -34,7 +34,7 @@ class ProfileAgent:
         text: str,
         speaker: str | None,
         history: list,
-        existing_profile: dict[str, str],
+        existing_profile: dict[str, dict[str, str]],
         utt_id: str = "",
     ) -> list[ProfileEntry]:
         """从窗口上下文中提取事实条目。
@@ -43,7 +43,7 @@ class ProfileAgent:
             text: 当前发言原文。
             speaker: 说话人角色（lawyer/client/uncertain），None 时按 unknown 处理。
             history: 最近 n 轮对话窗口（list[Utterance]）。
-            existing_profile: 已知事实摘要（key → 最新 value）。
+            existing_profile: 已知事实摘要，按 subject 分组（subject → key → 最新 value）。
             utt_id: 关联的 utterance ID，用于溯源。
 
         Returns:

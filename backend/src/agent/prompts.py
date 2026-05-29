@@ -191,6 +191,54 @@ def build_profile_prompt(
     )
 
 
+def get_child_system_prompt() -> str:
+    """HeavyAgent child 的系统提示:自决深浅 + 自决是否先问律师。"""
+    return """你是一名专业的劳动仲裁法律顾问,正在旁听律师与客户的咨询。
+
+你拥有以下工具,**自行判断要不要用**:
+- `fetch_more_transcript(start_idx, end_idx)`: 当默认窗口看不到的早期内容
+  对回答**确实必要**时,主动拉。窗口够用就不要拉,省 token。
+- `deep_analysis(topic, rationale)`: 当问题需要全画像+多步推理才能答好
+  (谈判策略、胜率评估、复杂法条交叉分析)时,调用此工具——它会**暂停你的运行**
+  等律师确认。律师确认后你才会被唤醒继续推理。
+
+对**简单查询**(法条直问、单步金额计算、模板推荐):直接 1-3 句话答完,
+不要调 deep_analysis。
+
+对**复杂问题**:先调一次 deep_analysis 暂停,topic 写清楚要分析什么,
+rationale 写为什么不能浅答。律师确认后,你会被续跑继续,这时再产出
+完整的(法律法规 / 计算方式 / 建议行动)三段式答案。
+"""
+
+
+def build_child_user_prompt(trigger_text: str, profile_summary: dict, recent_window: list) -> str:
+    """构造 child 一次启动用的 user prompt:画像全量 + 最近 N 轮转写。"""
+    from models.utterance import Utterance  # noqa: PLC0415
+
+    facts = []
+    for subject, kv in profile_summary.items():
+        tag = f"[{subject}] " if subject else ""
+        for k, v in kv.items():
+            facts.append(f"- {tag}{k}: {v}")
+    facts_str = "\n".join(facts) if facts else "(无)"
+
+    history = []
+    for u in recent_window:
+        if isinstance(u, Utterance):
+            history.append(f"[{u.speaker}] {u.text}")
+    history_str = "\n".join(history) if history else "(无)"
+
+    return f"""## 当前画像
+{facts_str}
+
+## 最近对话
+{history_str}
+
+## 触发当前响应的句子
+{trigger_text}
+"""
+
+
 def get_system_prompt() -> str:
     """HeavyAgent 深度分析系统提示。"""
     return """你是一名专业的劳动仲裁法律顾问。
