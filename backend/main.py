@@ -9,6 +9,7 @@ import soundfile as sf
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+from agent.bus import UtteranceBus  # noqa: E402
 from agent.context_store import ContextStore  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
 from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
@@ -63,10 +64,15 @@ async def legal_session(ws: WebSocket, session_id: str):
                 "closed_by": utt.closed_by,
                 "is_final": True,
             })
-            asyncio.create_task(orch.handle_utterance(utt))
+            ok = await bus.put(utt)
+            if not ok:
+                # 有界队列满时丢弃，避免内存无限堆积
+                print(f"[WARN] Utterance bus full, dropping utt {utt.id}")
 
     ctx = ContextStore()
     orch = Orchestrator(ctx)
+    bus = UtteranceBus(maxsize=10)
+    orch.attach_bus(bus)
 
     async def on_suggestion(text, meta):
         if meta.get("kind") == "pending":
@@ -96,6 +102,7 @@ async def legal_session(ws: WebSocket, session_id: str):
             })
 
     orch.set_suggestion_callback(on_suggestion)
+    await orch.start()
 
     stt_task = asyncio.create_task(consume_stt())
 
