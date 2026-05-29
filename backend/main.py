@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import logging
 import sys
 import time
 from pathlib import Path
@@ -22,6 +23,8 @@ from stt.funasr_stream import stream_stt  # noqa: E402
 
 ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册.wav"
 SESSION_DB = Path(__file__).parent / "data" / "sessions.db"
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -126,9 +129,11 @@ async def legal_session(ws: WebSocket, session_id: str):
                         "utt_id": meta["utt_id"],
                     },
                 })
-        except Exception:
+        except (WebSocketDisconnect, RuntimeError):
             # WS 已断开时不应崩溃
             pass
+        except Exception as exc:
+            logger.warning("Suggestion callback failed: %s", exc)
 
     orch.set_suggestion_callback(on_suggestion)
     await orch.start()
@@ -158,11 +163,13 @@ async def legal_session(ws: WebSocket, session_id: str):
                     "closed_by": utt.closed_by,
                     "is_final": True,
                 })
-            except Exception:
+            except (WebSocketDisconnect, RuntimeError):
                 pass
+            except Exception as exc:
+                logger.warning("Failed to send transcript to WS: %s", exc)
             ok = await bus.put(utt)
             if not ok:
-                print(f"[WARN] Utterance bus full, dropping utt {utt.id}")
+                logger.warning("Utterance bus full, dropping utt %s", utt.id)
 
     stt_task = asyncio.create_task(consume_stt())
 
@@ -215,9 +222,9 @@ async def legal_session(ws: WebSocket, session_id: str):
             await session_manager.detach_ws(session_id)
         try:
             await orch.shutdown()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Orchestrator shutdown failed: %s", exc)
         try:
             await stt_task
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("STT task cleanup failed: %s", exc)

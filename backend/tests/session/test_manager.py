@@ -108,3 +108,22 @@ class TestCleanup:
             s.last_active_at = time.monotonic() - 2.0
         await manager.cleanup_expired()
         assert await manager.get_state(sid) is None
+
+
+@pytest.mark.asyncio
+class TestSetSummary:
+    async def test_set_summary(self, manager):
+        sid = await manager.create_session(_dummy_enrollment())
+        await manager.set_summary(sid, "AI generated summary")
+        state = await manager.get_state(sid)
+        assert state.summary == "AI generated summary"
+
+    async def test_set_summary_missing_session(self, manager):
+        # 不存在的 session 不应报错
+        await manager.set_summary("nope", "summary")
+
+    async def test_set_summary_triggers_snapshot(self, manager):
+        sid = await manager.create_session(_dummy_enrollment())
+        await manager.set_summary(sid, "summary text")
+        # 快照已写入后端
+        assert manager._backend.load(sid)["summary"] == "summary text"

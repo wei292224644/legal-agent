@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse:Edit": {
+      "if": "endsWith(file_path, '.py')",
+      "run": "Bash(uv run ruff format {{file_path}} && uv run ruff check --fix {{file_path}})"
+    },
+    "PreToolUse:Edit": {
+      "if": "matches(file_path, '\\.env(\\.example)?$')",
+      "prompt": "此文件可能包含密钥，确认要继续编辑吗？"
+    }
+  }
+}

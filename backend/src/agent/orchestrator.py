@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass, field
 
@@ -15,6 +16,8 @@ from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentRouter
 from agent.profile_agent import ProfileAgent
 from models.utterance import Utterance
+
+logger = logging.getLogger(__name__)
 
 PROFILE_WINDOW_SIZE = 6
 
@@ -99,7 +102,9 @@ class Orchestrator:
         # None 不是合法运行态:match_speaker 永不返回 None,出现 None 说明
         # enrollment 没接上或上游漏分类——是 bug,告警后降级保活,绝不静默吞。
         if utt.speaker is None:
-            print(f"[WARN] utterance {utt.id} speaker=None,声纹链路可能未接通(已降级为 client)")
+            logger.warning(
+                "utterance %s speaker=None,声纹链路可能未接通(已降级为 client)", utt.id
+            )
         # uncertain 是合法结果(声纹拿不准):2 方会谈"非律师即客户",按 client 处理,
         # 宁可多提取后让律师删,也别让 PA 因 speaker 不是 [client] 而静默丢事实。
         # 前端转写在进 bus 前已拿到真实 speaker,此处归一只影响 agent 侧。
@@ -130,9 +135,9 @@ class Orchestrator:
                     for entry in pa_entries:
                         entry.timestamp = utt.t_start
                     await self._ctx.enqueue_profile_update(utt.id, pa_entries)
-            except Exception:
+            except Exception as exc:
                 # PA 提取失败不应阻塞 IR 结果和建议推送
-                pass
+                logger.warning("ProfileAgent extraction failed: %s", exc)
 
         ir_result = await ir_task
 
@@ -211,9 +216,9 @@ class Orchestrator:
                 await self.handle_utterance(utt)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as exc:
                 # 单句处理失败（如 LLM 超时）不应杀死消费者，否则整场会谈哑火。
-                print(f"[ERROR] handle_utterance failed, skipping utterance: {e}")
+                logger.error("handle_utterance failed, skipping utterance: %s", exc)
 
     async def _emit_suggestion(self, text: str | None, meta: dict) -> None:
         """调用 suggestion_callback，自动兼容同步/异步回调。"""
