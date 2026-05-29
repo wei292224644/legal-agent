@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import os
-import time
 from collections.abc import AsyncIterator
 
 import numpy as np
@@ -35,10 +33,6 @@ from models.utterance import ClosedBy, Utterance
 
 _vad_model: AutoModel | None = None
 _asr_model: AutoModel | None = None
-
-# 诊断 trace(env 开关,默认关,生产零开销):拆解每句产出延迟的各阶段
-_STT_TRACE = os.getenv("STT_TRACE") == "1"
-_trace_log: list[dict] = []
 
 
 def _get_models() -> tuple[AutoModel, AutoModel]:
@@ -227,7 +221,6 @@ async def stream_stt(
     """
     vad_model, asr_model = _get_models()
 
-    trace_t0 = time.monotonic()  # trace 墙钟锚点(1x 下 ≈ 音频起点)
     pieces: list[np.ndarray] = []
     t0: float | None = None
     yielded_until_ms = 0
@@ -285,9 +278,7 @@ async def stream_stt(
             if not stable:
                 continue
 
-            t_stable = time.monotonic() if _STT_TRACE else 0.0
             text = await spec_asr[matched_key]
-            t_after_asr = time.monotonic() if _STT_TRACE else 0.0
             # 清理已 yield 的 cache 项(以及小于 e_ms 的陈旧 spec)
             for k in list(spec_asr.keys()):
                 if k[1] <= e_ms + 100:
@@ -303,17 +294,6 @@ async def stream_stt(
                     int(s_ms * SR / 1000) : int(e_ms * SR / 1000)
                 ].copy()  # 跟 spec_asr 的 seg_audio 一致,防御后续并发改写
                 speaker = await asyncio.to_thread(match_speaker, speaker_audio, SR, enrollment)
-            if _STT_TRACE:
-                t_yield = time.monotonic()
-                _trace_log.append({
-                    "e_ms": e_ms,
-                    "buf_ms": total_ms,  # 检测到该段时缓冲已到哪(对比 e_ms 看检测滞后)
-                    "audio_end_rel": e_ms / 1000.0,
-                    "stable_rel": t_stable - trace_t0,  # 进入可产出态的墙钟
-                    "dt_asr_ms": (t_after_asr - t_stable) * 1000,  # 等投机 ASR
-                    "dt_cam_ms": (t_yield - t_after_asr) * 1000,  # cam++ await
-                    "yield_rel": t_yield - trace_t0,  # 真正 yield 的墙钟
-                })
             yield Utterance(
                 id=_utt_id(t_start, text),
                 text=text,

@@ -232,23 +232,6 @@ async def main():
     print(f"  raw speaker 分布: {dict(Counter(raw_speakers))}  (uncertain/None 在 agent 端被降级为 client)")
     print(f"  closed_by 分布:   {dict(Counter(closed_bys))}")
 
-    if os.getenv("STT_TRACE") == "1":
-        import stt.funasr_stream as fs
-
-        tl = fs._trace_log
-        if tl:
-            detect_lag = [r["stable_rel"] - r["audio_end_rel"] for r in tl]  # 段音频结束→进入可产出态
-            dt_asr = [r["dt_asr_ms"] / 1000 for r in tl]
-            dt_cam = [r["dt_cam_ms"] / 1000 for r in tl]
-            yield_total = [r["yield_rel"] - r["audio_end_rel"] for r in tl]  # ≈ 实测 STT 延迟
-            buf_minus_e = [(r["buf_ms"] - r["e_ms"]) / 1000 for r in tl]  # 检测到时缓冲超出段尾多少
-            print(f"\n[STT-TRACE] n={len(tl)}  enroll={'OFF' if NO_ENROLL else 'ON'}  各阶段拆解(s):")
-            print(f"  ① 段检测滞后(音频结束→可产出): {_stats_ms(detect_lag)}")
-            print(f"     └ 检测时缓冲超出段尾 buf-e_ms: {_stats_ms(buf_minus_e)}")
-            print(f"  ② 等投机ASR dt_asr:            {_stats_ms(dt_asr)}")
-            print(f"  ③ cam++ await dt_cam:          {_stats_ms(dt_cam)}")
-            print(f"  ④ yield总延迟(①+②+③+握手):     {_stats_ms(yield_total)}")
-
     if NO_AGENT:
         print(f"\n结束: {datetime.now().strftime('%H:%M:%S')}")
         print("=" * 80, flush=True)

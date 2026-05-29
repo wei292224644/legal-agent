@@ -1,8 +1,6 @@
 import { useState, useCallback, memo } from "react";
 import { useWebSocket, type SuggestionData } from "@/hooks/useWebSocket";
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AudioControls from "@/components/AudioControls";
 import {
@@ -17,7 +15,6 @@ import {
   Users,
   HelpCircle,
   CheckCircle2,
-  Circle,
 } from "lucide-react";
 
 type TranscriptLine = { speaker: string; text: string };
@@ -59,34 +56,12 @@ type AnalysisData = {
 };
 
 const categoryConfig = {
-  statute: {
-    label: "法规引用",
-    icon: BookOpen,
-    border: "border-[#d4a853]/30",
-    bg: "bg-[#d4a853]/5",
-  },
-  contract: {
-    label: "合同条款",
-    icon: FileText,
-    border: "border-[#6b8ec4]/30",
-    bg: "bg-[#6b8ec4]/5",
-  },
-  risk: {
-    label: "风险提示",
-    icon: ShieldAlert,
-    border: "border-[#c45c5c]/40",
-    bg: "bg-[#c45c5c]/5",
-  },
+  statute: { label: "法规引用", icon: BookOpen, color: "#d4a853" },
+  contract: { label: "合同条款", icon: FileText, color: "#6b8ec4" },
+  risk: { label: "风险提示", icon: ShieldAlert, color: "#c45c5c" },
 } as const;
 
-const riskLevelClass = {
-  高: "border-[#c45c5c]/50 text-[#c45c5c]",
-  中: "border-[#d4a853]/50 text-[#d4a853]",
-  低: "border-[#6b8f6b]/50 text-[#6b8f6b]",
-} as const;
-
-const riskLevelIcon = { 高: Circle, 中: Circle, 低: Circle } as const;
-const riskLevelColor = { 高: "text-[#c45c5c]", 中: "text-[#d4a853]", 低: "text-[#6b8f6b]" } as const;
+const riskLevelColor = { 高: "#c45c5c", 中: "#d4a853", 低: "#6b8f6b" } as const;
 
 const emptyAnalysis = (
   <div className="flex flex-col items-center justify-center h-full text-[#525252] gap-2">
@@ -126,43 +101,46 @@ const TranscriptItem = memo(function TranscriptItem({
   );
 });
 
-const AnalysisCard = memo(function AnalysisCard({ a }: { a: Analysis }) {
+const AnalysisItem = memo(function AnalysisItem({
+  a,
+}: {
+  a: Analysis;
+}) {
   const cfg = categoryConfig[a.category];
   return (
-    <Card
-      className={`p-4 ${cfg.bg} ${cfg.border} border rounded-lg transition-all duration-300`}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <Badge
-          variant="outline"
-          className={`text-xs ${cfg.border} text-[#e5e5e5] rounded`}
+    <div className="relative pl-5 py-3">
+      <div
+        className="absolute left-0 top-2 bottom-0 w-px"
+        style={{ backgroundColor: `${cfg.color}18` }}
+      />
+      <div
+        className="absolute left-[-2px] top-2.5 w-1.5 h-1.5 rounded-full"
+        style={{ backgroundColor: `${cfg.color}50` }}
+      />
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="text-xs font-mono uppercase tracking-wide"
+          style={{ color: cfg.color }}
         >
-          <cfg.icon className="w-3 h-3" /> {cfg.label}
-        </Badge>
+          <cfg.icon className="w-3 h-3 inline" /> {cfg.label}
+        </span>
         {a.category === "risk" && a.level && (
-          <Badge
-            variant="outline"
-            className={`text-xs ${
-              riskLevelClass[a.level as keyof typeof riskLevelClass] ?? ""
-            } rounded`}
+          <span
+            className="text-xs font-mono uppercase tracking-wide"
+            style={{
+              color: riskLevelColor[a.level as keyof typeof riskLevelColor],
+            }}
           >
-            {a.level && (() => {
-              const Icon = riskLevelIcon[a.level as keyof typeof riskLevelIcon];
-              const color = riskLevelColor[a.level as keyof typeof riskLevelColor];
-              return <Icon className={`w-3 h-3 ${color}`} />;
-            })()}{" "}
             {a.level}
-          </Badge>
+          </span>
         )}
       </div>
-      <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">
-        {a.title}
-      </h3>
+      <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">{a.title}</h3>
       <p className="text-xs text-[#8a8a8a] leading-relaxed">{a.content}</p>
       {a.citation && (
         <p className="text-xs text-[#d4a853]/70 mt-2 font-mono">{a.citation}</p>
       )}
-    </Card>
+    </div>
   );
 });
 
@@ -177,14 +155,19 @@ const SuggestionCard = memo(function SuggestionCard({
 }) {
   if (s.kind === "pending") {
     return (
-      <Card className="p-4 bg-[#d4a853]/5 border-[#d4a853]/30 border rounded-lg transition-all duration-300">
-        <Badge
-          variant="outline"
-          className="text-xs border-[#d4a853]/30 text-[#d4a853] mb-2 rounded"
-        >
-          <HelpCircle className="w-3 h-3" /> 检测到可分析意图
-        </Badge>
-        <p className="text-xs text-[#8a8a8a] leading-relaxed mb-3">
+      <div className="relative pl-5 py-3">
+        <div
+          className="absolute left-0 top-2 bottom-0 w-px"
+          style={{ backgroundColor: "#d4a85318" }}
+        />
+        <div
+          className="absolute left-[-2px] top-2.5 w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: "#d4a85350" }}
+        />
+        <span className="text-xs font-mono uppercase tracking-wide text-[#d4a853]">
+          <HelpCircle className="w-3 h-3 inline" /> 检测到可分析意图
+        </span>
+        <p className="text-xs text-[#8a8a8a] leading-relaxed my-2">
           {s.intentType}
           {s.lawDomain ? ` · ${s.lawDomain}` : ""}
         </p>
@@ -205,21 +188,26 @@ const SuggestionCard = memo(function SuggestionCard({
             忽略
           </Button>
         </div>
-      </Card>
+      </div>
     );
   }
   return (
-    <Card className="p-4 bg-[#6b8ec4]/5 border-[#6b8ec4]/30 border rounded-lg transition-all duration-300">
-      <Badge
-        variant="outline"
-        className="text-xs border-[#6b8ec4]/30 text-[#e5e5e5] mb-2 rounded"
-      >
-        <CheckCircle2 className="w-3 h-3" /> {s.intentType}
-      </Badge>
-      <p className="text-xs text-[#e5e5e5] leading-relaxed whitespace-pre-wrap">
+    <div className="relative pl-5 py-3">
+      <div
+        className="absolute left-0 top-2 bottom-0 w-px"
+        style={{ backgroundColor: "#6b8ec418" }}
+      />
+      <div
+        className="absolute left-[-2px] top-2.5 w-1.5 h-1.5 rounded-full"
+        style={{ backgroundColor: "#6b8ec450" }}
+      />
+      <span className="text-xs font-mono uppercase tracking-wide text-[#6b8ec4]">
+        <CheckCircle2 className="w-3 h-3 inline" /> {s.intentType}
+      </span>
+      <p className="text-xs text-[#e5e5e5] leading-relaxed whitespace-pre-wrap mt-2">
         {s.text}
       </p>
-    </Card>
+    </div>
   );
 });
 
@@ -309,7 +297,7 @@ export default function LiveSession() {
     suggestions.length === 0 && analyses.length === 0 ? (
       emptyAnalysis
     ) : (
-      <div className="space-y-3">
+      <div className="space-y-5">
         {suggestions.map((s) => (
           <SuggestionCard
             key={s.kind === "pending" ? s.requestId : s.id}
@@ -319,7 +307,7 @@ export default function LiveSession() {
           />
         ))}
         {analyses.map((a) => (
-          <AnalysisCard key={a.id} a={a} />
+          <AnalysisItem key={a.id} a={a} />
         ))}
       </div>
     );
@@ -361,7 +349,7 @@ export default function LiveSession() {
   return (
     <div className="flex flex-col h-screen bg-[#0d0b08] text-[#e5e5e5]">
       {/* Desktop header */}
-      <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-[rgba(255,255,255,0.08)] bg-[#0d0b08] shrink-0">
+      <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-[rgba(255,255,255,0.04)] bg-[#0d0b08] shrink-0">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-medium tracking-wide text-[#525252]">
             实时会谈
@@ -383,7 +371,7 @@ export default function LiveSession() {
       </header>
 
       {/* Mobile header */}
-      <header className="flex md:hidden items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)] bg-[#0d0b08] shrink-0">
+      <header className="flex md:hidden items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.04)] bg-[#0d0b08] shrink-0">
         <div className="flex items-center gap-3">
           <h1 className="text-base font-medium tracking-wide text-[#525252]">
             实时会谈
@@ -400,8 +388,8 @@ export default function LiveSession() {
       {/* Desktop layout: Analysis left, Transcript right */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {/* Left: Analysis (dominant, 40%) */}
-        <div className="w-[40%] flex flex-col border-r border-[rgba(255,255,255,0.08)]">
-          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.08)] shrink-0">
+        <div className="w-[40%] flex flex-col bg-[#12100c]">
+          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.04)] shrink-0">
             <h2 className="text-lg font-medium tracking-wide text-[#d4a853]">
               实时洞察
             </h2>
@@ -409,12 +397,14 @@ export default function LiveSession() {
               {suggestions.length + analyses.length} 条分析结果
             </p>
           </div>
-          <ScrollArea className="flex-1 px-4 py-4">{analysisContent}</ScrollArea>
+          <ScrollArea className="flex-1 px-5 py-6">
+            {analysisContent}
+          </ScrollArea>
         </div>
 
         {/* Right: Transcript (secondary, 60%) */}
         <div className="flex-1 flex flex-col">
-          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.08)] shrink-0 flex items-center justify-between">
+          <div className="px-6 py-3 border-b border-[rgba(255,255,255,0.04)] shrink-0 flex items-center justify-between">
             <h2 className="text-lg font-medium tracking-wide text-[#8a8a8a]">
               转写记录
             </h2>
@@ -432,7 +422,9 @@ export default function LiveSession() {
       <div className="flex md:hidden flex-1 flex-col overflow-hidden">
         <div className="flex-1 overflow-hidden">
           {activeTab === "analysis" ? (
-            <ScrollArea className="h-full px-4 py-4">{analysisContent}</ScrollArea>
+            <ScrollArea className="h-full px-4 py-4 bg-[#12100c]">
+              {analysisContent}
+            </ScrollArea>
           ) : (
             <ScrollArea className="h-full px-4 py-4">
               {transcriptContent}
@@ -441,7 +433,7 @@ export default function LiveSession() {
         </div>
 
         {/* Mobile bottom tab bar */}
-        <nav className="flex border-t border-[rgba(255,255,255,0.08)] bg-[#17140f] shrink-0">
+        <nav className="flex border-t border-[rgba(255,255,255,0.04)] bg-[#17140f] shrink-0">
           <button
             onClick={() => setActiveTab("analysis")}
             className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${
