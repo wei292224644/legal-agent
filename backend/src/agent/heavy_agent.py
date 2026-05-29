@@ -28,6 +28,7 @@ def _build_model() -> DeepSeek:
     return DeepSeek(
         id=DEEPSEEK_MODEL,
         api_key=client.api_key,
+        base_url=str(client.base_url),
     )
 
 

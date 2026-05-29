@@ -74,6 +74,7 @@ async def run_single_dialogue(name: str, turns: list, logger: JudgmentLogger):
         pa=logger.wrap_pa(ProfileAgent()),
         ha=logger.wrap_ha(HeavyAgent(ctx)),
     )
+    await orch.start()
 
     all_suggestions = []
     pending_requests = []

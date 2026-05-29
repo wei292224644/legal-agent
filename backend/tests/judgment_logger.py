@@ -110,12 +110,13 @@ class JudgmentLogger:
         log = self._log
 
         class _LoggingPA:
-            async def extract(self, text, speaker, existing_keys, utt_id=""):
+            async def extract(self, text, speaker, history, existing_profile, utt_id=""):
                 t0 = time.monotonic()
                 result = await pa.extract(
                     text=text,
                     speaker=speaker,
-                    existing_keys=existing_keys,
+                    history=history,
+                    existing_profile=existing_profile,
                     utt_id=utt_id,
                 )
                 log(
@@ -124,7 +125,8 @@ class JudgmentLogger:
                     {
                         "text": text,
                         "speaker": speaker,
-                        "existing_keys": list(existing_keys),
+                        "history": [_serialize(u) for u in history] if history else [],
+                        "existing_profile": dict(existing_profile) if existing_profile else {},
                         "utt_id": utt_id,
                     },
                     result,

@@ -196,8 +196,14 @@ async def test_full_wav_realtime_cer():
 
         audio = stream_wav_realtime(MAIN_WAV, chunk_ms=100, speed=SPEED)
         utterances = []
+        latencies: list[float] = []  # 从 t_end 到 utterance 产出的延迟
+        stream_start = time.monotonic()
         async for utt in stream_stt(audio):
+            yielded_wall = time.monotonic()
             utterances.append(utt)
+            # 延迟 = 产出的墙钟时间 - 流起始 - 该 utterance 在音频中的结束时刻
+            latency = yielded_wall - stream_start - utt.t_end
+            latencies.append(latency)
             logger.event("transcript.final", utt)
 
         logger.event("stream.end", {"utterance_count": len(utterances)})
@@ -228,6 +234,12 @@ async def test_full_wav_realtime_cer():
                 "soft_cap": sum(1 for u in utterances if u.closed_by == "soft_cap"),
             },
         )
+        if latencies:
+            logger.set_metric("latency_ms_max", round(max(latencies) * 1000, 1))
+            logger.set_metric("latency_ms_min", round(min(latencies) * 1000, 1))
+            logger.set_metric("latency_ms_mean", round(sum(latencies) / len(latencies) * 1000, 1))
+            logger.set_metric("latency_ms_p50", round(sorted(latencies)[len(latencies) // 2] * 1000, 1))
+            logger.set_metric("latency_ms_p95", round(sorted(latencies)[int(len(latencies) * 0.95)] * 1000, 1))
 
     assert utterances, "应产出 utterance"
     assert 0.5 <= ratio <= 1.5, (
