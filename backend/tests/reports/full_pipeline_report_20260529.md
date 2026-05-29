@@ -23,18 +23,18 @@
 
 ---
 
-## 二、头号问题 — STT 产出延迟 ~5.8s,**结构性,与 agent 无关** ⚠️
+## 二、延迟 — 真实 STT ≈ 1.0s,agent 影响 ≈ 0(两个旧结论都是测量假象)✅
 
-> **更正:** 本节初版结论是"agent 并发把 STT 拖慢 7x",**该结论错误**,已被定向埋点 + 同配置对照实验推翻。第一次跑测到的 7.7s 是当时本机被并发的分析脚本/grep 占了 CPU 所致,不是 agent。下面是修正后的、有埋点证据的结论。
+> **更正历程(两次纠错):** 初版说"agent 拖慢 7x"——错(是我并发占 CPU);二版说"5.8s 结构性 + enrollment +4.7s"——也错(是冷模型加载偏移)。下面是经埋点 + 产出 trace + 修复验证后的最终结论。
 
 定向埋点(`tests/_instrument.py`,monkeypatch `asyncio.to_thread` 测排队/执行 + loop-lag 探针)+ 四次跑对照:
 
 | 跑法(均 1x,同音频) | STT 产出延迟 avg | 说明 |
 |---|---|---|
-| 历史 STT 单侧,**无 enrollment** | 1.1s | 不跑 cam++ |
-| baseline:STT+cam++,无 agent,**带埋点** | 5.47s | — |
-| full:STT+cam++ **+ agent**,带埋点 | 5.63s | **vs baseline 仅 +0.16s** |
-| 隔离:STT+cam++,无 agent,**关埋点**(生产配置) | 5.81s | 埋点开销 ≈ 0 |
+| baseline:STT+cam++,无 agent | 5.47s | 含冷模型加载偏移 |
+| full:STT+cam++ **+ agent** | 5.63s | **vs baseline 仅 +0.16s** → agent 无影响 |
+| 隔离:无 agent,关埋点 | 5.81s | 埋点开销 ≈ 0 |
+| **预热模型后(修复测量bug)** | **1.03s** | **去掉冷加载偏移 = 真实延迟** |
 
 **埋点分解(baseline,无竞争):**
 
@@ -51,11 +51,27 @@
 - **C CPU 争用** → exec 在有/无 agent 下完全一致,排除
 - **agent 影响** → full vs baseline 仅 +0.16s(噪声内),排除
 
-**真凶 = soft_cap 流式切句算法的结构性产出滞后。** 每句总计算量才 ~0.85s(26+761+58),但延迟 5.8s——**~4.9s 是算法"等"出来的,不是算出来的**(详见 §三:连续语音下要等 merged 段长过 8s 才切首段)。三个 agent 都是原生异步网络 IO,不抢 CPU、不阻塞 loop,所以对 STT 延迟几乎零影响。
+### 真相:5.8s 是测量假象,真实 STT 延迟 ≈ 1.0s
 
-**一个未解但可复现的点:** 无 enrollment 1.1s vs 有 enrollment 5.8s(各跑 2-3 次稳定),但 cam++ exec 只有 58ms,这 4.7s 差**不在 exec/queue/loop 里**,埋点抓不到。推测与 async generator pull-based 拉取 + cam++ inline `await` 的调度交互有关,需加产出路径 trace(记录"段进入 bounds → 真正 yield"的间隔)才能定位。**它直接决定生产真实 STT 延迟是 1.1s 还是 5.8s。**
+产出路径 trace(`STT_TRACE=1`,在 `funasr_stream` 产出点拆解每句各阶段)定位:
 
-**影响:** 现场律师看到转写比真实说话滞后 ~5.8s(生产配置),叠加 agent 反应 ~2.5s,语音→建议 ≈ 8s。这是 STT 切句算法 + cam++ 路径的代价,**与 agent 无关**——优化要往 STT 那边使劲,不是 agent。
+| 阶段(enrollment ON) | 耗时 avg |
+|---|---|
+| ① 段检测滞后(音频结束→可产出) | 172ms |
+| ② 等投机 ASR | 788ms |
+| ③ cam++ await | 67ms |
+| **④ generator 内部 yield 总延迟** | **1027ms** |
+| consumer 实测(预热前) | 5647ms |
+
+generator 内部从音频结束到 yield 只要 **1.0s**,但 consumer 收到是 5.6s——中间 **4.7s 是常量偏移**(consumer 延迟跨度只有 580ms,= 内部 1027ms±580ms + 固定 4686ms)。
+
+**根因 = 冷启动模型加载被算进了每句延迟。** VAD/ASR 模型在 `stream_stt` 首次 pull 时才惰性 `_get_models()` 加载(直测冷启动 ~5–12s),而 e2e 的 `stream_start` 锚点打在 `async for` **之前**,把这一次性加载摊进了每一句的延迟。历史"无 enrollment 1.1s"是 pytest 里跑的——前序测试早把模型暖好了,所以没这偏移。**`enrollment 1.1 vs 5.8` 是红鲱鱼:不是 enrollment,是冷模型 vs 暖模型。**
+
+**修复 + 验证:** e2e 在打 `stream_start` 前预热 VAD/ASR。修复后 consumer 实测 **1027ms**,与内部 trace(1027ms)分毫不差,4.7s 偏移消失。
+
+**结论:真实稳态 STT 产出延迟 ≈ 1.0s(主要是 ASR 788ms),完全正常。** cam++ 仅 67ms,agent 仅 +0.16s,均可忽略。之前报告的"5.8s 结构性""agent 7x"两个结论**都是测量假象**(分别是冷启动 / 我自己并发占 CPU),已全部更正。
+
+**影响:** 现场律师看到转写滞后 ≈ 1.0s + agent 反应 ≈ 2.5s,语音→建议 ≈ 3.5s。STT 延迟不是问题。
 
 ---
 
@@ -78,7 +94,7 @@
 | HA quick(简单反馈) | 3 | 11.6s | 13.8s | 13.9s | DeepSeek+工具,慢;你说过可后续拆 |
 
 - **端到端反应延迟**(STT 产出→推出建议):pending 卡片 ~1–2.4s;唯一 ready(compute_compensation 走 quick 分析)= 9.2s。
-- 注意:以上 agent 延迟本身已被 STT 的 7.7s 滞后"喂晚了"——真实墙钟链路是 7.7s(转写) + 反应。
+- 语音→建议全链路 ≈ STT 1.0s + 反应 ~2.5s ≈ 3.5s(pending 卡片);需深度分析的走确认后异步,不在关键路径。
 
 ---
 
@@ -90,14 +106,18 @@
 
 ## 六、建议优先级
 
-1. **(高)砍 STT 结构性产出滞后(~5.8s)** —— 这是头号延迟,**与 agent 无关,优化往 STT 使劲**。两条线索:(a) soft_cap 切首段要等 merged 段长过 8s,可改成"累计够 8s 立即在最近微停顿切"而非等整段;(b) 先钉死 enrollment 路径那 4.7s(见下)。
-2. **(高/待定)钉死 enrollment 的 +4.7s** —— 无 enrollment 1.1s vs 有 5.8s,埋点抓不到,需产出路径 trace。决定生产真实延迟是 1.1s 还是 5.8s。
-3. **(高)speaker-aware split** —— 在声纹切换处切段,根治跨说话人合并 + 大部分 uncertain + 词中截断。
-4. (中)IR 换本地 BERT —— 降 IR 延迟 + 去一个 LLM 依赖。
-5. (低)HA quick 优化 —— 你已定调后续拆独立 agent。
+延迟已不是问题(STT ≈1.0s、agent 无影响)。剩下的真问题都在切句质量:
 
-> **已用埋点证伪:** agent 拖慢(+0.16s)、线程池排队(queue~0)、loop 阻塞(lag 1ms)、CPU 争用(exec 不变)。
-> **已验证稳定性:** bus 无丢弃、IR/PA 调用数一致、speaker 无 None、uncertain→client 兜底命中真实边界段。
-> **未隔离:** enrollment 路径 +4.7s 的精确机制(需产出路径 trace)。
+1. **(高)speaker-aware split** —— 在声纹切换处切段,根治跨说话人合并 + 大部分 uncertain + 词中截断。这是你一直困扰的"人物分离不稳定"的病根。
+2. (中)soft_cap 词中截断 —— 8s 硬截断切在词中,可考虑在最近微停顿优先切;但优先级低于 split。
+3. (中)IR 换本地 BERT —— 降 IR p95(2.5s)+ 去一个 LLM 依赖。
+4. (低)HA quick 优化 —— 你已定调后续拆独立 agent。
+
+> **延迟三连证伪(全有数据):**
+> - agent 拖慢 → +0.16s(full vs baseline);队列排队 queue~0;loop 阻塞 lag 1ms;CPU 争用 exec 不变。
+> - "5.8s" → 冷模型加载偏移(产出 trace:内部 1.0s vs consumer 5.6s = 固定 4.7s);预热后 consumer 1.03s == 内部,偏移消失。
+> - 真实稳态 STT ≈ **1.0s**(ASR 788ms 为主),cam++ 67ms。
 >
-> 诊断埋点:`tests/_instrument.py` + `e2e_full_pipeline.py` 的 `INSTRUMENT=1` / `NO_AGENT=1` 开关(默认关,零开销)。
+> **已验证稳定性:** bus 无丢弃、IR/PA 调用数一致(55/55、26/26)、speaker 无 None、uncertain→client 兜底命中真实边界段。
+>
+> **诊断工具(默认关,生产零开销):** `tests/_instrument.py`(to_thread 排队/执行 + loop-lag);env 开关 `INSTRUMENT=1`(埋点)/ `NO_AGENT=1`(纯STT baseline)/ `NO_ENROLL=1`(跳cam++)/ `STT_TRACE=1`(产出路径分阶段);`funasr_stream.py` 的 trace 同为 env-gated。`e2e_full_pipeline.py` 已修预热,STT 延迟测量不再含冷启动。

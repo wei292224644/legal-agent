@@ -191,7 +191,7 @@ const SuggestionCard = memo(function SuggestionCard({
         <div className="flex gap-2">
           <Button
             size="sm"
-            className="bg-[#d4a853] hover:bg-[#e0b86a] text-[#0d0b08]"
+            className="bg-gradient-to-b from-[#e0b86a] to-[#c9a04a] text-[#0d0b08] border-t border-b border-t-white/15 border-b-black/20 hover:from-[#e8c47a] hover:to-[#d4a853] active:from-[#c9a04a] active:to-[#b08d3f] transition-all"
             onClick={() => onConfirm(s.requestId)}
           >
             生成深度分析
@@ -199,7 +199,7 @@ const SuggestionCard = memo(function SuggestionCard({
           <Button
             size="sm"
             variant="outline"
-            className="border-[rgba(255,255,255,0.08)] text-[#8a8a8a]"
+            className="border border-[rgba(255,255,255,0.08)] text-[#8a8a8a] hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] transition-colors"
             onClick={() => onDismiss(s.requestId)}
           >
             忽略

@@ -97,6 +97,7 @@
 ### 4.4 HeavyAgent child
 
 - **性质:** LLM(Agno,DeepSeek),**并发多实例**,对共享状态(context + memory)**只读**。
+- **上下文获取:** 默认 = **全量画像 + 最近 N 轮转写窗口**(N 可调,现状 `get_recent_window(10)`),不给完整转写(长会谈撑爆 token,且与画像冗余)。另提供一个**只读**工具 `fetch_more_transcript`(拉取更早 / 更宽的转写切片),HA 判断「需要窗口之外的早期内容」时自动调用。默认窗口覆盖常态 + PA 滞后 + 对话语气;按需检索覆盖少数够不着早期细节的情况。画像是「长期蒸馏状态」给全量,转写是「最近原话」给窗口——**这正是 PA 存在的意义:让 HA 不必读完整转写。**
 - **职责:** 自己选 skill/tool、自己定响应深浅、决定要不要先问律师。
 - **深浅 = 是否踩 gated 工具**(见 §7):简单问题直接答完(run completed);需要深析时调 `requires_confirmation` 的深度工具 → run paused → HITL。
 - **明确不做:** 不写共享状态、不管自己的生命周期(spawn/销毁由代码)。
@@ -240,5 +241,6 @@ Agno 2.6.x 原生支持,核心:`@tool(requires_confirmation=True)` + `run.is_pau
 - **画像兜底:** 一句「无需响应但含关键事实」的 client 话(如「我 2019 年入职」)→ 断言 BERT 丢弃(不 spawn)**且**画像被更新。
 - **深浅由 child 涌现:** 简单问 → run completed、无 pending;复杂问 → run paused、产生带预览的 pending。
 - **续跑不重头:** confirm 后走 `continue_run`,断言未对同一句重新发起理解(无第二次 base 推理)。
-- **并发只读不竞态:** 多个 child 并发期间,画像写入仅来自 PA;child 不产生写。
+- **并发只读不竞态:** 多个 child 并发期间,画像写入仅来自 PA;child 不产生写(含 `fetch_more_transcript` 也只读)。
+- **按需拉取转写:** 给一个答案依赖窗口之外早期发言的复杂问 → 断言 HA 自动调用了 `fetch_more_transcript`,且默认窗口够用的简单问不调用它。
 - **清理无泄漏:** confirm/reject/dismiss/超时 四条路径后,`pending` 与 db 中均无残留挂起 run。
