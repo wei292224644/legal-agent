@@ -3,7 +3,7 @@ import { useWebSocket, type SuggestionData } from '@/hooks/useWebSocket'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import AudioControls from '@/components/AudioControls'
 
 type TranscriptLine = { speaker: string; text: string }
 type Analysis = {
@@ -133,7 +133,6 @@ export default function LiveSession() {
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [status, setStatus] = useState('待连接...')
-  const [isRecording, setIsRecording] = useState(false)
 
   const onTranscript = useCallback((data: TranscriptData) => {
     setTranscript(prev => [...prev, { speaker: data.speaker, text: data.text }])
@@ -177,7 +176,7 @@ export default function LiveSession() {
     })
   }, [])
 
-  const { isConnected, confirmIntent, dismissIntent } = useWebSocket(
+  const { isConnected, sendAudioChunk, confirmIntent, dismissIntent } = useWebSocket(
     'ws://localhost:8000/ws/demo-session',
     { onTranscript, onAnalysis, onSuggestion }
   )
@@ -198,17 +197,7 @@ export default function LiveSession() {
               {isConnected ? '🟢 已连接' : '🟡 连接中...'} · {status}
             </p>
           </div>
-          <Button
-            variant={isRecording ? 'destructive' : 'default'}
-            size="sm"
-            onClick={() => setIsRecording(prev => !prev)}
-            className={isRecording
-              ? 'bg-red-900 hover:bg-red-800 text-red-200 border-red-700'
-              : 'bg-amber-600 hover:bg-amber-500 text-zinc-900 border-amber-500'
-            }
-          >
-            {isRecording ? '⏹ 停止' : '🎤 开始录音'}
-          </Button>
+          <AudioControls onChunk={sendAudioChunk} />
         </header>
         <ScrollArea className="flex-1 px-6 py-4">
           {transcript.length === 0

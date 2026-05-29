@@ -3,6 +3,27 @@ export interface WavOptions {
   channels: number
 }
 
+function writeString(view: DataView, offset: number, str: string) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i))
+  }
+}
+
+function float32ToInt16Bytes(samples: Float32Array): Uint8Array {
+  const buffer = new ArrayBuffer(samples.length * 2)
+  const view = new DataView(buffer)
+  for (let i = 0; i < samples.length; i++) {
+    const clamped = Math.max(-1, Math.min(1, samples[i]))
+    const int16 = Math.round(clamped * 32767)
+    view.setInt16(i * 2, int16, true)
+  }
+  return new Uint8Array(buffer)
+}
+
+export function encodePcmChunk(samples: Float32Array): Uint8Array {
+  return float32ToInt16Bytes(samples)
+}
+
 export function encodeWavChunk(
   samples: Float32Array,
   options: WavOptions,
@@ -38,19 +59,8 @@ export function encodeWavChunk(
   view.setUint32(40, dataSize, true)
 
   // PCM samples: Float32 [-1, 1] -> Int16
-  let offset = headerSize
-  for (let i = 0; i < samples.length; i++) {
-    const clamped = Math.max(-1, Math.min(1, samples[i]))
-    const int16 = Math.round(clamped * 32767)
-    view.setInt16(offset, int16, true)
-    offset += bytesPerSample
-  }
+  const pcmBytes = float32ToInt16Bytes(samples)
+  bytes.set(pcmBytes, headerSize)
 
   return bytes
-}
-
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i))
-  }
 }

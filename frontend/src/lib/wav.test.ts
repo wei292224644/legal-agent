@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeWavChunk } from './wav'
+import { encodeWavChunk, encodePcmChunk } from './wav'
 
 describe('encodeWavChunk', () => {
   it('encodes Float32Array mono to WAV with correct header', () => {
@@ -45,5 +45,36 @@ describe('encodeWavChunk', () => {
     const view = new DataView(chunk.buffer)
     expect(view.getInt16(44, true)).toBe(32767)
     expect(view.getInt16(46, true)).toBe(-32767)
+  })
+})
+
+describe('encodePcmChunk', () => {
+  it('encodes Float32Array to Int16 PCM bytes', () => {
+    const samples = new Float32Array([0, 0.5, -0.5, 1, -1])
+    const chunk = encodePcmChunk(samples)
+
+    expect(chunk).toBeInstanceOf(Uint8Array)
+    expect(chunk.length).toBe(5 * 2) // 5 samples * 2 bytes
+
+    const view = new DataView(chunk.buffer)
+    expect(view.getInt16(0, true)).toBe(0)
+    expect(view.getInt16(2, true)).toBeCloseTo(16384, -1)
+    expect(view.getInt16(4, true)).toBeCloseTo(-16384, -1)
+    expect(view.getInt16(6, true)).toBe(32767)
+    expect(view.getInt16(8, true)).toBe(-32767)
+  })
+
+  it('returns empty bytes for empty samples', () => {
+    const samples = new Float32Array(0)
+    const chunk = encodePcmChunk(samples)
+    expect(chunk.length).toBe(0)
+  })
+
+  it('clamps values outside [-1, 1]', () => {
+    const samples = new Float32Array([2, -2])
+    const chunk = encodePcmChunk(samples)
+    const view = new DataView(chunk.buffer)
+    expect(view.getInt16(0, true)).toBe(32767)
+    expect(view.getInt16(2, true)).toBe(-32767)
   })
 })
