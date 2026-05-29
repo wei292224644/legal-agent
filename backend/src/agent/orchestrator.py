@@ -29,6 +29,25 @@ class PendingRequest:
     generation: int
     meta: dict = field(default_factory=dict)
 
+    def to_dict(self) -> dict:
+        return {
+            "request_id": self.request_id,
+            "utt": self.utt.to_dict(),
+            "intent_type": self.intent_type,
+            "generation": self.generation,
+            "meta": self.meta,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PendingRequest":
+        return cls(
+            request_id=d["request_id"],
+            utt=Utterance.from_dict(d["utt"]),
+            intent_type=d["intent_type"],
+            generation=d["generation"],
+            meta=d.get("meta", {}),
+        )
+
 
 class Orchestrator:
     """中央调度器。
@@ -203,3 +222,36 @@ class Orchestrator:
         cb_result = self._suggestion_callback(text, meta)
         if asyncio.iscoroutine(cb_result):
             await cb_result
+
+    # ------------------------------------------------------------------
+    # 序列化（纯数据，不含 Agent 实例 / callback / bus 等运行时对象）
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> dict:
+        """序列化为纯 dict；仅含 pending 请求和 ctx 数据。"""
+        return {
+            "pending": [req.to_dict() for req in self._pending.values()],
+            "ctx": self._ctx.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict, ctx: ContextStore | None = None) -> "Orchestrator":
+        """从 dict 恢复；ctx 若已在外部恢复则直接传入，否则从 dict 重建。
+
+        恢复后需重新设置：ir / pa / ha（或默认新建）、bus、callback。
+        """
+        if ctx is None:
+            ctx = ContextStore.from_dict(d["ctx"])
+        inst = cls.__new__(cls)
+        inst._ctx = ctx
+        inst._ir = IntentRouter()
+        inst._pa = ProfileAgent()
+        inst._ha = HeavyAgent(ctx)
+        inst._suggestion_callback = None
+        inst._pending = {
+            req["request_id"]: PendingRequest.from_dict(req)
+            for req in d.get("pending", [])
+        }
+        inst._bus = None
+        inst._bus_task = None
+        return inst

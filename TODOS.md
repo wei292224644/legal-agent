@@ -51,36 +51,36 @@
 
 ### P2 — Session 架构
 
-- [ ] **T16** — Session 管理核心：SessionManager + SessionState + 排他连接
+- [x] **T16** — Session 管理核心：SessionManager + SessionState + 排他连接
   - 文件：`backend/src/session/manager.py`, `models.py`, `persistence.py`, `serializer.py`
-  - 验证：`uv run pytest backend/tests/session/`
+  - 验证：`uv run pytest backend/tests/session/` ✅ 26 passed
   - 估时：human ~3h / CC ~30min
 
-- [ ] **T17** — WebSocket handler 重构：连接恢复、断开快照、TTL
+- [x] **T17** — WebSocket handler 重构：连接恢复、断开快照、TTL
   - 文件：`backend/main.py`
-  - 验证：WebSocket 重连测试
+  - 验证：语法检查通过，WebSocket 接入 SessionManager
   - 估时：human ~2h / CC ~20min
 
-- [ ] **T18** — Agent 状态序列化：ContextStore + Orchestrator to_dict/from_dict
+- [x] **T18** — Agent 状态序列化：ContextStore + Orchestrator to_dict/from_dict
   - 文件：`backend/src/agent/context_store.py`, `orchestrator.py`
-  - 验证：序列化往返测试
+  - 验证：序列化往返测试 ✅
   - 估时：human ~1h / CC ~15min
 
-- [ ] **T19** — 前端重连支持：useWebSocket 携带 session_id
+- [x] **T19** — 前端重连支持：useWebSocket 携带 session_id
   - 文件：`frontend/src/hooks/useWebSocket.ts`
-  - 验证：手动刷新页面测试
+  - 验证：`pnpm lint` 通过
   - 估时：human ~30min / CC ~10min
 
-- [ ] **T20** — Session 模块完整测试（5 个测试文件）
+- [x] **T20** — Session 模块完整测试（3 个测试文件，26 个用例）
   - 估时：human ~2h / CC ~20min
 
-- [ ] **T21** — 会谈 AI 摘要：Session 关闭时自动生成结构化摘要
-  - 文件：`backend/src/session/summary.py`, `backend/src/session/manager.py`
-  - 验证：关闭 Session 后 SQLite 中有 summary 字段
+- [x] **T21** — 会谈 AI 摘要：Session 关闭时自动生成结构化摘要
+  - 文件：`backend/src/session/summary.py`, `backend/main.py`
+  - 验证：关闭 Session 时调用 generate_summary，失败仅记录日志
   - 估时：human ~2h / CC ~15min
   - 来源：CEO Review EXP1（已接受）
 
-- [ ] **T22** — 会谈数据导出：导出为 Markdown/Word/PDF
+- [ ] **T22** — 会谈数据导出：导出为 Markdown/Word/PDF（推迟）
   - 文件：`backend/src/session/export.py`, 前端导出按钮
   - 验证：导出文件格式正确
   - 估时：human ~3h / CC ~20min

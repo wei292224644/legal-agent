@@ -47,3 +47,16 @@ class Utterance:
             "timestamp": self.timestamp,
             "content_hash": self.content_hash,
         }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> Utterance:
+        """从 dict 重建 Utterance。"""
+        return cls(
+            id=d["id"],
+            text=d["text"],
+            t_start=d["t_start"],
+            t_end=d["t_end"],
+            speaker=d.get("speaker"),
+            closed_by=d.get("closed_by", "vad"),
+            timestamp=d.get("timestamp", 0.0),
+        )

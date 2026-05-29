@@ -14,6 +14,7 @@
 """
 
 import asyncio
+import os
 import statistics
 import sys
 import time
@@ -26,6 +27,17 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
+
+# 诊断开关(默认关,生产/常规跑零开销):
+#   INSTRUMENT=1 开定向埋点(to_thread 排队/执行 + loop-lag)
+#   NO_AGENT=1   跳过 agent 只跑 STT,做 baseline 对比(不花 LLM API)
+INSTRUMENT = os.getenv("INSTRUMENT") == "1"
+NO_AGENT = os.getenv("NO_AGENT") == "1"
+NO_ENROLL = os.getenv("NO_ENROLL") == "1"  # 不传声纹(跳过 cam++),对照 enrollment 延迟
+if INSTRUMENT:
+    import _instrument
+
+    _instrument.patch_to_thread()
 
 import soundfile as sf  # noqa: E402
 from generate_report import analyze_ha, analyze_ir, analyze_pa, load_jsonl  # noqa: E402
@@ -90,14 +102,16 @@ async def main():
     enrollment = _load_enrollment()
 
     ctx = ContextStore()
-    orch = Orchestrator(
-        ctx,
-        ir=jlogger.wrap_ir(IntentRouter()),
-        pa=jlogger.wrap_pa(ProfileAgent()),
-        ha=jlogger.wrap_ha(HeavyAgent(ctx)),
-    )
-    bus = UtteranceBus(maxsize=10)
-    orch.attach_bus(bus)
+    orch = bus = None
+    if not NO_AGENT:
+        orch = Orchestrator(
+            ctx,
+            ir=jlogger.wrap_ir(IntentRouter()),
+            pa=jlogger.wrap_pa(ProfileAgent()),
+            ha=jlogger.wrap_ha(HeavyAgent(ctx)),
+        )
+        bus = UtteranceBus(maxsize=10)
+        orch.attach_bus(bus)
 
     # utt_id -> stt 产出时的墙钟,用于算 agent 反应延迟(STT产出 → 推出建议)
     emit_wall: dict[str, float] = {}
@@ -123,14 +137,19 @@ async def main():
                 },
             )
 
-        orch.set_suggestion_callback(on_suggestion)
-        await orch.start()
+        if not NO_AGENT:
+            orch.set_suggestion_callback(on_suggestion)
+            await orch.start()
+
+        probe = _instrument.start_loop_probe() if INSTRUMENT else None
 
         rlog.event(
             "stream.start",
             {
                 "wav": MAIN_WAV.name,
                 "speed": SPEED,
+                "no_agent": NO_AGENT,
+                "instrument": INSTRUMENT,
                 "tau_high": enrollment.tau_high,
                 "tau_low": enrollment.tau_low,
             },
@@ -142,9 +161,21 @@ async def main():
         utt_count = 0
         bus_drops = 0
 
+        # 预热 VAD/ASR:这俩在 stream_stt 首次 pull 时才惰性加载(冷启动 5-12s)。
+        # 若不预热,stream_start 之后的冷加载会被算进每句 STT 延迟(虚高 ~5s)。
+        # cam++ 已由 _load_enrollment 预热。
+        import numpy as np
+
+        from stt.funasr_stream import _get_models
+
+        _vad, _asr = _get_models()
+        _warm = np.zeros(16000, dtype=np.float32)
+        await asyncio.to_thread(_vad.generate, input=_warm)
+        await asyncio.to_thread(_asr.generate, input=_warm)
+
         stream_start = time.monotonic()
         audio = stream_wav_realtime(MAIN_WAV, chunk_ms=100, speed=SPEED)
-        async for utt in stream_stt(audio, enrollment=enrollment):
+        async for utt in stream_stt(audio, enrollment=None if NO_ENROLL else enrollment):
             now = time.monotonic()
             stt_lat = now - stream_start - utt.t_end / SPEED  # 音频 t_end 对应墙钟 = start + t_end/speed
             stt_latencies.append(stt_lat)
@@ -157,18 +188,20 @@ async def main():
             rec["stt_latency_ms"] = round(stt_lat * 1000, 1)
             rlog.event("transcript.final", rec)
 
-            ok = await bus.put(utt)
-            if not ok:
-                bus_drops += 1
-                rlog.event("bus.drop", {"utt_id": utt.id, "text_preview": utt.text[:40]})
+            if not NO_AGENT:
+                ok = await bus.put(utt)
+                if not ok:
+                    bus_drops += 1
+                    rlog.event("bus.drop", {"utt_id": utt.id, "text_preview": utt.text[:40]})
 
         rlog.event("stream.end", {"utterance_count": utt_count})
 
         # drain:先等队列被消费空,再 grace 等最后一句的 IR/PA + 后台 quick 分析落定
-        print(f"\n[drain] STT 喂完,等 bus 消费 + 在途 agent 任务(grace {DRAIN_GRACE_S:.0f}s)...", flush=True)
-        while bus._q.qsize() > 0:
-            await asyncio.sleep(0.5)
-        await asyncio.sleep(DRAIN_GRACE_S)
+        if not NO_AGENT:
+            print(f"\n[drain] STT 喂完,等 bus 消费 + 在途 agent 任务(grace {DRAIN_GRACE_S:.0f}s)...", flush=True)
+            while bus._q.qsize() > 0:
+                await asyncio.sleep(0.5)
+            await asyncio.sleep(DRAIN_GRACE_S)
 
         # ---------- STT / bus / 反应延迟 指标 ----------
         from collections import Counter
@@ -181,23 +214,51 @@ async def main():
         rlog.set_metric("closed_by_dist", dict(Counter(closed_bys)))
         rlog.set_metric("suggestions_emitted", len(react_latencies))
 
-        await orch.shutdown()
+        if probe is not None:
+            probe.cancel()
+        if INSTRUMENT:
+            _instrument.report(rlog)
+
+        if not NO_AGENT:
+            await orch.shutdown()
 
     jlogger.close()
+
+    print("\n" + "=" * 80)
+    print(f"稳定性 & 延迟 摘要  {'[BASELINE: 无 agent]' if NO_AGENT else '[全链路]'}")
+    print("=" * 80)
+    print(f"\n[STT] utterance={utt_count}  bus_dropped={bus_drops}  (丢弃>0 即 stt→agent 不稳)")
+    print(f"  STT 产出延迟(ms): {_stats_ms(stt_latencies)}")
+    print(f"  raw speaker 分布: {dict(Counter(raw_speakers))}  (uncertain/None 在 agent 端被降级为 client)")
+    print(f"  closed_by 分布:   {dict(Counter(closed_bys))}")
+
+    if os.getenv("STT_TRACE") == "1":
+        import stt.funasr_stream as fs
+
+        tl = fs._trace_log
+        if tl:
+            detect_lag = [r["stable_rel"] - r["audio_end_rel"] for r in tl]  # 段音频结束→进入可产出态
+            dt_asr = [r["dt_asr_ms"] / 1000 for r in tl]
+            dt_cam = [r["dt_cam_ms"] / 1000 for r in tl]
+            yield_total = [r["yield_rel"] - r["audio_end_rel"] for r in tl]  # ≈ 实测 STT 延迟
+            buf_minus_e = [(r["buf_ms"] - r["e_ms"]) / 1000 for r in tl]  # 检测到时缓冲超出段尾多少
+            print(f"\n[STT-TRACE] n={len(tl)}  enroll={'OFF' if NO_ENROLL else 'ON'}  各阶段拆解(s):")
+            print(f"  ① 段检测滞后(音频结束→可产出): {_stats_ms(detect_lag)}")
+            print(f"     └ 检测时缓冲超出段尾 buf-e_ms: {_stats_ms(buf_minus_e)}")
+            print(f"  ② 等投机ASR dt_asr:            {_stats_ms(dt_asr)}")
+            print(f"  ③ cam++ await dt_cam:          {_stats_ms(dt_cam)}")
+            print(f"  ④ yield总延迟(①+②+③+握手):     {_stats_ms(yield_total)}")
+
+    if NO_AGENT:
+        print(f"\n结束: {datetime.now().strftime('%H:%M:%S')}")
+        print("=" * 80, flush=True)
+        return
 
     # ---------- agent 侧分析(复用 generate_report 的分析器读 judgment jsonl) ----------
     records = load_jsonl(jpath)
     ir = analyze_ir(records)
     pa = analyze_pa(records)
     ha = analyze_ha(records)
-
-    print("\n" + "=" * 80)
-    print("稳定性 & 延迟 摘要")
-    print("=" * 80)
-    print(f"\n[STT] utterance={utt_count}  bus_dropped={bus_drops}  (丢弃>0 即 stt→agent 不稳)")
-    print(f"  STT 产出延迟(ms): {_stats_ms(stt_latencies)}")
-    print(f"  raw speaker 分布: {dict(Counter(raw_speakers))}  (uncertain/None 在 agent 端被降级为 client)")
-    print(f"  closed_by 分布:   {dict(Counter(closed_bys))}")
 
     print(f"\n[反应延迟] STT产出→推出建议(ms): {_stats_ms(react_latencies)}  (共 {len(react_latencies)} 条建议)")
 

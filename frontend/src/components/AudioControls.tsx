@@ -20,15 +20,28 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
     e.target.value = ''
   }
 
+  const primaryBtn =
+    'bg-gradient-to-b from-[#e0b86a] to-[#c9a04a] text-[#0d0b08] ' +
+    'border-t border-b border-t-white/15 border-b-black/20 ' +
+    'hover:from-[#e8c47a] hover:to-[#d4a853] ' +
+    'active:from-[#c9a04a] active:to-[#b08d3f] ' +
+    'transition-all'
+
+  const secondaryBtn =
+    'border border-[rgba(255,255,255,0.08)] text-[#e5e5e5] ' +
+    'hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] ' +
+    'transition-colors'
+
+  const dangerBtn =
+    'border border-[#c45c5c]/40 text-[#c45c5c] bg-[#c45c5c]/5 ' +
+    'hover:bg-[#c45c5c]/15 hover:border-[#c45c5c]/60 ' +
+    'transition-colors'
+
   return (
     <div className="flex items-center gap-3">
       {mode === 'idle' ? (
         <>
-          <Button
-            size="sm"
-            onClick={startRecording}
-            className="bg-[#d4a853] hover:bg-[#e0b86a] text-[#0d0b08] border-[#d4a853]"
-          >
+          <Button size="sm" onClick={startRecording} className={primaryBtn}>
             <Mic className="w-4 h-4" />
             开始录音
           </Button>
@@ -36,7 +49,7 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
             size="sm"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            className="border-[rgba(255,255,255,0.08)] text-[#e5e5e5] hover:bg-[#1e1b15]"
+            className={secondaryBtn}
           >
             <Upload className="w-4 h-4" />
             上传音频
@@ -53,12 +66,7 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
 
       {mode === 'mic' ? (
         <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={stop}
-            className="border-[#c45c5c]/50 text-[#c45c5c] hover:bg-[#c45c5c]/10 hover:text-[#c45c5c]"
-          >
+          <Button size="sm" variant="outline" onClick={stop} className={dangerBtn}>
             <Square className="w-4 h-4" />
             停止
           </Button>
@@ -71,12 +79,7 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
 
       {mode === 'file' ? (
         <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={stop}
-            className="border-[rgba(255,255,255,0.08)] text-[#e5e5e5] hover:bg-[#1e1b15]"
-          >
+          <Button size="sm" variant="outline" onClick={stop} className={secondaryBtn}>
             <Square className="w-4 h-4" />
             停止
           </Button>

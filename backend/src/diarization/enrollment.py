@@ -25,6 +25,36 @@ class Enrollment:
     seed_threshold: float = 0.50  # cos sim 低于此阈值的段被取为 client seed
     seed_min_duration_s: float = 3.0  # 短段不稳定,不作为 seed
 
+    def to_dict(self) -> dict:
+        """序列化为纯 dict；ndarray 转为 list。"""
+        return {
+            "embedding": self.embedding.tolist(),
+            "tau_high": self.tau_high,
+            "tau_low": self.tau_low,
+            "client_embedding": (
+                self.client_embedding.tolist() if self.client_embedding is not None else None
+            ),
+            "margin": self.margin,
+            "seed_threshold": self.seed_threshold,
+            "seed_min_duration_s": self.seed_min_duration_s,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> Enrollment:
+        return cls(
+            embedding=np.array(d["embedding"], dtype=np.float32),
+            tau_high=d.get("tau_high", 0.5),
+            tau_low=d.get("tau_low", 0.3),
+            client_embedding=(
+                np.array(d["client_embedding"], dtype=np.float32)
+                if d.get("client_embedding") is not None
+                else None
+            ),
+            margin=d.get("margin", 0.10),
+            seed_threshold=d.get("seed_threshold", 0.50),
+            seed_min_duration_s=d.get("seed_min_duration_s", 3.0),
+        )
+
 
 def enroll_speaker(audio: np.ndarray, sr: int) -> Enrollment:
     """从注册音频产出 Enrollment。"""

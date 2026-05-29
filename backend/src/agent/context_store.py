@@ -23,6 +23,29 @@ class ProfileEntry:
     category: str | None = None
     subject: str = ""  # 事实归属主体：本人 / 对方 / 第三方
 
+    def to_dict(self) -> dict:
+        return {
+            "key": self.key,
+            "value": self.value,
+            "timestamp": self.timestamp,
+            "source_utt_id": self.source_utt_id,
+            "confidence": self.confidence,
+            "category": self.category,
+            "subject": self.subject,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ProfileEntry":
+        return cls(
+            key=d["key"],
+            value=d["value"],
+            timestamp=d["timestamp"],
+            source_utt_id=d["source_utt_id"],
+            confidence=d.get("confidence", 1.0),
+            category=d.get("category"),
+            subject=d.get("subject", ""),
+        )
+
 
 class ContextStore:
     """上下文存储器。管理 utterance 历史、generation 计数和画像条目。"""
@@ -115,3 +138,29 @@ class ContextStore:
                 # 单条解析失败不影响队列，继续消费下一条
                 pass
             self._profile_queue.task_done()
+
+    # ------------------------------------------------------------------
+    # 序列化（纯数据，不含 asyncio runtime 对象）
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> dict:
+        """序列化为纯 dict；不含 _lock/_worker_task/_profile_queue/_shutdown。"""
+        return {
+            "utterances": [u.to_dict() for u in self._utterances],
+            "profile": [e.to_dict() for e in self._profile],
+            "generation": self._generation,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ContextStore":
+        """从 dict 恢复；caller 需自行调用 start_profile_worker() 恢复运行时。"""
+        inst = cls.__new__(cls)
+        inst._utterances = [Utterance.from_dict(u) for u in d.get("utterances", [])]
+        inst._profile = [ProfileEntry.from_dict(e) for e in d.get("profile", [])]
+        inst._generation = d.get("generation", 0)
+        # runtime objects — caller must call start_profile_worker()
+        inst._profile_queue = asyncio.Queue()
+        inst._worker_task = None
+        inst._lock = asyncio.Lock()
+        inst._shutdown = False
+        return inst
