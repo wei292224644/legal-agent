@@ -27,4 +27,4 @@ Thumbs.db
 *.swo
 
 # gstack (project-local, not vendored)
-.gstack/
+# .gstack/
