@@ -191,16 +191,28 @@ def test_profile_entry_category():
 
 
 def test_get_profile_summary_returns_latest_values():
-    """get_profile_summary 应返回每个 key 的最新值。"""
+    """get_profile_summary 应返回每个 (subject, key) 的最新值，按 subject 分组。"""
     store = ContextStore()
     store._profile = [
-        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u1"),
-        ProfileEntry(key="工龄", value="2年", timestamp=2.0, source_utt_id="u2"),
-        ProfileEntry(key="月薪", value="30000", timestamp=3.0, source_utt_id="u3"),
+        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u1", subject="当事人"),
+        ProfileEntry(key="工龄", value="2年", timestamp=2.0, source_utt_id="u2", subject="当事人"),
+        ProfileEntry(key="月薪", value="30000", timestamp=3.0, source_utt_id="u3", subject="当事人"),
     ]
     summary = store.get_profile_summary()
-    assert summary["月薪"] == "30000"
-    assert summary["工龄"] == "2年"
+    assert summary["当事人"]["月薪"] == "30000"
+    assert summary["当事人"]["工龄"] == "2年"
+
+
+def test_get_profile_summary_same_key_different_subject_coexist():
+    """step 3 核心：同一 key 在不同 subject 下不互相覆盖（如离职原因 当事人主张 vs 对方理由）。"""
+    store = ContextStore()
+    store._profile = [
+        ProfileEntry(key="离职原因", value="被违法解除", timestamp=1.0, source_utt_id="u1", subject="当事人"),
+        ProfileEntry(key="离职原因", value="不胜任工作", timestamp=2.0, source_utt_id="u2", subject="对方"),
+    ]
+    summary = store.get_profile_summary()
+    assert summary["当事人"]["离职原因"] == "被违法解除"
+    assert summary["对方"]["离职原因"] == "不胜任工作"
 
 
 def test_get_profile_summary_empty_profile():

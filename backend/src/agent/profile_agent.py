@@ -4,6 +4,7 @@
 """
 
 import json
+import logging
 
 from openai import AsyncOpenAI
 
@@ -12,6 +13,11 @@ from agent.llm_client import build_qwen_client
 from agent.prompts import build_profile_prompt
 from agent.utils import extract_json_from_markdown
 from config import QWEN_MODEL
+
+logger = logging.getLogger(__name__)
+
+# subject 只接受这三个值；模型偶尔会输出字段名等噪声，统一兜底。
+_VALID_SUBJECTS = frozenset(("当事人", "对方", "第三方"))
 
 
 class ProfileAgent:
@@ -55,7 +61,7 @@ class ProfileAgent:
             model=self._model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=100,
+            max_tokens=256,
             extra_body={"enable_thinking": False},
         )
 
@@ -89,6 +95,10 @@ class ProfileAgent:
                     val = str(e["value"])
                     if not self._is_valid_value(val):
                         continue
+                    subject = str(e.get("subject", ""))
+                    if subject and subject not in _VALID_SUBJECTS:
+                        logger.warning("丢弃非法 subject %r（key=%r）", subject, e["key"])
+                        subject = ""
                     entries.append(
                         ProfileEntry(
                             key=e["key"],
@@ -96,6 +106,7 @@ class ProfileAgent:
                             timestamp=0.0,
                             source_utt_id=utt_id or "llm",
                             confidence=0.9,
+                            subject=subject,
                         )
                     )
             return entries

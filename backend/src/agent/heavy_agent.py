@@ -58,7 +58,8 @@ class HeavyAgent:
 
             lines = ["=== 用户画像 ==="]
             for e in profile:
-                lines.append(f"- {e.key}: {e.value}")
+                tag = f"[{e.subject}] " if e.subject else ""
+                lines.append(f"- {tag}{e.key}: {e.value}")
 
             lines.append("\n=== 对话历史 ===")
             for u in history:

@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react'
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useWebSocket, type SuggestionData } from '@/hooks/useWebSocket'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,10 @@ type Analysis = {
   citation?: string
   level?: string
 }
+
+type Suggestion =
+  | { kind: 'pending'; requestId: string; intentType: string; lawDomain: string | null }
+  | { kind: 'ready'; id: string; requestId?: string; text: string; intentType: string }
 
 type TranscriptData = { text: string; speaker: string; is_final: boolean }
 type AnalysisData = { category: string; title: string; content: string; citation?: string; level?: string }
@@ -85,9 +89,49 @@ const AnalysisCard = memo(function AnalysisCard({ a }: { a: Analysis }) {
   )
 })
 
+const SuggestionCard = memo(function SuggestionCard({
+  s,
+  onConfirm,
+  onDismiss,
+}: {
+  s: Suggestion
+  onConfirm: (requestId: string) => void
+  onDismiss: (requestId: string) => void
+}) {
+  if (s.kind === 'pending') {
+    return (
+      <Card className="p-4 bg-amber-500/5 border-amber-500/30 border transition-all duration-300">
+        <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-300 mb-2">
+          💡 需要深度分析？
+        </Badge>
+        <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+          {s.intentType}{s.lawDomain ? ` · ${s.lawDomain}` : ''}
+        </p>
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-amber-600 hover:bg-amber-500 text-zinc-900" onClick={() => onConfirm(s.requestId)}>
+            确认分析
+          </Button>
+          <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-400" onClick={() => onDismiss(s.requestId)}>
+            忽略
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+  return (
+    <Card className="p-4 bg-blue-400/5 border-blue-400/30 border transition-all duration-300">
+      <Badge variant="outline" className="text-xs border-blue-400/30 text-zinc-300 mb-2">
+        ✅ {s.intentType}
+      </Badge>
+      <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-wrap">{s.text}</p>
+    </Card>
+  )
+})
+
 export default function LiveSession() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
   const [analyses, setAnalyses] = useState<Analysis[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [status, setStatus] = useState('待连接...')
   const [isRecording, setIsRecording] = useState(false)
 
@@ -107,10 +151,41 @@ export default function LiveSession() {
     }, ...prev])
   }, [])
 
-  const { isConnected } = useWebSocket(
+  const onSuggestion = useCallback((data: SuggestionData) => {
+    setSuggestions(prev => {
+      if (data.type === 'suggestion.pending') {
+        const pending: Suggestion = {
+          kind: 'pending',
+          requestId: data.meta.request_id ?? '',
+          intentType: data.meta.intent_type,
+          lawDomain: data.meta.law_domain,
+        }
+        return [pending, ...prev]
+      }
+      const ready: Suggestion = {
+        kind: 'ready',
+        id: crypto.randomUUID(),
+        requestId: data.meta.request_id,
+        text: data.text ?? '',
+        intentType: data.meta.intent_type,
+      }
+      // 确认后的 ready 带 request_id：替换对应 pending 卡片；否则（simple 快速回答）直接插入
+      if (data.meta.request_id) {
+        return prev.map(s => (s.kind === 'pending' && s.requestId === data.meta.request_id ? ready : s))
+      }
+      return [ready, ...prev]
+    })
+  }, [])
+
+  const { isConnected, confirmIntent, dismissIntent } = useWebSocket(
     'ws://localhost:8000/ws/demo-session',
-    { onTranscript, onAnalysis }
+    { onTranscript, onAnalysis, onSuggestion }
   )
+
+  const handleDismiss = useCallback((requestId: string) => {
+    dismissIntent(requestId)
+    setSuggestions(prev => prev.filter(s => !(s.kind === 'pending' && s.requestId === requestId)))
+  }, [dismissIntent])
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-200">
@@ -152,13 +227,21 @@ export default function LiveSession() {
       <aside className="w-[380px] flex flex-col bg-zinc-900/50">
         <header className="px-6 py-4 border-b border-zinc-800">
           <h2 className="font-serif text-lg tracking-wide text-amber-200/90">AI 分析</h2>
-          <p className="text-xs text-zinc-500 mt-0.5 font-mono">{analyses.length} 条分析结果</p>
+          <p className="text-xs text-zinc-500 mt-0.5 font-mono">{suggestions.length + analyses.length} 条分析结果</p>
         </header>
         <ScrollArea className="flex-1 px-4 py-4">
-          {analyses.length === 0
+          {suggestions.length === 0 && analyses.length === 0
             ? emptyAnalysis
             : (
               <div className="space-y-3">
+                {suggestions.map((s) => (
+                  <SuggestionCard
+                    key={s.kind === 'pending' ? s.requestId : s.id}
+                    s={s}
+                    onConfirm={confirmIntent}
+                    onDismiss={handleDismiss}
+                  />
+                ))}
                 {analyses.map((a) => <AnalysisCard key={a.id} a={a} />)}
               </div>
             )}

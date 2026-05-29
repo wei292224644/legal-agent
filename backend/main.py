@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 import sys
 import time
@@ -36,12 +37,22 @@ def _get_lawyer_enrollment() -> Enrollment:
     return _lawyer_enrollment
 
 
+def _session_enrollment() -> Enrollment:
+    """每个会话拿到独立的 enrollment 副本。
+
+    matcher 的双声纹自举会写回 client_embedding;若所有会话共享全局单例,
+    会话 A 的客户声纹种子会泄漏污染会话 B 的说话人判定。
+    """
+    return copy.deepcopy(_get_lawyer_enrollment())
+
+
 @app.websocket("/ws/{session_id}")
 async def legal_session(ws: WebSocket, session_id: str):
     await ws.accept()
 
     # 首次加载会跑 cam++ 推理,放线程池避免阻塞 event loop(后续 session 是缓存命中,几乎 0 成本)
-    enrollment = await asyncio.to_thread(_get_lawyer_enrollment)
+    # 每会话独立副本:matcher 双声纹自举会写回 client_embedding,共享会污染其他会话
+    enrollment = await asyncio.to_thread(_session_enrollment)
     audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] = asyncio.Queue()
     t0 = time.monotonic()
 

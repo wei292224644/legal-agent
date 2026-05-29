@@ -19,9 +19,11 @@
 - **命名约定:**
   - Python: snake_case 文件 + 函数
   - TypeScript: PascalCase 组件, camelCase 函数/hooks
-- **外部依赖/文档:**
-  - 设计文档: `~/.gstack/projects/legal-agent/wwj-main-design-*.md`
-  - 千问 STT API, deepseek-v4-pro API, pyannote-audio, Agno
+- **外部依赖:**
+  - **STT / 声纹（本地）:** FunASR — `fsmn-vad` 切句 + `paraformer-zh` 转写；`cam++`(campplus) 说话人声纹
+  - **LLM:** 千问 (Qwen, DashScope OpenAI 兼容端点) — IntentRouter / ProfileAgent；DeepSeek (`deepseek-chat`，经 Agno) — HeavyAgent
+  - **框架:** Agno (Agent)、instructor (结构化输出)、FastAPI、openai SDK
+  - **设计 spec:** `backend/docs/superpowers/specs/*.md`
 
 ---
 

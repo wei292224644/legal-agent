@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 
+from agent.bus import UtteranceBus
 from agent.context_store import ContextStore
 from agent.heavy_agent import HeavyAgent
 from agent.intent_router import IntentResult
@@ -321,6 +322,87 @@ async def test_profile_timestamp_from_utt(store, mock_ir_client):
 
 
 @pytest.mark.asyncio
+async def test_pa_skipped_for_lawyer(store, mock_ir_client):
+    """律师发言不触发 PA 提取：PA 是 LLM 调用且只提取客户事实，对律师的话纯浪费。"""
+    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
+
+    class SpyPA:
+        def __init__(self):
+            self.calls = 0
+
+        async def extract(self, text, speaker, history, existing_profile, utt_id=""):
+            self.calls += 1
+            return []
+
+    pa = SpyPA()
+    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=HeavyAgent(store))
+    orch.set_suggestion_callback(lambda text, meta: None)
+
+    await orch.handle_utterance(
+        Utterance(id="u_1", text="您工作多久了？", speaker="lawyer", t_start=0.0, t_end=1.0)
+    )
+    await asyncio.sleep(0.05)
+    assert pa.calls == 0, "律师发言不应调用 PA"
+
+    await orch.handle_utterance(
+        Utterance(id="u_2", text="工龄三年", speaker="client", t_start=1.0, t_end=2.0)
+    )
+    await asyncio.sleep(0.05)
+    assert pa.calls == 1, "客户发言应调用 PA"
+
+
+@pytest.mark.asyncio
+async def test_bus_consumer_survives_handler_exception(store):
+    """IR 抛异常不应杀死 bus consumer：后续 utterance 仍被正常处理。
+
+    回归 orchestrator.py 中 _consume_bus 只 catch CancelledError 导致单次
+    LLM 抖动整场哑火的 bug。
+    """
+
+    class FlakyIR:
+        """第一次调用抛异常，之后正常返回 simple。"""
+
+        def __init__(self):
+            self.calls = 0
+
+        async def classify(self, text: str, speaker: str | None = None):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("LLM timeout")
+            return IntentResult(severity="simple", intent_type="query_law", rationale="stub")
+
+    class StubPA:
+        async def extract(self, text, speaker, history, existing_profile, utt_id=""):
+            return []
+
+    class StubHA:
+        async def analyze_quick(self, utt, intent_type, generation):
+            return f"答案: {utt.text}"
+
+    bus = UtteranceBus()
+    orch = Orchestrator(store, ir=FlakyIR(), pa=StubPA(), ha=StubHA())
+    orch.attach_bus(bus)
+
+    suggestions = []
+
+    async def on_suggestion(text, meta):
+        suggestions.append((text, meta))
+
+    orch.set_suggestion_callback(on_suggestion)
+    await orch.start()
+
+    # 第一句触发异常，第二句应仍被消费并产出建议
+    await bus.put(Utterance(id="u_1", text="第一句会让IR崩", speaker="client", t_start=0.0, t_end=1.0))
+    await bus.put(Utterance(id="u_2", text="第二句应正常处理", speaker="client", t_start=1.0, t_end=2.0))
+    await asyncio.sleep(0.2)
+    await orch.shutdown()
+
+    ready = [(t, m) for t, m in suggestions if m["kind"] == "ready"]
+    assert len(ready) == 1, "异常后消费者应存活并处理第二句"
+    assert ready[0][1]["utt_id"] == "u_2"
+
+
+@pytest.mark.asyncio
 async def test_ten_turn_dialogue_stability_and_completeness(store):
     """10轮短对话回归: simple 直推, complex 挂起, ignore 不触发。"""
 
@@ -411,3 +493,85 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
 
     profile_keys = set(store.get_profile_keys())
     assert {"月薪", "工龄", "解除通知时间"}.issubset(profile_keys)
+
+
+@pytest.mark.asyncio
+async def test_uncertain_speaker_treated_as_client(store, mock_ir_client, capsys):
+    """声纹 uncertain → agent 端静默按 client 处理。
+
+    2 方会谈"非律师即客户"。若不归一，PA 的 prompt 只认 [client]，
+    uncertain 段会被模型当作非客户发言而静默丢事实。uncertain 是合法
+    结果，不应告警（区别于 None）。
+    """
+    ir_stub = mock_ir_client(severity="ignore")
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
+
+    utt = Utterance(
+        id="u_1",
+        text="两年三个月",
+        speaker="uncertain",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
+    )
+    await orch.handle_utterance(utt)
+
+    # PA 必须以 client 被调用，而非 uncertain
+    assert pa.extract.call_args.kwargs["speaker"] == "client"
+    # 存储的发言也归一为 client，使 PA 的历史窗口一致
+    assert store.get_full_history()[-1].speaker == "client"
+    # uncertain 是合法结果，不告警
+    assert "speaker=None" not in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_none_speaker_warns_loudly(store, mock_ir_client, capsys):
+    """speaker=None 是上游 bug 信号（match_speaker 永不返回 None），必须告警。
+
+    不能像 uncertain 那样静默降级——否则 enrollment 没接通时全程 None→client，
+    声纹静默失效却无人察觉。
+    """
+    ir_stub = mock_ir_client(severity="ignore")
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
+
+    utt = Utterance(
+        id="u_1",
+        text="两年三个月",
+        speaker=None,
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
+    )
+    await orch.handle_utterance(utt)
+
+    # None 必须告警（大声说），而非静默
+    assert "speaker=None" in capsys.readouterr().out
+    # 但仍降级保活，按 client 处理
+    assert pa.extract.call_args.kwargs["speaker"] == "client"
+
+
+@pytest.mark.asyncio
+async def test_lawyer_speaker_not_rewritten(store, mock_ir_client):
+    """律师发言不能被误归一为 client（否则会把律师的话当事实提取）。"""
+    ir_stub = mock_ir_client(severity="ignore")
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
+
+    utt = Utterance(
+        id="u_1",
+        text="你工作多久了？",
+        speaker="lawyer",
+        t_start=0.0,
+        t_end=1.0,
+        timestamp=datetime.now(),
+    )
+    await orch.handle_utterance(utt)
+
+    assert store.get_full_history()[-1].speaker == "lawyer"
+    # 律师发言跳过 PA，不应调用 extract
+    pa.extract.assert_not_called()

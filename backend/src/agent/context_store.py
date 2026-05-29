@@ -21,6 +21,7 @@ class ProfileEntry:
     source_utt_id: str
     confidence: float = 1.0
     category: str | None = None
+    subject: str = ""  # 事实归属主体：本人 / 对方 / 第三方
 
 
 class ContextStore:
@@ -74,11 +75,15 @@ class ContextStore:
         sorted_profile = sorted(self._profile, key=lambda e: e.timestamp, reverse=True)
         return list(dict.fromkeys(e.key for e in sorted_profile))
 
-    def get_profile_summary(self) -> dict[str, str]:
-        """返回已知事实摘要（每个 key 取最新值）。"""
-        summary = {}
+    def get_profile_summary(self) -> dict[str, dict[str, str]]:
+        """返回已知事实摘要，按 subject 分组，每个 (subject, key) 取最新值。
+
+        形如 {"当事人": {"职业": "..."}, "对方": {"职业": "..."}}；
+        未标注主体的条目归在 "" 分组下。同一 key 在不同 subject 下并存，不互相覆盖。
+        """
+        summary: dict[str, dict[str, str]] = {}
         for entry in self._profile:
-            summary[entry.key] = entry.value
+            summary.setdefault(entry.subject, {})[entry.key] = entry.value
         return summary
 
     async def stop_profile_worker(self) -> None:

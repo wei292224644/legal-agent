@@ -76,29 +76,44 @@ class Orchestrator:
         IR + PA 并行执行后串行等待结果；HeavyAgent.analyze_quick 改为后台
         asyncio.create_task 并发，避免慢速 LLM 阻塞后续 utterance 的消费。
         """
+        # speaker 由声纹判定填入 lawyer/client/uncertain。
+        # None 不是合法运行态:match_speaker 永不返回 None,出现 None 说明
+        # enrollment 没接上或上游漏分类——是 bug,告警后降级保活,绝不静默吞。
+        if utt.speaker is None:
+            print(f"[WARN] utterance {utt.id} speaker=None,声纹链路可能未接通(已降级为 client)")
+        # uncertain 是合法结果(声纹拿不准):2 方会谈"非律师即客户",按 client 处理,
+        # 宁可多提取后让律师删,也别让 PA 因 speaker 不是 [client] 而静默丢事实。
+        # 前端转写在进 bus 前已拿到真实 speaker,此处归一只影响 agent 侧。
+        if utt.speaker not in ("lawyer", "client"):
+            utt.speaker = "client"
+
         generation = await self._ctx.append_utterance(utt)
 
         ir_task = asyncio.create_task(self._ir.classify(text=utt.text, speaker=utt.speaker))
-        pa_task = asyncio.create_task(
-            self._pa.extract(
-                text=utt.text,
-                speaker=utt.speaker,
-                history=self._ctx.get_recent_window(n=PROFILE_WINDOW_SIZE),
-                existing_profile=self._ctx.get_profile_summary(),
-                utt_id=utt.id,
+        # 律师发言不做事实提取:PA 是 LLM 调用,且只提取客户陈述的事实,
+        # 对律师的话提取纯属浪费 token。IR 仍照常分类(后续将换为本地 BERT)。
+        pa_task = None
+        if utt.speaker != "lawyer":
+            pa_task = asyncio.create_task(
+                self._pa.extract(
+                    text=utt.text,
+                    speaker=utt.speaker,
+                    history=self._ctx.get_recent_window(n=PROFILE_WINDOW_SIZE),
+                    existing_profile=self._ctx.get_profile_summary(),
+                    utt_id=utt.id,
+                )
             )
-        )
 
-        pa_entries: list = []
-        try:
-            pa_entries = await pa_task
-            if pa_entries:
-                for entry in pa_entries:
-                    entry.timestamp = utt.t_start
-                await self._ctx.enqueue_profile_update(utt.id, pa_entries)
-        except Exception:
-            # PA 提取失败不应阻塞 IR 结果和建议推送
-            pa_entries = []
+        if pa_task is not None:
+            try:
+                pa_entries = await pa_task
+                if pa_entries:
+                    for entry in pa_entries:
+                        entry.timestamp = utt.t_start
+                    await self._ctx.enqueue_profile_update(utt.id, pa_entries)
+            except Exception:
+                # PA 提取失败不应阻塞 IR 结果和建议推送
+                pass
 
         ir_result = await ir_task
 
@@ -177,6 +192,9 @@ class Orchestrator:
                 await self.handle_utterance(utt)
             except asyncio.CancelledError:
                 break
+            except Exception as e:
+                # 单句处理失败（如 LLM 超时）不应杀死消费者，否则整场会谈哑火。
+                print(f"[ERROR] handle_utterance failed, skipping utterance: {e}")
 
     async def _emit_suggestion(self, text: str | None, meta: dict) -> None:
         """调用 suggestion_callback，自动兼容同步/异步回调。"""

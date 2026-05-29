@@ -3,6 +3,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 type Callbacks = {
   onTranscript?: (data: TranscriptData) => void
   onAnalysis?: (data: AnalysisData) => void
+  onSuggestion?: (data: SuggestionData) => void
 }
 
 type TranscriptData = {
@@ -16,6 +17,19 @@ type AnalysisData = {
   title: string
   content: string
   citation?: string
+}
+
+export type SuggestionData = {
+  type: 'suggestion.pending' | 'suggestion.ready'
+  text: string | null
+  meta: {
+    severity: string
+    intent_type: string
+    law_domain: string | null
+    entities: string[]
+    utt_id: string
+    request_id?: string
+  }
 }
 
 export interface WsLike {
@@ -72,7 +86,12 @@ export function useWebSocket(
     }
 
     ws.onmessage = (e: MessageEvent) => {
-      const msg: Record<string, unknown> = JSON.parse(e.data)
+      let msg: Record<string, unknown>
+      try {
+        msg = JSON.parse(e.data)
+      } catch {
+        return
+      }
 
       if (msg.type === 'pong') return
 
@@ -83,6 +102,11 @@ export function useWebSocket(
 
       if (msg.type === 'analysis') {
         callbacksRef.current.onAnalysis?.(msg as unknown as AnalysisData)
+        return
+      }
+
+      if (msg.type === 'suggestion.pending' || msg.type === 'suggestion.ready') {
+        callbacksRef.current.onSuggestion?.(msg as unknown as SuggestionData)
         return
       }
     }
@@ -105,5 +129,13 @@ export function useWebSocket(
     wsRef.current?.send(chunk)
   }, [])
 
-  return { isConnected, sendAudioChunk }
+  const confirmIntent = useCallback((requestId: string) => {
+    wsRef.current?.send(JSON.stringify({ type: 'confirm', request_id: requestId }))
+  }, [])
+
+  const dismissIntent = useCallback((requestId: string) => {
+    wsRef.current?.send(JSON.stringify({ type: 'dismiss', request_id: requestId }))
+  }, [])
+
+  return { isConnected, sendAudioChunk, confirmIntent, dismissIntent }
 }

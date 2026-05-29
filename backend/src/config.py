@@ -1,10 +1,25 @@
 """集中配置管理。
 
-所有环境变量和可调参数统一在此定义，默认映射到项目根目录的 .env 文件。
-使用 python-dotenv 的调用方应在导入本模块前执行 load_dotenv()。
+所有环境变量和可调参数统一在此定义。本模块在导入时自动加载 backend/.env，
+因此任何 import config 的代码（含 uvicorn 启动路径）都能拿到 .env 里的值，
+无需调用方手动 load_dotenv。已存在的环境变量（shell / CI）优先，不被覆盖。
 """
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# .env 在 backend/ 根目录；本文件位于 backend/src/，向上两级。
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+
+
+def load_env(path: Path = ENV_PATH) -> None:
+    """加载 .env 到 os.environ。override=False：已有环境变量优先。"""
+    load_dotenv(path, override=False)
+
+
+load_env()
 
 # ═══════════════════════════════════════════════════════
 # 模型名称
