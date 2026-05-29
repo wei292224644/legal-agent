@@ -74,16 +74,21 @@ class ContextStore:
         sorted_profile = sorted(self._profile, key=lambda e: e.timestamp, reverse=True)
         return list(dict.fromkeys(e.key for e in sorted_profile))
 
+    def get_profile_summary(self) -> dict[str, str]:
+        """返回已知事实摘要（每个 key 取最新值）。"""
+        summary = {}
+        for entry in self._profile:
+            summary[entry.key] = entry.value
+        return summary
+
     async def stop_profile_worker(self) -> None:
-        """优雅关闭 profile worker：drain 队列、标记关闭、取消任务、等待退出。"""
-        while not self._profile_queue.empty():
-            try:
-                self._profile_queue.get_nowait()
-                self._profile_queue.task_done()
-            except asyncio.QueueEmpty:
-                break
+        """优雅关闭 profile worker：等待队列消费完毕再取消任务。"""
         self._shutdown = True
         if self._worker_task:
+            try:
+                await asyncio.wait_for(self._profile_queue.join(), timeout=2.0)
+            except TimeoutError:
+                pass
             self._worker_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task

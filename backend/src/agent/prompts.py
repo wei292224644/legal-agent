@@ -84,29 +84,63 @@ def build_role_aware_prompt(speaker: str, text: str) -> str:
     return template.format(speaker=speaker, text=text)
 
 
-def build_profile_prompt(speaker: str, text: str, existing_keys: str) -> str:
-    """法律事实提取提示。"""
+def build_profile_prompt(
+    speaker: str,
+    text: str,
+    history: list,
+    existing_profile: dict[str, str],
+) -> str:
+    """法律事实提取提示（窗口+已知事实）。"""
+    from models.utterance import Utterance
+
+    # 格式化最近对话窗口
+    history_lines = []
+    for utt in history:
+        if isinstance(utt, Utterance):
+            label = utt.speaker or "unknown"
+            history_lines.append(f"[{label}] {utt.text}")
+        else:
+            history_lines.append(str(utt))
+    history_str = "\n".join(history_lines) if history_lines else "（无）"
+
+    # 格式化已提取事实
+    if existing_profile:
+        facts_str = "\n".join(f"- {k}: {v}" for k, v in existing_profile.items())
+    else:
+        facts_str = "（无）"
+
     template = """\
 你是一个法律事实提取器，正在旁听律师与客户的咨询会谈。
 
-你的任务是从**当前这句话**中提取所有与法律案件相关的事实信息。
-已有的事实（不要重复提取）：
-{existing_keys}
+## 最近对话
+{history_str}
 
-提取规则：
-1. 只提取**客户陈述的事实**，不提取律师的提问或引导语
-2. 如果当前句子是疑问句（包含"吗"、"？"、"多少"、"多久"等），直接输出空数组
-3. 如果与已有事实重复，不要输出
-4. key 用简洁的中文（如"月薪"、"工龄"、"入职日期"）
-5. value 必须是原文中的**具体值**，不能是疑问词或模糊词
-6. 如果没有新事实，输出空数组
+## 已提取事实（key: 最新值）
+{facts_str}
+
+## 标准命名词表（优先使用）
+事故类：事故责任、伤情、医疗费、住院天数、伤残等级、误工天数
+劳动类：月薪、工龄、入职日期、合同类型、离职原因、赔偿金
+通用：姓名、年龄、职业、收入、房产、车辆、存款、债务
+
+## 提取规则
+1. 只提取 [client] 陈述的事实，不提取律师的话
+2. 当前对话中若无新事实，输出空数组
+3. key 优先从词表中选，没有合适的再自创（简洁中文）
+4. value 必须是原文中的具体值，不能是疑问词
+5. 同一 key 已有值时，如果新值补充/不同，也输出（追踪时间线）
 
 只输出 JSON，不要任何解释：
 {{"entries": [{{"key": "...", "value": "..."}}]}}
 
 当前句子（{speaker}）：{text}
 """
-    return template.format(speaker=speaker, text=text, existing_keys=existing_keys)
+    return template.format(
+        speaker=speaker,
+        text=text,
+        history_str=history_str,
+        facts_str=facts_str,
+    )
 
 
 def get_system_prompt() -> str:

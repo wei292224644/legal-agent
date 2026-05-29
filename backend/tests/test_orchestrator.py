@@ -334,13 +334,13 @@ async def test_ten_turn_dialogue_stability_and_completeness(store):
             return IntentResult(severity=severity, intent_type=intent_type, rationale="stub")
 
     class StubProfileAgent:
-        async def extract(self, text: str, speaker: str, existing_keys: list[str], utt_id=None):
+        async def extract(self, text: str, speaker: str | None, history: list, existing_profile: dict[str, str], utt_id: str = ""):
             entries = []
-            if "月薪" in text and "月薪" not in existing_keys:
+            if "月薪" in text and "月薪" not in existing_profile:
                 entries.append(MagicMock(key="月薪", value="25000", source_utt_id=utt_id or ""))
-            if "工龄" in text and "工龄" not in existing_keys:
+            if "工龄" in text and "工龄" not in existing_profile:
                 entries.append(MagicMock(key="工龄", value="2年3个月", source_utt_id=utt_id or ""))
-            if "解除通知" in text and "解除通知时间" not in existing_keys:
+            if "解除通知" in text and "解除通知时间" not in existing_profile:
                 entries.append(MagicMock(key="解除通知时间", value="2026-05-01", source_utt_id=utt_id or ""))
             return entries
 

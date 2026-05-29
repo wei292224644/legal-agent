@@ -27,26 +27,28 @@ class ProfileAgent:
         self,
         text: str,
         speaker: str | None,
-        existing_keys: list[str],
+        history: list,
+        existing_profile: dict[str, str],
         utt_id: str = "",
     ) -> list[ProfileEntry]:
-        """从单句发言中提取事实条目。
+        """从窗口上下文中提取事实条目。
 
         Args:
-            text: 发言原文。
+            text: 当前发言原文。
             speaker: 说话人角色（lawyer/client/uncertain），None 时按 unknown 处理。
-            existing_keys: 已提取的 key 列表，用于去重提示。
+            history: 最近 n 轮对话窗口（list[Utterance]）。
+            existing_profile: 已知事实摘要（key → 最新 value）。
             utt_id: 关联的 utterance ID，用于溯源。
 
         Returns:
             新提取的 ProfileEntry 列表（已过滤疑问词和无效值）。
         """
-        keys_str = "、".join(existing_keys) if existing_keys else "（无）"
         speaker_label = speaker or "unknown"
         prompt = build_profile_prompt(
             text=text,
             speaker=speaker_label,
-            existing_keys=keys_str,
+            history=history,
+            existing_profile=existing_profile,
         )
 
         response = await self._client.chat.completions.create(

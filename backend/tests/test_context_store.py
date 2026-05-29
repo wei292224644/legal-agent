@@ -188,3 +188,43 @@ def test_profile_entry_category():
         key="工龄", value="2年", timestamp=0.0, source_utt_id="u1"
     )
     assert entry_default.category is None
+
+
+def test_get_profile_summary_returns_latest_values():
+    """get_profile_summary 应返回每个 key 的最新值。"""
+    store = ContextStore()
+    store._profile = [
+        ProfileEntry(key="月薪", value="25000", timestamp=1.0, source_utt_id="u1"),
+        ProfileEntry(key="工龄", value="2年", timestamp=2.0, source_utt_id="u2"),
+        ProfileEntry(key="月薪", value="30000", timestamp=3.0, source_utt_id="u3"),
+    ]
+    summary = store.get_profile_summary()
+    assert summary["月薪"] == "30000"
+    assert summary["工龄"] == "2年"
+
+
+def test_get_profile_summary_empty_profile():
+    """空 profile 时 get_profile_summary 返回空 dict。"""
+    store = ContextStore()
+    assert store.get_profile_summary() == {}
+
+
+@pytest.mark.asyncio
+async def test_profile_worker_graceful_shutdown():
+    """stop_profile_worker 应等待队列消费完毕，不丢失未处理的更新。"""
+    store = ContextStore()
+    await store.start_profile_worker()
+    await asyncio.sleep(0)  # 确保 worker 已启动并开始等待队列
+
+    entry = ProfileEntry(
+        key="月薪", value="25000", timestamp=0.0, source_utt_id="u_1", confidence=1.0
+    )
+    await store.enqueue_profile_update("u_1", [entry])
+
+    # 直接 stop，不额外 sleep 等待 worker 自然消费
+    await store.stop_profile_worker()
+
+    profile = store.get_profile()
+    assert len(profile) == 1
+    assert profile[0].key == "月薪"
+    assert profile[0].value == "25000"

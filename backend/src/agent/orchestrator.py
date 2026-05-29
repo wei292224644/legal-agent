@@ -16,6 +16,8 @@ from agent.intent_router import IntentRouter
 from agent.profile_agent import ProfileAgent
 from models.utterance import Utterance
 
+PROFILE_WINDOW_SIZE = 6
+
 
 @dataclass
 class PendingRequest:
@@ -71,7 +73,8 @@ class Orchestrator:
     async def handle_utterance(self, utt: Utterance) -> int:
         """处理单句发言，返回所属 generation。
 
-        并行执行意图分类和画像提取，避免串行等待 LLM 两次。
+        IR + PA 并行执行后串行等待结果；HeavyAgent.analyze_quick 改为后台
+        asyncio.create_task 并发，避免慢速 LLM 阻塞后续 utterance 的消费。
         """
         generation = await self._ctx.append_utterance(utt)
 
@@ -80,16 +83,22 @@ class Orchestrator:
             self._pa.extract(
                 text=utt.text,
                 speaker=utt.speaker,
-                existing_keys=self._ctx.get_profile_keys(),
+                history=self._ctx.get_recent_window(n=PROFILE_WINDOW_SIZE),
+                existing_profile=self._ctx.get_profile_summary(),
                 utt_id=utt.id,
             )
         )
 
-        pa_entries = await pa_task
-        if pa_entries:
-            for entry in pa_entries:
-                entry.timestamp = utt.t_start
-            await self._ctx.enqueue_profile_update(utt.id, pa_entries)
+        pa_entries: list = []
+        try:
+            pa_entries = await pa_task
+            if pa_entries:
+                for entry in pa_entries:
+                    entry.timestamp = utt.t_start
+                await self._ctx.enqueue_profile_update(utt.id, pa_entries)
+        except Exception:
+            # PA 提取失败不应阻塞 IR 结果和建议推送
+            pa_entries = []
 
         ir_result = await ir_task
 
@@ -110,10 +119,7 @@ class Orchestrator:
         if ir_result.severity == "simple":
             if ir_result.intent_type == "record_only":
                 return generation
-            result = await self._ha.analyze_quick(utt, ir_result.intent_type, generation)
-            if result is not None:
-                meta["kind"] = "ready"
-                await self._emit_suggestion(result, meta)
+            asyncio.create_task(self._run_quick_analysis(utt, ir_result.intent_type, generation, meta))
         else:
             request_id = f"req_{uuid.uuid4().hex[:8]}"
             self._pending[request_id] = PendingRequest(
@@ -155,6 +161,13 @@ class Orchestrator:
             except asyncio.CancelledError:
                 pass
         self._pending.clear()
+
+    async def _run_quick_analysis(self, utt: Utterance, intent_type: str, generation: int, meta: dict) -> None:
+        """后台运行 HeavyAgent.analyze_quick 并 emit suggestion。"""
+        result = await self._ha.analyze_quick(utt, intent_type, generation)
+        if result is not None:
+            ready_meta = {**meta, "kind": "ready"}
+            await self._emit_suggestion(result, ready_meta)
 
     async def _consume_bus(self) -> None:
         """事件总线消费者：循环 get utterance 并交给 handle_utterance 处理。"""
