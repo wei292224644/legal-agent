@@ -5,6 +5,34 @@ import hashlib
 import hmac
 import urllib.parse
 
+import numpy as np
+import soundfile as sf
+
+TARGET_SR = 16000
+
+
+def _load_audio_as_pcm16(path: str) -> tuple[bytes, float]:
+    """读取音频文件，重采样到 16kHz 单声道，转为 16bit PCM bytes。
+
+    Returns:
+        (pcm_bytes, duration_ms)
+    """
+    data, sr = sf.read(path, dtype="float32")
+    # 转单声道
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    # 重采样到 16kHz
+    if sr != TARGET_SR:
+        ratio = TARGET_SR / sr
+        n = int(len(data) * ratio)
+        indices = np.linspace(0, len(data) - 1, n)
+        data = np.interp(indices, np.arange(len(data)), data)
+    # float32 [-1, 1] -> int16
+    data_int16 = (data * 32767).astype(np.int16)
+    pcm_bytes = data_int16.tobytes()
+    duration_ms = len(data_int16) / TARGET_SR * 1000
+    return pcm_bytes, duration_ms
+
 
 def _generate_signature(params: dict[str, str], secret: str) -> str:
     """按照讯飞规则生成 HmacSHA1 + Base64 签名。
