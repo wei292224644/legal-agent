@@ -14,6 +14,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from agent.bus import UtteranceBus  # noqa: E402
 from agent.context_store import ContextStore  # noqa: E402
+from agent.relevance_gate import load_relevance_model  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
 from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
 from session.manager import SessionManager  # noqa: E402
@@ -67,6 +68,9 @@ def _session_enrollment() -> Enrollment:
 
 @app.on_event("startup")
 async def _startup() -> None:
+    # 预加载 BERT 模型。硬依赖：失败即阻止服务启动。
+    load_relevance_model()
+
     global session_manager
     SESSION_DB.parent.mkdir(parents=True, exist_ok=True)
     backend = SQLiteBackend(SESSION_DB)

@@ -49,8 +49,8 @@ def load_relevance_model() -> None:
     _bert_model = BertModel.from_pretrained(str(_MODEL_DIR)).to(_device)
     _bert_model.eval()
 
-    # 3. 分类头
-    cfg_path = _MODEL_DIR / "config.json"
+    # 3. 分类头（读取独立的分类头配置，避免覆盖 BERT 的 config.json）
+    cfg_path = _MODEL_DIR / "classifier_config.json"
     with open(cfg_path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
     num_classes = cfg.get("num_classes", 2)
