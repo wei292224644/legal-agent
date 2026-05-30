@@ -163,7 +163,9 @@ def test_phase3_ema_update(monkeypatch, lawyer_emb, client_emb):
     """阶段3：高置信度 client 窗口触发 EMA 更新。"""
     from diarization import speaker_change_detector as scd
 
-    fake = _make_fake_extractor([client_emb, client_emb, client_emb, client_emb])
+    # alt_client 也是 client 声纹（与 lawyer 正交，与 client_emb 有 0.8 相似度）
+    alt_client = np.array([0.0, 0.8, 0.6], dtype=np.float32)
+    fake = _make_fake_extractor([alt_client, alt_client, alt_client, alt_client])
     monkeypatch.setattr(scd, "extract_embedding", fake)
 
     seg = np.full(16000 * 4, 0.01, dtype=np.float32)

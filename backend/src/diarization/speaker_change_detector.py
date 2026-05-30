@@ -107,6 +107,12 @@ def detect_speaker_changes(
                     if diff < -0.30:
                         voiceprint.client = _ema_update(voiceprint.client, emb, weight=0.15)
 
+        if seeded and cur_state == "client" and prev_state == "client":
+            s_c = float(np.dot(emb, voiceprint.client))
+            diff = s_l - s_c
+            if diff < -0.30:
+                voiceprint.client = _ema_update(voiceprint.client, emb, weight=0.15)
+
         prev_state = cur_state
         prev_s = s_l
 
