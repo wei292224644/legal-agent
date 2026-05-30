@@ -63,6 +63,40 @@ def _generate_signature(params: dict[str, str], secret: str) -> str:
     return base64.b64encode(mac.digest()).decode("utf-8")
 
 
+def _parse_transcription_result(data: dict) -> dict[str, object]:
+    """解析讯飞转写结果中的单句数据。
+
+    Returns:
+        {"text": str, "speaker": int, "start_ms": int, "end_ms": int}
+    """
+    st = data.get("cn", {}).get("st", {})
+    text_parts = []
+    speaker = 0
+    start_ms = st.get("bg", 0)
+    end_ms = st.get("ed", 0)
+
+    for rt_item in st.get("rt", []):
+        for ws_item in rt_item.get("ws", []):
+            for cw in ws_item.get("cw", []):
+                w = cw.get("w", "")
+                wp = cw.get("wp", "n")
+                if wp == "n":
+                    text_parts.append(w)
+                elif wp == "p":
+                    text_parts.append(w)
+                # rl: 1/2/3... 表示切换到该说话人；0 表示继续上一说话人
+                rl = cw.get("rl", 0)
+                if rl > 0:
+                    speaker = rl
+
+    return {
+        "text": "".join(text_parts),
+        "speaker": speaker,
+        "start_ms": start_ms,
+        "end_ms": end_ms,
+    }
+
+
 def _register_voiceprint(
     audio_base64: str,
     audio_type: str,

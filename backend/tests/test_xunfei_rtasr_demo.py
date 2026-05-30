@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from demo_xunfei_rtasr import _generate_signature, _load_audio_as_pcm16, _register_voiceprint
+from demo_xunfei_rtasr import _generate_signature, _load_audio_as_pcm16, _parse_transcription_result, _register_voiceprint
 
 
 def test_generate_signature():
@@ -71,6 +71,34 @@ def test_register_voiceprint():
     assert body["audio_data"] == "dGVzdA=="
     assert body["audio_type"] == "raw"
     mock_resp.raise_for_status.assert_called_once()
+
+
+def test_parse_transcription_result():
+    """验证转写结果被解析为结构化文本。"""
+    raw = {
+        "cn": {
+            "st": {
+                "type": 0,
+                "bg": 2340,
+                "ed": 5120,
+                "rt": [
+                    {
+                        "ws": [
+                            {"cw": [{"w": "你", "wb": 2340, "we": 2680, "wp": "n", "rl": 1}]},
+                            {"cw": [{"w": "好", "wb": 2680, "we": 2950, "wp": "n", "rl": 0}]},
+                            {"cw": [{"w": "。", "wb": 2950, "we": 2950, "wp": "p", "rl": 0}]},
+                        ]
+                    }
+                ],
+            }
+        },
+        "seg_id": 0,
+    }
+    sentence = _parse_transcription_result(raw)
+    assert sentence["text"] == "你好。"
+    assert sentence["speaker"] == 1
+    assert sentence["start_ms"] == 2340
+    assert sentence["end_ms"] == 5120
 
 
 def test_register_voiceprint_error_code():
