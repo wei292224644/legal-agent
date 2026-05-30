@@ -92,7 +92,7 @@ async def get_history(session_id: str):
     try:
         sid = uuid.UUID(session_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="无效的 session_id 格式")
+        raise HTTPException(status_code=400, detail="无效的 session_id 格式") from None
 
     async with _maker() as s:
         row = await SessionRepository(s).get(sid)
