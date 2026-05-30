@@ -1,7 +1,7 @@
 # 实时会谈 Agent 路由架构重构 — 设计文档
 
 **Date:** 2026-05-29
-**Status:** 设计已收敛,待评审 → 实现计划
+**Status:** 已实现(2026-05-30)
 **起因:** IntentRouter 被业务裹挟,意图模型(计划换 BERT)的训练目标里混入了产品策略,难以独立训练与演进。
 
 ---
@@ -244,3 +244,19 @@ Agno 2.6.x 原生支持,核心:`@tool(requires_confirmation=True)` + `run.is_pau
 - **并发只读不竞态:** 多个 child 并发期间,画像写入仅来自 PA;child 不产生写(含 `fetch_more_transcript` 也只读)。
 - **按需拉取转写:** 给一个答案依赖窗口之外早期发言的复杂问 → 断言 HA 自动调用了 `fetch_more_transcript`,且默认窗口够用的简单问不调用它。
 - **清理无泄漏:** confirm/reject/dismiss/超时 四条路径后,`pending` 与 db 中均无残留挂起 run。
+
+---
+
+## 13. 实现备注(2026-05-30)
+
+- BERT 后继：当前 `RelevanceGate` 临时用 Qwen 实现。接口契约 `is_relevant(utt) -> bool`
+  稳定不变；接 BERT 时替换 `relevance_gate.py` 内部即可，其它代码 0 改动。
+- 前端协议：`suggestion.pending.meta` 不再含 `severity` / `intent_type` / `law_domain` /
+  `entities`，新增 `preview: {topic, rationale}`。前端卡片渲染需配套调整。
+- PA 暂未迁到 Agno `MemoryManager`；当前继续走 `ContextStore._profile` 结构化列表，
+  因为前端画像面板仍依赖 `subject / key / value`。迁移留待前端面板重做时再评估。
+- 生产用 `PostgresDb`,通过 `AGNO_DB_URL` 注入。dev/CI 通过 `reset_agno_db_for_tests(replacement=InMemoryDb())`
+  注入内存替身,单元测试不依赖真实 Postgres;集成测试在 `tests/integration/` 下单独标记
+  `@pytest.mark.integration` 起 docker postgres。
+- 如未来要支持高可用,可直接换托管 Postgres(Neon/Supabase),`db_url` 切换即可,
+  `get_agno_db()` 实现 0 改动。

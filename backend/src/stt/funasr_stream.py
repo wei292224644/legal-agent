@@ -11,6 +11,7 @@ VAD / ASR 用 asyncio.to_thread 跑,不阻塞事件循环。
 
 from __future__ import annotations
 
+import array
 import asyncio
 import hashlib
 from collections.abc import AsyncIterator
@@ -221,12 +222,11 @@ async def stream_stt(
     """
     vad_model, asr_model = _get_models()
 
-    pieces: list[np.ndarray] = []
     t0: float | None = None
     yielded_until_ms = 0
     last_vad_audio_ms = -VAD_RECHECK_INTERVAL_MS
 
-    audio_buffer = np.zeros(0, dtype=np.float32)
+    audio_buffer = array.array("f")
     # 投机 ASR 缓存:(s_ms, e_ms) → Task[str]
     spec_asr: dict[tuple[int, int], asyncio.Task] = {}
 
@@ -307,19 +307,20 @@ async def stream_stt(
     async for chunk, t_rel in audio_chunks:
         if t0 is None:
             t0 = t_rel
-        pieces.append(chunk)
-        audio_buffer = np.concatenate(pieces).astype(np.float32)
+        audio_buffer.frombytes(chunk.astype(np.float32).tobytes())
         total_ms = int(len(audio_buffer) * 1000 / SR)
 
         if total_ms - last_vad_audio_ms < VAD_RECHECK_INTERVAL_MS:
             continue
         last_vad_audio_ms = total_ms
 
-        async for utt in _emit_stable_or_final(audio_buffer, final=False):
+        snapshot = np.frombuffer(audio_buffer, dtype=np.float32)
+        async for utt in _emit_stable_or_final(snapshot, final=False):
             yield utt
 
     # 流末尾 flush
-    async for utt in _emit_stable_or_final(audio_buffer, final=True):
+    snapshot = np.frombuffer(audio_buffer, dtype=np.float32)
+    async for utt in _emit_stable_or_final(snapshot, final=True):
         yield utt
 
     # 取消未消费的 spec task(避免资源泄漏)

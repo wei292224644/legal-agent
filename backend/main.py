@@ -1,6 +1,8 @@
 import asyncio
+import contextlib
 import copy
 import json
+import logging
 import sys
 import time
 from pathlib import Path
@@ -22,6 +24,17 @@ from stt.funasr_stream import stream_stt  # noqa: E402
 
 ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册.wav"
 SESSION_DB = Path(__file__).parent / "data" / "sessions.db"
+
+# uvicorn 默认只给 uvicorn.* 系列 logger 加 handler,不给应用 logger。
+# 不调 basicConfig 的话,main.py 与 src/* 里的 logger.info 全静默,
+# 排查问题时会误以为代码没跑到。force=True 覆盖任何已有 root handler。
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    force=True,
+)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -69,32 +82,91 @@ async def _shutdown() -> None:
         session_manager = None
 
 
+async def _safe_send_json(ws: WebSocket, payload: dict) -> None:
+    try:
+        await ws.send_json(payload)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    except Exception as exc:
+        logger.warning("WS send failed: %s", exc)
+
+
+async def _safe_ws_close(ws: WebSocket, code: int = 1000, reason: str = "") -> None:
+    with contextlib.suppress(AttributeError):
+        await ws.close(code=code, reason=reason)
+
+
+async def _generate_summary_and_save(session_id: str, ctx: ContextStore) -> None:
+    summary = await generate_summary(ctx)
+    await session_manager.set_summary(session_id, summary)
+
+
+async def _handle_text_message(
+    ws: WebSocket,
+    msg: dict,
+    orch: Orchestrator,
+    session_id: str,
+    ctx: ContextStore,
+) -> bool:
+    """处理客户端文本消息。返回 True 表示会话应该关闭。"""
+    msg_type = msg.get("type")
+
+    if msg_type == "ping":
+        await _safe_send_json(ws, {"type": "pong"})
+        return False
+
+    if msg_type == "confirm":
+        request_id = msg.get("request_id")
+        if request_id:
+            ok = await orch.confirm_analysis(request_id)
+            await _safe_send_json(ws, {"type": "confirm_ack", "request_id": request_id, "ok": ok})
+        return False
+
+    if msg_type == "dismiss":
+        request_id = msg.get("request_id")
+        if request_id:
+            await orch.dismiss_pending(request_id)
+        return False
+
+    if msg_type == "close":
+        asyncio.create_task(_generate_summary_and_save(session_id, ctx))
+        await session_manager.close_session(session_id)
+        return True
+
+    return False
+
+
 @app.websocket("/ws/{session_id}")
 async def legal_session(ws: WebSocket, session_id: str):
     await ws.accept()
+    print(f"[WS] accepted sid={session_id}")
 
     # --- Session 获取 / 创建 / 恢复 ---
-    state = await session_manager.get_state(session_id)
-    if state is None:
-        state = await session_manager.restore_session(session_id)
+    state = await session_manager.get_state(session_id) or await session_manager.restore_session(session_id)
     if state is None:
         enrollment = await asyncio.to_thread(_session_enrollment)
         session_id = await session_manager.create_session(enrollment, session_id=session_id)
         state = await session_manager.get_state(session_id)
+        print(f"[WS] new session created sid={session_id}")
+    else:
+        print(f"[WS] session restored sid={session_id} status={state.status}")
 
     # 排他连接：已有 WebSocket 时拒绝新连接
-    attached = await session_manager.attach_ws(session_id, ws)
-    if not attached:
-        await ws.close(code=1008, reason="Session already connected")
+    if not await session_manager.attach_ws(session_id, ws):
+        print(f"[WS] attach REJECTED sid={session_id} (1008)")
+        await _safe_ws_close(ws, code=1008, reason="Session already connected")
         return
+    print(f"[WS] attached sid={session_id}")
 
     # --- 恢复或新建 Agent 状态 ---
     if state.context_store and state.orchestrator:
         ctx = ContextStore.from_dict(state.context_store)
-        orch = Orchestrator.from_dict(state.orchestrator, ctx=ctx)
+        orch = Orchestrator.from_dict(
+            state.orchestrator, ctx=ctx, session_id=session_id, user_id="lawyer-default"
+        )
     else:
         ctx = ContextStore()
-        orch = Orchestrator(ctx)
+        orch = Orchestrator(ctx, session_id=session_id, user_id="lawyer-default")
 
     bus = UtteranceBus(maxsize=10)
     orch.attach_bus(bus)
@@ -106,12 +178,9 @@ async def legal_session(ws: WebSocket, session_id: str):
                     "type": "suggestion.pending",
                     "text": None,
                     "meta": {
-                        "severity": meta["severity"],
-                        "intent_type": meta["intent_type"],
-                        "law_domain": meta["law_domain"],
-                        "entities": meta["entities"],
                         "utt_id": meta["utt_id"],
                         "request_id": meta["request_id"],
+                        "preview": meta.get("preview", {}),
                     },
                 })
             else:
@@ -119,16 +188,15 @@ async def legal_session(ws: WebSocket, session_id: str):
                     "type": "suggestion.ready",
                     "text": text,
                     "meta": {
-                        "severity": meta["severity"],
-                        "intent_type": meta["intent_type"],
-                        "law_domain": meta["law_domain"],
-                        "entities": meta["entities"],
                         "utt_id": meta["utt_id"],
+                        **({"request_id": meta["request_id"]} if "request_id" in meta else {}),
                     },
                 })
-        except Exception:
-            # WS 已断开时不应崩溃
+        except (WebSocketDisconnect, RuntimeError):
+            # WS 已断开,不应崩溃也不必告警(常规连接关闭)
             pass
+        except Exception as exc:
+            logger.warning("Suggestion callback failed: %s", exc)
 
     orch.set_suggestion_callback(on_suggestion)
     await orch.start()
@@ -146,25 +214,33 @@ async def legal_session(ws: WebSocket, session_id: str):
             yield item
 
     async def consume_stt():
-        async for utt in stream_stt(audio_iter(), enrollment=enrollment):
-            try:
-                await ws.send_json({
-                    "type": "transcript",
-                    "id": utt.id,
-                    "text": utt.text,
-                    "t_start": utt.t_start,
-                    "t_end": utt.t_end,
-                    "speaker": utt.speaker,
-                    "closed_by": utt.closed_by,
-                    "is_final": True,
-                })
-            except Exception:
-                pass
-            ok = await bus.put(utt)
-            if not ok:
-                print(f"[WARN] Utterance bus full, dropping utt {utt.id}")
+        # 包一层 try 把异常显式 log 出来。否则 stt_task 异常被 finally 里的
+        # contextlib.suppress(Exception) 吞掉,排查时完全看不到。
+        try:
+            async for utt in stream_stt(audio_iter(), enrollment=enrollment):
+                logger.info("STT produced utt: %s", utt.text[:50])
+                await _safe_send_json(
+                    ws,
+                    {
+                        "type": "transcript",
+                        "id": utt.id,
+                        "text": utt.text,
+                        "t_start": utt.t_start,
+                        "t_end": utt.t_end,
+                        "speaker": utt.speaker,
+                        "closed_by": utt.closed_by,
+                        "is_final": True,
+                    },
+                )
+                ok = await bus.put(utt)
+                if not ok:
+                    logger.warning("Utterance bus full, dropping utt %s", utt.id)
+        except Exception:
+            logger.exception("consume_stt died")
+            raise
 
     stt_task = asyncio.create_task(consume_stt())
+    print(f"[WS] entering receive loop sid={session_id}")
 
     # --- 主循环 ---
     try:
@@ -172,52 +248,44 @@ async def legal_session(ws: WebSocket, session_id: str):
             data = await ws.receive()
 
             if data["type"] == "websocket.disconnect":
+                print(f"[WS] disconnect received sid={session_id} code={data.get('code')}")
                 break
 
             if "bytes" in data:
                 audio = np.frombuffer(data["bytes"], dtype=np.int16).astype(np.float32) / 32768.0
+                if len(audio) > 0:
+                    logger.info(
+                        "WS recv bytes: len=%d, max=%.4f, min=%.4f", len(audio), float(audio.max()), float(audio.min())
+                    )
+                else:
+                    logger.info("WS recv bytes: len=0 (empty chunk)")
                 await audio_q.put((audio, time.monotonic() - t0))
 
             elif "text" in data:
                 try:
                     msg = json.loads(data["text"])
                 except json.JSONDecodeError:
-                    await ws.send_json({"type": "error", "message": "Invalid JSON"})
+                    await _safe_send_json(ws, {"type": "error", "message": "Invalid JSON"})
                     continue
-                msg_type = msg.get("type")
-                if msg_type == "ping":
-                    await ws.send_json({"type": "pong"})
-                elif msg_type == "confirm":
-                    request_id = msg.get("request_id")
-                    if request_id:
-                        ok = await orch.confirm_analysis(request_id)
-                        await ws.send_json({"type": "confirm_ack", "request_id": request_id, "ok": ok})
-                elif msg_type == "dismiss":
-                    request_id = msg.get("request_id")
-                    if request_id:
-                        orch.dismiss_pending(request_id)
-                elif msg_type == "close":
-                    summary = await generate_summary(ctx)
-                    state = await session_manager.get_state(session_id)
-                    if state is not None:
-                        state.summary = summary
-                    await session_manager.close_session(session_id)
+                should_close = await _handle_text_message(ws, msg, orch, session_id, ctx)
+                if should_close:
                     break
 
     except (WebSocketDisconnect, RuntimeError):
         pass
+    except Exception as exc:
+        logger.warning("WS main loop unexpected error: %s", exc, exc_info=True)
     finally:
         await audio_q.put(None)
         # 保存 Agent 状态 → SessionManager → 持久化
+        # 无论 update_agent_state 是否成功，都必须 detach_ws，否则 _ws_map 泄漏
         state = await session_manager.get_state(session_id)
         if state is not None and state.status != "closed":
-            await session_manager.update_agent_state(session_id, ctx, orch)
-            await session_manager.detach_ws(session_id)
-        try:
+            with contextlib.suppress(Exception):
+                await session_manager.update_agent_state(session_id, ctx, orch)
+            with contextlib.suppress(Exception):
+                await session_manager.detach_ws(session_id)
+        with contextlib.suppress(Exception):
             await orch.shutdown()
-        except Exception:
-            pass
-        try:
+        with contextlib.suppress(Exception):
             await stt_task
-        except Exception:
-            pass

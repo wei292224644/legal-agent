@@ -6,9 +6,12 @@ profile 更新通过 asyncio.Queue 异步消费，避免阻塞主路径。
 
 import asyncio
 import contextlib
+import logging
 from dataclasses import dataclass
 
 from models.utterance import Utterance
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -134,9 +137,9 @@ class ContextStore:
             try:
                 for entry in entries:
                     self._profile.append(entry)
-            except Exception:
+            except Exception as exc:
                 # 单条解析失败不影响队列，继续消费下一条
-                pass
+                logger.warning("Profile worker dropped entry: %s", exc)
             self._profile_queue.task_done()
 
     # ------------------------------------------------------------------

@@ -63,3 +63,19 @@ ENERGY_THRESHOLD_RATIO: float = float(os.getenv("ENERGY_THRESHOLD_RATIO", "0.10"
 
 # VAD 重检间隔（毫秒），控制流式处理轮询频率
 VAD_RECHECK_INTERVAL_MS: int = int(os.getenv("VAD_RECHECK_INTERVAL_MS", "100"))
+
+# ═══════════════════════════════════════════════════════
+# Agno HITL / Run 状态持久化
+# ═══════════════════════════════════════════════════════
+
+# Agno PostgresDb 连接串。生产推荐;dev 默认连本机 docker postgres。
+AGNO_DB_URL: str = os.getenv(
+    "AGNO_DB_URL",
+    "postgresql+psycopg://legal:legal@localhost:5432/legal_agent",
+)
+
+# 单个 child run 的最长在飞时间（秒）。卡死时由 asyncio.wait_for 强制取消。
+RUN_TIMEOUT: float = float(os.getenv("RUN_TIMEOUT", "30"))
+
+# 挂起 run 等待律师确认的最长 TTL（秒）。超时由后台扫描 abandon。
+PENDING_TTL: float = float(os.getenv("PENDING_TTL", "300"))

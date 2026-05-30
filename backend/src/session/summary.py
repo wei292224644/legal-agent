@@ -5,11 +5,14 @@ Session 关闭时调用 HeavyAgent 生成结构化摘要。
 
 from __future__ import annotations
 
+import logging
 import os
 
 from openai import AsyncOpenAI
 
 from agent.context_store import ContextStore
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "qwen-turbo"
 _BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -22,7 +25,7 @@ async def generate_summary(ctx: ContextStore) -> str | None:
     """
     api_key = os.getenv("DASHSCOPE_API_KEY")
     if not api_key:
-        print("[WARN] DASHSCOPE_API_KEY not set, skipping summary generation")
+        logger.warning("DASHSCOPE_API_KEY not set, skipping summary generation")
         return None
 
     history = ctx.get_full_history()
@@ -66,5 +69,5 @@ async def generate_summary(ctx: ContextStore) -> str | None:
         )
         return response.choices[0].message.content
     except Exception as exc:
-        print(f"[WARN] Summary generation failed: {exc}")
+        logger.warning("Summary generation failed: %s", exc)
         return None
