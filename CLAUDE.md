@@ -235,3 +235,8 @@ Key routing rules:
 
 ### Session 恢复机制
 `SessionManager` 在启动时从 SQLite 恢复未过期的会话状态。WebSocket 连接建立时，若 `session_id` 对应的状态已存在，则直接续接；若不存在但数据库有快照，则自动恢复。会话每 60 秒自动快照，TTL 600 秒。
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
