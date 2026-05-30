@@ -153,18 +153,3 @@ async def test_ttl_sweep_abandons_stale_pending(store):
     )
     await orch.shutdown()
 
-
-@pytest.mark.asyncio
-async def test_restored_pending_is_dropped_to_avoid_stale_runoutput(store):
-    """from_dict 必须丢弃序列化的 pending —— RunOutput 不可序列化,
-    若硬恢复,confirm 路径会因 run_output=None 而无 requirement 可 confirm。"""
-    ha, _, _ = _make_paused_ha()
-    orch = Orchestrator(store, gate=_StubGate(), pa=_StubPA(), ha=ha)
-    rid = await _spawn_pending(orch)
-    snapshot = orch.to_dict()
-    assert any(p["request_id"] == rid for p in snapshot["pending"]), "snapshot 仍记录 pending(供审计)"
-
-    restored = Orchestrator.from_dict(
-        snapshot, ctx=store, gate=_StubGate(), pa=_StubPA(), ha=ha
-    )
-    assert restored._pending == {}, "恢复后必须为空,避免对失效 RunOutput 调 confirm"

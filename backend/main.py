@@ -214,24 +214,43 @@ async def legal_session(ws: WebSocket, session_id: str):
         orch.attach_bus(bus)
 
         async def on_suggestion(text, meta):
+            utt_id = meta.get("utt_id")
+            request_id = meta.get("request_id")
             try:
                 if meta.get("kind") == "pending":
+                    if utt_id and request_id:
+                        preview = meta.get("preview", {})
+                        async with _maker() as s:
+                            from repositories.suggestions import SuggestionRepository
+                            await SuggestionRepository(s).upsert_pending(
+                                sid_uuid,
+                                utt_id=utt_id,
+                                request_id=request_id,
+                                preview_topic=preview.get("topic"),
+                                preview_rationale=preview.get("rationale"),
+                            )
                     await ws.send_json({
                         "type": "suggestion.pending",
                         "text": None,
                         "meta": {
-                            "utt_id": meta["utt_id"],
-                            "request_id": meta["request_id"],
+                            "utt_id": utt_id,
+                            "request_id": request_id,
                             "preview": meta.get("preview", {}),
                         },
                     })
                 else:
+                    if request_id and text:
+                        async with _maker() as s:
+                            from repositories.suggestions import SuggestionRepository
+                            await SuggestionRepository(s).upsert_ready(
+                                sid_uuid, request_id=request_id, text=text, utt_id=utt_id,
+                            )
                     await ws.send_json({
                         "type": "suggestion.ready",
                         "text": text,
                         "meta": {
-                            "utt_id": meta["utt_id"],
-                            **({"request_id": meta["request_id"]} if "request_id" in meta else {}),
+                            "utt_id": utt_id,
+                            **({"request_id": request_id} if request_id else {}),
                         },
                     })
             except (WebSocketDisconnect, RuntimeError):

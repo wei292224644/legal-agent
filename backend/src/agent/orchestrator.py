@@ -50,33 +50,8 @@ class PendingRequest:
     preview: dict
     # wall-clock 秒。TTL 比较用 time.time() 统一基线,跨进程也有意义。
     created_at: float = field(default_factory=time.time)
-    # 仅内存。to_dict / from_dict 不带这个字段。
+    # 仅内存。不序列化。
     run_output: Any = None
-
-    def to_dict(self) -> dict:
-        return {
-            "request_id": self.request_id,
-            "run_id": self.run_id,
-            "utt_id": self.utt_id,
-            "generation": self.generation,
-            "preview": self.preview,
-            "created_at": self.created_at,
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> PendingRequest:
-        # run_output 永远为 None(不可序列化),恢复出来的 pending 没有可
-        # confirm 的 requirements,只能等 TTL sweep 自然过期或主动 dismiss。
-        # Orchestrator.from_dict 会决定要不要把它带回来,见下方注释。
-        return cls(
-            request_id=d["request_id"],
-            run_id=d["run_id"],
-            utt_id=d["utt_id"],
-            generation=d["generation"],
-            preview=d.get("preview", {}),
-            created_at=d.get("created_at", time.time()),
-            run_output=None,
-        )
 
 
 class Orchestrator:
@@ -354,45 +329,3 @@ class Orchestrator:
         if asyncio.iscoroutine(result):
             await result
 
-    # ------------------------------------------------------------------
-    # serialization
-    # ------------------------------------------------------------------
-
-    def to_dict(self) -> dict:
-        return {
-            "pending": [p.to_dict() for p in self._pending.values()],
-            "ctx": self._ctx.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(
-        cls,
-        d: dict,
-        ctx: ContextStore | None = None,
-        session_id: str = "default",
-        user_id: str = "default",
-        gate: RelevanceGate | None = None,
-        pa: ProfileAgent | None = None,
-        ha: HeavyAgent | None = None,
-    ):
-        """从快照恢复 Orchestrator。
-
-        **不恢复 pending**:RunOutput 含不可序列化的运行期对象(模型/工具
-        实例/消息流引用),跨进程恢复后无法 confirm。如果旧进程崩溃时有
-        挂起 run,Agno db 里的 paused 状态由其内部 GC 与本类的 TTL sweep
-        共同清理。前端 UX 上,会话恢复后律师只能在新对话里重新触发。
-        """
-        if ctx is None:
-            ctx = ContextStore.from_dict(d["ctx"])
-        inst = cls.__new__(cls)
-        inst._ctx = ctx
-        inst._gate = gate or RelevanceGate()
-        inst._pa = pa or ProfileAgent()
-        inst._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
-        inst._suggestion_callback = None
-        inst._pending = {}  # 故意丢弃 d.get("pending", []),见 docstring
-        inst._inflight = set()
-        inst._bus = None
-        inst._bus_task = None
-        inst._ttl_task = None
-        return inst
