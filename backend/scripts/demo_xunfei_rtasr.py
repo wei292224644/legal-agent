@@ -92,7 +92,11 @@ def _parse_transcription_result(data: dict) -> dict[str, object]:
                 elif wp == "p":
                     text_parts.append(w)
                 # rl: 1/2/3... 表示切换到该说话人；0 表示继续上一说话人
-                rl = cw.get("rl", 0)
+                _rl = cw.get("rl", 0)
+                try:
+                    rl = int(_rl) if _rl is not None else 0
+                except (ValueError, TypeError):
+                    rl = 0
                 if rl > 0:
                     speaker = rl
 
@@ -292,23 +296,34 @@ def main() -> None:
         print("  XUNFEI_APISECRET=xxx")
         raise SystemExit(1)
 
+    # 声纹注册音频（律师声纹，需 10s~60s）
+    enroll_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师声纹注册_30s.wav"
+    if not enroll_path.exists():
+        print(f"错误：找不到声纹注册音频 {enroll_path}")
+        raise SystemExit(1)
+
+    # 实时转写音频（会谈对话）
     fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "two_utterances.wav"
     if not fixture_path.exists():
         print(f"错误：找不到测试音频 {fixture_path}")
         raise SystemExit(1)
 
-    print(f"[加载音频] {fixture_path.name}")
+    print(f"[加载声纹音频] {enroll_path.name}")
+    enroll_pcm, enroll_duration_ms = _load_audio_as_pcm16(str(enroll_path))
+    print(f"[声纹音频信息] 时长 {enroll_duration_ms / 1000:.1f}s")
+
+    print(f"[加载转写音频] {fixture_path.name}")
     pcm_bytes, duration_ms = _load_audio_as_pcm16(str(fixture_path))
-    print(f"[音频信息] 时长 {duration_ms / 1000:.1f}s, PCM 大小 {len(pcm_bytes)} bytes")
+    print(f"[转写音频信息] 时长 {duration_ms / 1000:.1f}s, PCM 大小 {len(pcm_bytes)} bytes")
 
-    if duration_ms < 10_000:
-        print("警告：音频时长不足 10s，声纹注册可能失败。请使用更长的音频。")
+    if enroll_duration_ms < 10_000:
+        print("警告：声纹音频时长不足 10s，注册可能失败。")
 
-    # 声纹注册：音频截断到 60s
-    register_pcm = pcm_bytes
-    if duration_ms > 60_000:
-        print("警告：音频时长超过 60s，声纹注册将只取前 60s")
-        register_pcm = pcm_bytes[: int(60_000 / 1000 * TARGET_SR * 2)]
+    # 声纹注册：截断到 60s
+    register_pcm = enroll_pcm
+    if enroll_duration_ms > 60_000:
+        print("警告：声纹音频超过 60s，只取前 60s")
+        register_pcm = enroll_pcm[: int(60_000 / 1000 * TARGET_SR * 2)]
 
     print("[声纹注册] 正在上传...")
     audio_base64 = base64.b64encode(register_pcm).decode("utf-8")
