@@ -26,5 +26,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Models (large binary files, not tracked in git)
+__modles__/
+
 # gstack (project-local, not vendored)
 # .gstack/
