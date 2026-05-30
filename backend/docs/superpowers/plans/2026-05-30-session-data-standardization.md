@@ -212,7 +212,7 @@ volumes:
 
 ```
 # Postgres 连接（dev 默认指向 docker-compose）
-DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent
+DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent
 ```
 
 - [ ] **Step 5: 启动 Postgres 验证**
@@ -255,7 +255,7 @@ async def test_engine_connects_to_postgres():
     """engine 能连上 Postgres 并执行 SELECT 1——验证连接串与驱动配置正确。"""
     os.environ.setdefault(
         "DATABASE_URL",
-        "postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent",
+        "postgresql+psycopg://legal:legal@localhost:5432/legal_agent",
     )
     engine = create_engine_from_env()
     async with engine.connect() as conn:
@@ -419,7 +419,7 @@ sqlalchemy.url =
 
 - [ ] **Step 4: 验证 alembic 能连库（暂无 migration）**
 
-Run: `cd backend && DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run alembic current`
+Run: `cd backend && DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run alembic current`
 Expected: 输出空（没有版本记录）但不报错。
 
 - [ ] **Step 5: 提交**
@@ -558,7 +558,7 @@ import db.models  # noqa: F401
 async def db_session():
     os.environ.setdefault(
         "DATABASE_URL",
-        "postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent",
+        "postgresql+psycopg://legal:legal@localhost:5432/legal_agent",
     )
     engine = create_engine_from_env()
     async with engine.begin() as conn:
@@ -720,7 +720,7 @@ git commit -m "feat(db): ORM 模型（sessions/utterances/suggestions/profile_en
 
 - [ ] **Step 1: 让 alembic 自动生成 migration**
 
-Run: `cd backend && DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run alembic revision --autogenerate -m "initial schema"`
+Run: `cd backend && DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run alembic revision --autogenerate -m "initial schema"`
 Expected: 在 `alembic/versions/` 下生成一个新文件，包含四张表的 `op.create_table(...)`。
 
 - [ ] **Step 2: 重命名为 0001_initial.py**
@@ -741,7 +741,7 @@ Expected: 在 `alembic/versions/` 下生成一个新文件，包含四张表的 
 ```bash
 cd backend
 docker compose exec postgres psql -U legal_agent -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run alembic upgrade head
+DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run alembic upgrade head
 docker compose exec postgres psql -U legal_agent -c "\dt"
 ```
 Expected: 列出 `alembic_version`、`profile_entries`、`sessions`、`suggestions`、`utterances` 五张表。
@@ -1983,8 +1983,8 @@ cd backend && grep -n "update_agent_state" main.py src/
 ```bash
 cd backend
 docker compose up -d postgres
-DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run alembic upgrade head
-DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run uvicorn main:app --reload
+DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run alembic upgrade head
+DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run uvicorn main:app --reload
 ```
 
 另开终端 curl：
@@ -2300,7 +2300,7 @@ if (!sessionId) return;
 
 ```bash
 cd backend && docker compose up -d postgres
-DATABASE_URL=postgresql+psycopg://legal_agent:legal_agent_dev@localhost:5432/legal_agent uv run uvicorn main:app --reload &
+DATABASE_URL=postgresql+psycopg://legal:legal@localhost:5432/legal_agent uv run uvicorn main:app --reload &
 
 cd ../frontend && pnpm dev
 ```
