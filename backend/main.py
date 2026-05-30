@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -80,6 +80,38 @@ async def create_session():
     """创建新会话并返回 session_id。前端拿到 id 后通过 WS 连接。"""
     session_id = await session_manager.create_session()
     return {"session_id": session_id}
+
+
+@app.get("/api/sessions/{session_id}/history")
+async def get_history(session_id: str):
+    """返回 session 的完整历史（utterances + suggestions），供前端刷新回放。"""
+    from repositories.sessions import SessionRepository
+    from repositories.suggestions import SuggestionRepository
+    from repositories.utterances import UtteranceRepository
+
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的 session_id 格式")
+
+    async with _maker() as s:
+        row = await SessionRepository(s).get(sid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        utts = await UtteranceRepository(s).list_by_session(sid)
+        sugs = await SuggestionRepository(s).list_by_session(sid)
+
+    return {
+        "session_id": str(sid),
+        "status": row.status,
+        "utterances": [
+            {
+                "id": u.id, "text": u.text, "t_start": u.t_start,
+                "t_end": u.t_end, "speaker": u.speaker, "closed_by": u.closed_by,
+            } for u in utts
+        ],
+        "suggestions": sugs,
+    }
 
 
 @app.on_event("startup")
