@@ -9,6 +9,7 @@ import json
 import os
 import random
 import string
+import time
 import urllib.parse
 import uuid as uuid_mod
 from pathlib import Path
@@ -225,6 +226,7 @@ async def _transcribe(
 
         # 发送和接收并行：一个 task 发音频，一个 task 收结果
         chunk_size = int(TARGET_SR * 0.04 * 2)
+        start_time = time.time()
 
         async def _send_audio() -> None:
             for i in range(0, len(pcm_bytes), chunk_size):
@@ -248,7 +250,8 @@ async def _transcribe(
                         sentence = _parse_transcription_result(data)
                         if sentence["text"]:
                             sentences.append(sentence)
-                            _print_sentence(sentence)
+                            latency_ms = int((time.time() - start_time) * 1000)
+                            _print_sentence(sentence, latency_ms)
                     elif msg_type == "error":
                         print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
                         break
@@ -256,8 +259,19 @@ async def _transcribe(
                 pass
 
         await asyncio.gather(_send_audio(), _receive_results())
+        total_duration_ms = int((time.time() - start_time) * 1000)
+        print(f"[统计] 总耗时 {total_duration_ms}ms")
 
     return sentences
+
+
+def _save_results(sentences: list[dict[str, object]], output_path: Path) -> None:
+    """将转写结果保存为 JSON 文件。"""
+    output_path.write_text(
+        json.dumps(sentences, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"[保存结果] {output_path}")
 
 
 def _format_time(ms: int) -> str:
@@ -269,13 +283,13 @@ def _format_time(ms: int) -> str:
     return f"{minutes:02d}:{seconds:02d}.{millis:03d}"
 
 
-def _print_sentence(sentence: dict[str, object]) -> None:
+def _print_sentence(sentence: dict[str, object], latency_ms: int = 0) -> None:
     """打印单句转写结果。"""
     speaker = sentence["speaker"]
     start = _format_time(sentence["start_ms"])
     end = _format_time(sentence["end_ms"])
     text = sentence["text"]
-    print(f"[说话人{speaker}] {start} - {end}")
+    print(f"[说话人{speaker}] {start} - {end}  (延迟 {latency_ms}ms)")
     print(f"  {text}")
 
 
@@ -303,7 +317,7 @@ def main() -> None:
         raise SystemExit(1)
 
     # 实时转写音频（会谈对话）
-    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "two_utterances.wav"
+    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师客户对话_1min.wav"
     if not fixture_path.exists():
         print(f"错误：找不到测试音频 {fixture_path}")
         raise SystemExit(1)
@@ -352,6 +366,10 @@ def main() -> None:
             )
         )
         print(f"[完成] 共 {len(sentences)} 句")
+
+        # 保存结果到 JSON
+        output_path = Path(__file__).parent / f"{fixture_path.stem}_xunfei_rtasr.json"
+        _save_results(sentences, output_path)
     except Exception as e:
         print(f"[错误] {e}")
         raise SystemExit(1)

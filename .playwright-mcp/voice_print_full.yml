@@ -1,0 +1,823 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - list [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /
+      - listitem [ref=e8]:
+        - generic [ref=e9]: 产品能力
+      - listitem [ref=e11]:
+        - generic [ref=e12]: 行业方案
+      - listitem [ref=e14]:
+        - link "星火大模型" [ref=e15] [cursor=pointer]:
+          - /url: https://xinghuo.xfyun.cn/
+      - listitem [ref=e16]:
+        - generic [ref=e17]: 生态合作
+      - listitem [ref=e19]:
+        - generic [ref=e20]: 服务支持
+      - listitem [ref=e22]:
+        - generic [ref=e23]: AI开发者大赛
+      - generic [ref=e25]:
+        - generic [ref=e27] [cursor=pointer]: 中文站
+        - link "控制台" [ref=e30] [cursor=pointer]:
+          - /url: https://console.xfyun.cn/app/myapp
+    - list [ref=e34]
+  - generic [ref=e36]:
+    - complementary [ref=e37]:
+      - generic [ref=e38]: 文档中心
+      - list [ref=e39]:
+        - listitem [ref=e40]:
+          - paragraph [ref=e42] [cursor=pointer]:
+            - img [ref=e43]
+            - text: 平台文档
+        - listitem [ref=e45]:
+          - paragraph [ref=e47] [cursor=pointer]:
+            - img [ref=e48]
+            - text: 星火认知大模型
+        - listitem [ref=e50]:
+          - generic [ref=e51]:
+            - paragraph [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+              - text: 语音识别
+            - list [ref=e55]:
+              - listitem [ref=e56]:
+                - paragraph [ref=e58] [cursor=pointer]: 语音识别大模型
+              - listitem [ref=e60]:
+                - paragraph [ref=e62] [cursor=pointer]: 语音听写
+              - listitem [ref=e64]:
+                - generic [ref=e65]:
+                  - paragraph [ref=e66] [cursor=pointer]: 录音文件转写
+                  - list [ref=e68]:
+                    - listitem [ref=e69]:
+                      - link "录音文件转写标准版" [ref=e70] [cursor=pointer]:
+                        - /url: /doc/asr/ifasr_new/API.html
+                    - listitem [ref=e71]:
+                      - link "录音文件转写大模型" [ref=e72] [cursor=pointer]:
+                        - /url: /doc/spark/asr_llm/Ifasr_llm.html
+                    - listitem [ref=e73]:
+                      - link "声纹注册接口" [ref=e74] [cursor=pointer]:
+                        - /url: /doc/spark/asr_llm/voice_print.html
+                    - listitem [ref=e75]:
+                      - link "语音分析" [ref=e76] [cursor=pointer]:
+                        - /url: /doc/spark/spark_asr/spark_VAA.html
+                    - listitem [ref=e77]:
+                      - link "Android SDK文档" [ref=e78] [cursor=pointer]:
+                        - /url: /doc/asr/ifasr_new/Android.html
+                    - listitem [ref=e79]:
+                      - link "Linux SDK文档" [ref=e80] [cursor=pointer]:
+                        - /url: /doc/asr/ifasr_new/Linux.html
+                    - listitem [ref=e81]:
+                      - link "语音转写服务说明" [ref=e82] [cursor=pointer]:
+                        - /url: /doc/asr/ifasr_new/lfasr-description.html
+                    - listitem [ref=e83]:
+                      - link "语音转写服务协议" [ref=e84] [cursor=pointer]:
+                        - /url: /doc/asr/ifasr_new/agreement.html
+              - listitem [ref=e85]:
+                - paragraph [ref=e87] [cursor=pointer]: 极速语音转写
+              - listitem [ref=e89]:
+                - paragraph [ref=e91] [cursor=pointer]: 实时语音转写
+              - listitem [ref=e93]:
+                - paragraph [ref=e95] [cursor=pointer]: 离线语音听写
+              - listitem [ref=e97]:
+                - paragraph [ref=e99] [cursor=pointer]: 离线语音听写（新版）
+              - listitem [ref=e101]:
+                - paragraph [ref=e103] [cursor=pointer]: 语音唤醒
+              - listitem [ref=e105]:
+                - paragraph [ref=e107] [cursor=pointer]: 语音唤醒（新版）
+              - listitem [ref=e109]:
+                - paragraph [ref=e111] [cursor=pointer]: 离线命令词识别
+              - listitem [ref=e113]:
+                - paragraph [ref=e115] [cursor=pointer]: 离线命令词识别（新版）
+              - listitem [ref=e117]:
+                - paragraph [ref=e119] [cursor=pointer]: 实时语音转写sp
+        - listitem [ref=e121]:
+          - paragraph [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - text: 语音合成
+        - listitem [ref=e126]:
+          - paragraph [ref=e128] [cursor=pointer]:
+            - img [ref=e129]
+            - text: 语音扩展
+        - listitem [ref=e131]:
+          - paragraph [ref=e133] [cursor=pointer]:
+            - img [ref=e134]
+            - text: 自然语言处理
+        - listitem [ref=e136]:
+          - paragraph [ref=e138] [cursor=pointer]:
+            - img [ref=e139]
+            - text: 人脸识别
+        - listitem [ref=e141]:
+          - paragraph [ref=e143] [cursor=pointer]:
+            - img [ref=e144]
+            - text: 文字识别
+        - listitem [ref=e146]:
+          - paragraph [ref=e148] [cursor=pointer]:
+            - img [ref=e149]
+            - text: 图像识别
+        - listitem [ref=e151]:
+          - paragraph [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+            - text: 基础服务
+        - listitem [ref=e156]:
+          - paragraph [ref=e158] [cursor=pointer]:
+            - img [ref=e159]
+            - text: 解决方案
+        - listitem [ref=e161]:
+          - paragraph [ref=e163] [cursor=pointer]:
+            - img [ref=e164]
+            - text: MSC API文档
+    - main [ref=e166]:
+      - generic [ref=e167]:
+        - list [ref=e168]:
+          - listitem [ref=e169]:
+            - link "文档中心" [ref=e170] [cursor=pointer]:
+              - /url: /doc/
+            - text: ">"
+          - listitem [ref=e171]: spark>
+          - listitem [ref=e172]: asr_llm>
+          - listitem [ref=e173]: voice_print
+        - search [ref=e174]:
+          - combobox [ref=e176]
+      - generic [ref=e177]:
+        - heading "# 声纹分离接口" [level=1] [ref=e178]:
+          - link "#" [ref=e179] [cursor=pointer]:
+            - /url: "#声纹分离接口"
+          - text: 声纹分离接口
+        - paragraph [ref=e180]:
+          - strong [ref=e181]: 声纹分离接口辅助于转写大模型的发音人分离功能，通过将(10s，1min)中范围的音频注册为声纹id，然后在使用转写大模型能力时，同时上传声纹id , 以此达到发音人分离的极致效果。
+        - heading "# 1. 用户声纹注册接口" [level=1] [ref=e182]:
+          - link "#" [ref=e183] [cursor=pointer]:
+            - /url: "#_1-用户声纹注册接口"
+          - text: 1. 用户声纹注册接口
+        - paragraph [ref=e184]:
+          - strong [ref=e185]: 功能
+          - text: ：注册声纹特征。
+        - heading "# 请求地址" [level=2] [ref=e186]:
+          - link "#" [ref=e187] [cursor=pointer]:
+            - /url: "#请求地址"
+          - text: 请求地址
+        - code [ref=e190]: https://office-api-personal-dx.iflyaisol.com/res/feature/v1/register
+        - heading "# 请求头" [level=2] [ref=e191]:
+          - link "#" [ref=e192] [cursor=pointer]:
+            - /url: "#请求头"
+          - text: 请求头
+        - table [ref=e193]:
+          - rowgroup [ref=e194]:
+            - row "参数名 值 说明" [ref=e195]:
+              - columnheader "参数名" [ref=e196]
+              - columnheader "值" [ref=e197]
+              - columnheader "说明" [ref=e198]
+          - rowgroup [ref=e199]:
+            - row "Content-Type application/json 请求体为JSON格式" [ref=e200]:
+              - cell "Content-Type" [ref=e201]:
+                - code [ref=e202]: Content-Type
+              - cell "application/json" [ref=e203]:
+                - code [ref=e204]: application/json
+              - cell "请求体为JSON格式" [ref=e205]
+            - row "signature string 基于请求参数生成的签名" [ref=e206]:
+              - cell "signature" [ref=e207]:
+                - code [ref=e208]: signature
+              - cell "string" [ref=e209]:
+                - code [ref=e210]: string
+              - cell "基于请求参数生成的签名" [ref=e211]
+        - heading "# 请求参数 (Query + Body)" [level=2] [ref=e212]:
+          - link "#" [ref=e213] [cursor=pointer]:
+            - /url: "#请求参数-query-body"
+          - text: 请求参数 (Query + Body)
+        - paragraph [ref=e214]:
+          - strong [ref=e215]: Query参数
+        - table [ref=e216]:
+          - rowgroup [ref=e217]:
+            - row "参数名 是否必传 取值范围 说明" [ref=e218]:
+              - columnheader "参数名" [ref=e219]
+              - columnheader "是否必传" [ref=e220]
+              - columnheader "取值范围" [ref=e221]
+              - columnheader "说明" [ref=e222]
+          - rowgroup [ref=e223]:
+            - row "appId 是 string 应用ID" [ref=e224]:
+              - cell "appId" [ref=e225]:
+                - code [ref=e226]: appId
+              - cell "是" [ref=e227]
+              - cell "string" [ref=e228]
+              - cell "应用ID" [ref=e229]
+            - row "accessKeyId 是 string 访问密钥ID" [ref=e230]:
+              - cell "accessKeyId" [ref=e231]:
+                - code [ref=e232]: accessKeyId
+              - cell "是" [ref=e233]
+              - cell "string" [ref=e234]
+              - cell "访问密钥ID" [ref=e235]
+            - row "dateTime 是 yyyy-MM-dd'T'HH:mm:ss±HHmm 带时区的请求时间" [ref=e236]:
+              - cell "dateTime" [ref=e237]:
+                - code [ref=e238]: dateTime
+              - cell "是" [ref=e239]
+              - cell "yyyy-MM-dd'T'HH:mm:ss±HHmm" [ref=e240]:
+                - code [ref=e241]: yyyy-MM-dd'T'HH:mm:ss±HHmm
+              - cell "带时区的请求时间" [ref=e242]
+            - row "signatureRandom 是 string 随机字符串" [ref=e243]:
+              - cell "signatureRandom" [ref=e244]:
+                - code [ref=e245]: signatureRandom
+              - cell "是" [ref=e246]
+              - cell "string" [ref=e247]
+              - cell "随机字符串" [ref=e248]
+        - paragraph [ref=e249]:
+          - strong [ref=e250]: Body参数
+        - table [ref=e251]:
+          - rowgroup [ref=e252]:
+            - row "参数名 是否必传 类型 说明" [ref=e253]:
+              - columnheader "参数名" [ref=e254]
+              - columnheader "是否必传" [ref=e255]
+              - columnheader "类型" [ref=e256]
+              - columnheader "说明" [ref=e257]
+          - rowgroup [ref=e258]:
+            - row "audio_data 是 string 用于提取声纹特征等音频，音频时长不超过 1min，不低于 10s，经过 标准 base64 编码的数据；" [ref=e259]:
+              - cell "audio_data" [ref=e260]:
+                - code [ref=e261]: audio_data
+              - cell "是" [ref=e262]
+              - cell "string" [ref=e263]
+              - cell "用于提取声纹特征等音频，音频时长不超过 1min，不低于 10s，经过 标准 base64 编码的数据；" [ref=e264]
+            - row "audio_type 是 string 音频类型:raw 、speex、opus-ogg raw对应的pcm/wav 格式音频" [ref=e265]:
+              - cell "audio_type" [ref=e266]:
+                - code [ref=e267]: audio_type
+              - cell "是" [ref=e268]
+              - cell "string" [ref=e269]
+              - cell "音频类型:raw 、speex、opus-ogg raw对应的pcm/wav 格式音频" [ref=e270]:
+                - text: 音频类型:raw 、speex、opus-ogg
+                - text: raw对应的pcm/wav 格式音频
+            - row "uid 否 String 用户id" [ref=e271]:
+              - cell "uid" [ref=e272]:
+                - code [ref=e273]: uid
+              - cell "否" [ref=e274]
+              - cell "String" [ref=e275]
+              - cell "用户id" [ref=e276]
+        - heading "# 请求示例" [level=2] [ref=e277]:
+          - link "#" [ref=e278] [cursor=pointer]:
+            - /url: "#请求示例"
+          - text: 请求示例
+        - generic [ref=e279]:
+          - text: json
+          - code [ref=e281]: "{ \"audio_data\": \"zzxAAAJOAZZZZZAAAAAAAAA...\", \"audio_type\": \"raw\" }"
+        - heading "# 返回参数" [level=2] [ref=e282]:
+          - link "#" [ref=e283] [cursor=pointer]:
+            - /url: "#返回参数"
+          - text: 返回参数
+        - table [ref=e284]:
+          - rowgroup [ref=e285]:
+            - row "参数名 说明" [ref=e286]:
+              - columnheader "参数名" [ref=e287]
+              - columnheader "说明" [ref=e288]
+          - rowgroup [ref=e289]:
+            - row "code 返回码，000000表示成功" [ref=e290]:
+              - cell "code" [ref=e291]:
+                - code [ref=e292]: code
+              - cell "返回码，000000表示成功" [ref=e293]:
+                - text: 返回码，
+                - code [ref=e294]: "000000"
+                - text: 表示成功
+            - row "desc 描述信息" [ref=e295]:
+              - cell "desc" [ref=e296]:
+                - code [ref=e297]: desc
+              - cell "描述信息" [ref=e298]
+            - row "data 结果对象，为JSON字符串格式" [ref=e299]:
+              - cell "data" [ref=e300]:
+                - code [ref=e301]: data
+              - cell "结果对象，为JSON字符串格式" [ref=e302]
+            - row "data.feature_id 新生成的声纹特征ID" [ref=e303]:
+              - cell "data.feature_id" [ref=e304]:
+                - code [ref=e305]: data.feature_id
+              - cell "新生成的声纹特征ID" [ref=e306]
+            - row "data.status 状态码，1表示成功" [ref=e307]:
+              - cell "data.status" [ref=e308]:
+                - code [ref=e309]: data.status
+              - cell "状态码，1表示成功" [ref=e310]:
+                - text: 状态码，
+                - code [ref=e311]: "1"
+                - text: 表示成功
+            - row "sid 请求会话ID" [ref=e312]:
+              - cell "sid" [ref=e313]:
+                - code [ref=e314]: sid
+              - cell "请求会话ID" [ref=e315]
+        - heading "# 返回示例" [level=2] [ref=e316]:
+          - link "#" [ref=e317] [cursor=pointer]:
+            - /url: "#返回示例"
+          - text: 返回示例
+        - generic [ref=e318]:
+          - text: json
+          - code [ref=e320]: "{ \"code\": \"000000\", \"desc\": \"success\", \"data\": \"{\\\"feature_id\\\":\\\"20250918230019446ygDeLdBoiC08RTKG\\\",\\\"status\\\":1}\", \"sid\": \"b4f76122d531419cb5cf33c590f75a39\" }"
+        - separator [ref=e321]
+        - heading "# 2. 用户声纹更新接口" [level=1] [ref=e322]:
+          - link "#" [ref=e323] [cursor=pointer]:
+            - /url: "#_2-用户声纹更新接口"
+          - text: 2. 用户声纹更新接口
+        - paragraph [ref=e324]:
+          - strong [ref=e325]: 功能
+          - text: ：更新已注册用户的声纹特征。
+        - heading "# 请求地址" [level=2] [ref=e326]:
+          - link "#" [ref=e327] [cursor=pointer]:
+            - /url: "#请求地址-2"
+          - text: 请求地址
+        - code [ref=e330]: https://office-api-personal-dx.iflyaisol.com/res/feature/v1/update
+        - heading "# 请求头" [level=2] [ref=e331]:
+          - link "#" [ref=e332] [cursor=pointer]:
+            - /url: "#请求头-2"
+          - text: 请求头
+        - paragraph [ref=e333]:
+          - text: 同
+          - strong [ref=e334]: 注册接口
+          - text: 。
+        - heading "# 请求参数 (Query + Body)" [level=2] [ref=e335]:
+          - link "#" [ref=e336] [cursor=pointer]:
+            - /url: "#请求参数-query-body-2"
+          - text: 请求参数 (Query + Body)
+        - paragraph [ref=e337]:
+          - strong [ref=e338]: Query参数
+          - text: ：同
+          - strong [ref=e339]: 注册接口
+          - text: 。
+        - paragraph [ref=e340]:
+          - strong [ref=e341]: Body参数
+        - table [ref=e342]:
+          - rowgroup [ref=e343]:
+            - row "参数名 是否必传 类型 说明" [ref=e344]:
+              - columnheader "参数名" [ref=e345]
+              - columnheader "是否必传" [ref=e346]
+              - columnheader "类型" [ref=e347]
+              - columnheader "说明" [ref=e348]
+          - rowgroup [ref=e349]:
+            - row "audio_data 是 string 用于提取声纹特征等音频，音频时长不超过 1min，不低于 10s，经过 标准 base64 编码的数据；" [ref=e350]:
+              - cell "audio_data" [ref=e351]:
+                - code [ref=e352]: audio_data
+              - cell "是" [ref=e353]
+              - cell "string" [ref=e354]
+              - cell "用于提取声纹特征等音频，音频时长不超过 1min，不低于 10s，经过 标准 base64 编码的数据；" [ref=e355]
+            - row "audio_type 是 string 音频类型:raw 、speex、opus-ogg raw对应的pcm/wav 格式音频" [ref=e356]:
+              - cell "audio_type" [ref=e357]:
+                - code [ref=e358]: audio_type
+              - cell "是" [ref=e359]
+              - cell "string" [ref=e360]
+              - cell "音频类型:raw 、speex、opus-ogg raw对应的pcm/wav 格式音频" [ref=e361]:
+                - text: 音频类型:raw 、speex、opus-ogg
+                - text: raw对应的pcm/wav 格式音频
+            - row "feature_id 是 string 待更新的声纹特征ID" [ref=e362]:
+              - cell "feature_id" [ref=e363]:
+                - code [ref=e364]: feature_id
+              - cell "是" [ref=e365]
+              - cell "string" [ref=e366]
+              - cell "待更新的声纹特征ID" [ref=e367]
+        - heading "# 请求示例" [level=2] [ref=e368]:
+          - link "#" [ref=e369] [cursor=pointer]:
+            - /url: "#请求示例-2"
+          - text: 请求示例
+        - generic [ref=e370]:
+          - text: json
+          - code [ref=e372]: "{ \"audio_data\": \"zzxAAAJOAZZZZZAAAAAAAAA...\", \"audio_type\": \"raw\", \"feature_id\": \"20250918230019446ygDeLdBoiC08RTKG\" }"
+        - heading "# 返回参数" [level=2] [ref=e373]:
+          - link "#" [ref=e374] [cursor=pointer]:
+            - /url: "#返回参数-2"
+          - text: 返回参数
+        - table [ref=e375]:
+          - rowgroup [ref=e376]:
+            - row "参数名 说明" [ref=e377]:
+              - columnheader "参数名" [ref=e378]
+              - columnheader "说明" [ref=e379]
+          - rowgroup [ref=e380]:
+            - row "code 返回码，000000表示成功" [ref=e381]:
+              - cell "code" [ref=e382]:
+                - code [ref=e383]: code
+              - cell "返回码，000000表示成功" [ref=e384]:
+                - text: 返回码，
+                - code [ref=e385]: "000000"
+                - text: 表示成功
+            - row "desc 描述信息" [ref=e386]:
+              - cell "desc" [ref=e387]:
+                - code [ref=e388]: desc
+              - cell "描述信息" [ref=e389]
+            - row "data 结果对象，为JSON字符串格式" [ref=e390]:
+              - cell "data" [ref=e391]:
+                - code [ref=e392]: data
+              - cell "结果对象，为JSON字符串格式" [ref=e393]
+            - row "data.status 状态码，1表示成功" [ref=e394]:
+              - cell "data.status" [ref=e395]:
+                - code [ref=e396]: data.status
+              - cell "状态码，1表示成功" [ref=e397]:
+                - text: 状态码，
+                - code [ref=e398]: "1"
+                - text: 表示成功
+            - row "sid 请求会话ID" [ref=e399]:
+              - cell "sid" [ref=e400]:
+                - code [ref=e401]: sid
+              - cell "请求会话ID" [ref=e402]
+        - heading "# 返回示例" [level=2] [ref=e403]:
+          - link "#" [ref=e404] [cursor=pointer]:
+            - /url: "#返回示例-2"
+          - text: 返回示例
+        - generic [ref=e405]:
+          - text: json
+          - code [ref=e407]: "{ \"code\": \"000000\", \"desc\": \"success\", \"data\": \"{\\\"status\\\":1}\", \"sid\": \"3b27245de8ad4c838cb5deaeeab1c1dd\" }"
+        - separator [ref=e408]
+        - heading "# 3. 用户声纹删除接口" [level=1] [ref=e409]:
+          - link "#" [ref=e410] [cursor=pointer]:
+            - /url: "#_3-用户声纹删除接口"
+          - text: 3. 用户声纹删除接口
+        - paragraph [ref=e411]:
+          - strong [ref=e412]: 功能
+          - text: ：删除一个或多个用户的声纹特征。
+        - heading "# 请求地址" [level=2] [ref=e413]:
+          - link "#" [ref=e414] [cursor=pointer]:
+            - /url: "#请求地址-3"
+          - text: 请求地址
+        - code [ref=e417]: https://office-api-personal-dx.iflyaisol.com/res/feature/v1/delete
+        - heading "# 请求头" [level=2] [ref=e418]:
+          - link "#" [ref=e419] [cursor=pointer]:
+            - /url: "#请求头-3"
+          - text: 请求头
+        - paragraph [ref=e420]:
+          - text: 同
+          - strong [ref=e421]: 注册接口
+          - text: 。
+        - heading "# 请求参数 (Query + Body)" [level=2] [ref=e422]:
+          - link "#" [ref=e423] [cursor=pointer]:
+            - /url: "#请求参数-query-body-3"
+          - text: 请求参数 (Query + Body)
+        - paragraph [ref=e424]:
+          - strong [ref=e425]: Query参数
+          - text: ：同
+          - strong [ref=e426]: 注册接口
+          - text: 。
+        - paragraph [ref=e427]:
+          - strong [ref=e428]: Body参数
+        - table [ref=e429]:
+          - rowgroup [ref=e430]:
+            - row "参数名 是否必传 取值范围 说明" [ref=e431]:
+              - columnheader "参数名" [ref=e432]
+              - columnheader "是否必传" [ref=e433]
+              - columnheader "取值范围" [ref=e434]
+              - columnheader "说明" [ref=e435]
+          - rowgroup [ref=e436]:
+            - row "feature_ids 是 string[] 待删除的声纹特征ID数组" [ref=e437]:
+              - cell "feature_ids" [ref=e438]:
+                - code [ref=e439]: feature_ids
+              - cell "是" [ref=e440]
+              - cell "string[]" [ref=e441]
+              - cell "待删除的声纹特征ID数组" [ref=e442]
+        - heading "# 请求示例" [level=2] [ref=e443]:
+          - link "#" [ref=e444] [cursor=pointer]:
+            - /url: "#请求示例-3"
+          - text: 请求示例
+        - generic [ref=e445]:
+          - text: json
+          - code [ref=e447]: "{ \"feature_ids\": [\"20250918231248655AqK5GyNtf898q2Eg\", \"feature2\"] }"
+        - heading "# 返回参数" [level=2] [ref=e448]:
+          - link "#" [ref=e449] [cursor=pointer]:
+            - /url: "#返回参数-3"
+          - text: 返回参数
+        - table [ref=e450]:
+          - rowgroup [ref=e451]:
+            - row "参数名 说明" [ref=e452]:
+              - columnheader "参数名" [ref=e453]
+              - columnheader "说明" [ref=e454]
+          - rowgroup [ref=e455]:
+            - row "code 返回码，000000表示成功" [ref=e456]:
+              - cell "code" [ref=e457]:
+                - code [ref=e458]: code
+              - cell "返回码，000000表示成功" [ref=e459]:
+                - text: 返回码，
+                - code [ref=e460]: "000000"
+                - text: 表示成功
+            - row "desc 描述信息" [ref=e461]:
+              - cell "desc" [ref=e462]:
+                - code [ref=e463]: desc
+              - cell "描述信息" [ref=e464]
+            - 'row "data 结果对象，为JSON字符串格式。成功时为\"{}\"" [ref=e465]':
+              - cell "data" [ref=e466]:
+                - code [ref=e467]: data
+              - 'cell "结果对象，为JSON字符串格式。成功时为\"{}\"" [ref=e468]':
+                - text: 结果对象，为JSON字符串格式。成功时为
+                - code [ref=e469]: "\"{}\""
+            - row "sid 请求会话ID" [ref=e470]:
+              - cell "sid" [ref=e471]:
+                - code [ref=e472]: sid
+              - cell "请求会话ID" [ref=e473]
+        - heading "# 返回示例" [level=2] [ref=e474]:
+          - link "#" [ref=e475] [cursor=pointer]:
+            - /url: "#返回示例-3"
+          - text: 返回示例
+        - generic [ref=e476]:
+          - text: json
+          - code [ref=e478]: "{ \"code\": \"000000\", \"desc\": \"success\", \"data\": \"{}\", \"sid\": \"2fd99cfe3b0646928c166b2bcb404fce\" }"
+        - heading "# 4. 示例代码" [level=1] [ref=e479]:
+          - link "#" [ref=e480] [cursor=pointer]:
+            - /url: "#_4-示例代码"
+          - text: 4. 示例代码
+        - paragraph [ref=e481]:
+          - link "Python Demo" [ref=e482] [cursor=pointer]:
+            - /url: https://xfyun-doc.xfyun.cn/lc-sp-voiceprint_new_reg-1767597834240.zip
+            - text: Python Demo
+            - img [ref=e484]
+      - generic [ref=e488]:
+        - generic [ref=e489]: 在这篇文章中：
+        - list [ref=e490]:
+          - listitem [ref=e491]:
+            - link "请求地址" [ref=e492] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求地址
+          - listitem [ref=e493]:
+            - link "请求头" [ref=e494] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求头
+          - listitem [ref=e495]:
+            - link "请求参数 (Query + Body)" [ref=e496] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求参数-query-body
+          - listitem [ref=e497]:
+            - link "请求示例" [ref=e498] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求示例
+          - listitem [ref=e499]:
+            - link "返回参数" [ref=e500] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回参数
+          - listitem [ref=e501]:
+            - link "返回示例" [ref=e502] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回示例
+          - listitem [ref=e503]:
+            - link "请求地址" [ref=e504] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求地址-2
+          - listitem [ref=e505]:
+            - link "请求头" [ref=e506] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求头-2
+          - listitem [ref=e507]:
+            - link "请求参数 (Query + Body)" [ref=e508] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求参数-query-body-2
+          - listitem [ref=e509]:
+            - link "请求示例" [ref=e510] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求示例-2
+          - listitem [ref=e511]:
+            - link "返回参数" [ref=e512] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回参数-2
+          - listitem [ref=e513]:
+            - link "返回示例" [ref=e514] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回示例-2
+          - listitem [ref=e515]:
+            - link "请求地址" [ref=e516] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求地址-3
+          - listitem [ref=e517]:
+            - link "请求头" [ref=e518] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求头-3
+          - listitem [ref=e519]:
+            - link "请求参数 (Query + Body)" [ref=e520] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求参数-query-body-3
+          - listitem [ref=e521]:
+            - link "请求示例" [ref=e522] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#请求示例-3
+          - listitem [ref=e523]:
+            - link "返回参数" [ref=e524] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回参数-3
+          - listitem [ref=e525]:
+            - link "返回示例" [ref=e526] [cursor=pointer]:
+              - /url: /doc/spark/asr_llm/voice_print.html#返回示例-3
+  - generic [ref=e527]:
+    - generic [ref=e529]:
+      - generic [ref=e531] [cursor=pointer]: 在线咨询
+      - generic [ref=e533] [cursor=pointer]: 体验中心
+    - generic:
+      - generic [ref=e535] [cursor=pointer]: ×
+      - paragraph: 意见/投诉反馈
+      - paragraph [ref=e536]:
+        - text: 本入口仅处理对讯飞开放平台的意见和投诉，如果您是问题咨询请
+        - link "点击此处" [ref=e537] [cursor=pointer]:
+          - /url: https://xfyun.sobot.com/chat/pc/v2/index.html?sysnum=1f851a5acb6e4f408a3e3e5487750951&channelid=31
+        - text: 进行IM咨询，点击IM页面转人工服务可以为您转人工处理。
+      - generic:
+        - generic [ref=e538]:
+          - generic:
+            - generic [ref=e539]: "* 您的称呼"
+            - textbox "请输入您的称呼" [ref=e541]
+          - generic:
+            - generic [ref=e542]: "* 手机号码"
+            - generic [ref=e543]:
+              - combobox [ref=e544]:
+                - option "(+86)中国" [selected]
+                - option "(+853)中国澳门 (中國澳門)"
+                - option "(+886)中国台湾 (中國台灣)"
+                - option "(+852)中国香港"
+                - option "(+355)阿尔巴尼亚 (Shqipëri)"
+                - option "(+213)阿尔及利亚 (Algeria)"
+                - option "(+93)阿富汗 (‫افغانستان‬‎)"
+                - option "(+54)阿根廷 (Argentina)"
+                - option "(+971)阿拉伯联合酋长国 (‫الإمارات العربية المتحدة‬‎)"
+                - option "(+297)阿鲁巴 (Aruba)"
+                - option "(+968)阿曼 (‫عُمان‬‎)"
+                - option "(+994)阿塞拜疆 (Azərbaycan)"
+                - option "(+247)阿森松岛 (Ascension Island)"
+                - option "(+20)埃及 (‫مصر‬‎)"
+                - option "(+251)埃塞俄比亚 (Ethiopia)"
+                - option "(+353)爱尔兰 (Ireland)"
+                - option "(+372)爱沙尼亚 (Eesti)"
+                - option "(+376)安道尔 (Andorra)"
+                - option "(+244)安哥拉 (Angola)"
+                - option "(+1264)安圭拉 (Anguilla)"
+                - option "(+1268)安提瓜和巴布达 (Antigua & Barbuda)"
+                - option "(+43)奥地利 (Österreich)"
+                - option "(+61)澳大利亚 (Australia)"
+                - option "(+1246)巴巴多斯 (Barbados)"
+                - option "(+675)巴布亚新几内亚 (Papua New Guinea)"
+                - option "(+1242)巴哈马 (Bahamas)"
+                - option "(+92)巴基斯坦 (‫پاکستان‬‎)"
+                - option "(+595)巴拉圭 (Paraguay)"
+                - option "(+970)巴勒斯坦 (‫فلسطين‬‎)"
+                - option "(+973)巴林 (‫البحرين‬‎)"
+                - option "(+507)巴拿马 (Panamá)"
+                - option "(+55)巴西 (Brasil)"
+                - option "(+375)白俄罗斯 (Беларусь)"
+                - option "(+1441)百慕大 (Bermuda)"
+                - option "(+359)保加利亚 (България)"
+                - option "(+229)贝宁 (Bénin)"
+                - option "(+32)比利时 (Belgium)"
+                - option "(+354)冰岛 (Ísland)"
+                - option "(+591)玻利维亚 (Bolivia)"
+                - option "(+1787)波多黎各 (Puerto Rico)"
+                - option "(+48)波兰 (Polska)"
+                - option "(+387)波斯尼亚和黑塞哥维那 (Bosna i Hercegovina)"
+                - option "(+267)博茨瓦纳 (Botswana)"
+                - option "(+501)伯利兹 (Belize)"
+                - option "(+975)不丹 (འབྲུག)"
+                - option "(+226)布基纳法索 (Burkina Faso)"
+                - option "(+257)布隆迪 (Uburundi)"
+                - option "(+850)朝鲜 (북한)"
+                - option "(+240)赤道几内亚 (Guinea Ecuatorial)"
+                - option "(+45)丹麦 (Danmark)"
+                - option "(+49)德国 (Deutschland)"
+                - option "(+670)东帝汶 (Timor-Leste)"
+                - option "(+228)多哥 (Togo)"
+                - option "(+1809)多米尼加共和国 (República Dominicana)"
+                - option "(+1767)多米尼克 (Dominica)"
+                - option "(+7)俄罗斯 (Россия)"
+                - option "(+593)厄瓜多尔 (Ecuador)"
+                - option "(+291)厄立特里亚 (Eritrea)"
+                - option "(+33)法国 (France)"
+                - option "(+298)法罗群岛 (Føroyar)"
+                - option "(+689)法属波利尼西亚 (Polynésie française)"
+                - option "(+594)法属圭亚那 (Guyane française)"
+                - option "(+63)菲律宾 (Philippines)"
+                - option "(+358)芬兰 (Suomi)"
+                - option "(+238)佛得角 (Kabu Verdi)"
+                - option "(+500)福克兰群岛（马尔维纳斯群岛） (Falkland Islands (Islas Malvinas))"
+                - option "(+220)冈比亚 (Gambia)"
+                - option "(+242)刚果（布） (Congo-Brazzaville)"
+                - option "(+243)刚果（金） (Jamhuri ya Kidemokrasia ya Kongo)"
+                - option "(+57)哥伦比亚 (Colombia)"
+                - option "(+506)哥斯达黎加 (Costa Rica)"
+                - option "(+1473)格林纳达 (Grenada)"
+                - option "(+299)格陵兰 (Kalaallit Nunaat)"
+                - option "(+995)格鲁吉亚 (საქართველო)"
+                - option "(+590)瓜德罗普 (Guadeloupe)"
+                - option "(+592)圭亚那 (Guyana)"
+                - option "(+7)哈萨克斯坦 (Казахстан)"
+                - option "(+509)海地 (Haiti)"
+                - option "(+82)韩国 (대한민국)"
+                - option "(+31)荷兰 (Nederland)"
+                - option "(+599)荷属加勒比区 (Caribbean Netherlands)"
+                - option "(+1721)荷属圣马丁 (Sint Maarten)"
+                - option "(+382)黑山 (Crna Gora)"
+                - option "(+504)洪都拉斯 (Honduras)"
+                - option "(+686)基里巴斯 (Kiribati)"
+                - option "(+253)吉布提 (Djibouti)"
+                - option "(+996)吉尔吉斯斯坦 (Кыргызстан)"
+                - option "(+224)几内亚 (Guinée)"
+                - option "(+245)几内亚比绍 (Guiné-Bissau)"
+                - option "(+001)加拿大 (Canada)"
+                - option "(+233)加纳 (Gaana)"
+                - option "(+241)加蓬 (Gabon)"
+                - option "(+855)柬埔寨 (កម្ពុជា)"
+                - option "(+420)捷克 (Česko)"
+                - option "(+263)津巴布韦 (Zimbabwe)"
+                - option "(+237)喀麦隆 (Cameroun)"
+                - option "(+974)卡塔尔 (‫قطر‬‎)"
+                - option "(+1345)开曼群岛 (Cayman Islands)"
+                - option "(+269)科摩罗 (‫جزر القمر‬‎)"
+                - option "(+225)科特迪瓦 (Côte d’Ivoire)"
+                - option "(+965)科威特 (‫الكويت‬‎)"
+                - option "(+385)克罗地亚 (Hrvatska)"
+                - option "(+254)肯尼亚 (Kenya)"
+                - option "(+682)库克群岛 (Cook Islands)"
+                - option "(+599)库拉索 (Curaçao)"
+                - option "(+371)拉脱维亚 (Latvija)"
+                - option "(+266)莱索托 (Lesotho)"
+                - option "(+856)老挝 (ລາວ)"
+                - option "(+961)黎巴嫩 (‫لبنان‬‎)"
+                - option "(+231)利比里亚 (Liberia)"
+                - option "(+218)利比亚 (‫ليبيا‬‎)"
+                - option "(+370)立陶宛 (Lietuva)"
+                - option "(+423)列支敦士登 (Liechtenstein)"
+                - option "(+262)留尼汪 (La Réunion)"
+                - option "(+250)卢旺达 (Rwanda)"
+                - option "(+40)罗马尼亚 (România)"
+                - option "(+261)马达加斯加 (Madagasikara)"
+                - option "(+356)马耳他 (Malta)"
+                - option "(+960)马尔代夫 (Maldives)"
+                - option "(+265)马拉维 (Malawi)"
+                - option "(+60)马来西亚 (Malaysia)"
+                - option "(+223)马里 (Mali)"
+                - option "(+389)马其顿（前南斯拉夫马其顿共和国） (Република Македонија)"
+                - option "(+692)马绍尔群岛 (Marshall Islands)"
+                - option "(+596)马提尼克 (Martinique)"
+                - option "(+222)毛里塔尼亚 (‫موريتانيا‬‎)"
+                - option "(+1)美国 (United States)"
+                - option "(+1684)美属萨摩亚 (American Samoa)"
+                - option "(+1340)美属维尔京群岛 (U.S. Virgin Islands)"
+                - option "(+976)蒙古 (Монгол)"
+                - option "(+1664)蒙特塞拉特 (Montserrat)"
+                - option "(+880)孟加拉国 (বাংলাদেশ)"
+                - option "(+51)秘鲁 (Perú)"
+                - option "(+691)密克罗尼西亚 (Micronesia)"
+                - option "(+95)缅甸 (မြန်မာ)"
+                - option "(+373)摩尔多瓦 (Republica Moldova)"
+                - option "(+212)摩洛哥 (Morocco)"
+                - option "(+377)摩纳哥 (Monaco)"
+                - option "(+258)莫桑比克 (Moçambique)"
+                - option "(+52)墨西哥 (México)"
+                - option "(+264)纳米比亚 (Namibië)"
+                - option "(+27)南非 (South Africa)"
+                - option "(+211)南苏丹 (‫جنوب السودان‬‎)"
+                - option "(+977)尼泊尔 (नेपाल)"
+                - option "(+505)尼加拉瓜 (Nicaragua)"
+                - option "(+227)尼日尔 (Nijar)"
+                - option "(+234)尼日利亚 (Nigeria)"
+                - option "(+47)挪威 (Norge)"
+                - option "(+672)诺福克岛 (Norfolk Island)"
+                - option "(+680)帕劳 (Palau)"
+                - option "(+351)葡萄牙 (Portugal)"
+                - option "(+81)日本"
+                - option "(+46)瑞典 (Sverige)"
+                - option "(+41)瑞士 (Schweiz)"
+                - option "(+503)萨尔瓦多 (El Salvador)"
+                - option "(+685)萨摩亚 (Samoa)"
+                - option "(+381)塞尔维亚 (Србија)"
+                - option "(+232)塞拉利昂 (Sierra Leone)"
+                - option "(+221)塞内加尔 (Senegal)"
+                - option "(+357)塞浦路斯 (Κύπρος)"
+                - option "(+248)塞舌尔 (Seychelles)"
+                - option "(+966)沙特阿拉伯 (‫المملكة العربية السعودية‬‎)"
+                - option "(+239)圣多美和普林西比 (São Tomé e Príncipe)"
+                - option "(+290)圣赫勒拿 (St. Helena)"
+                - option "(+1869)圣基茨和尼维斯 (St. Kitts & Nevis)"
+                - option "(+1758)圣卢西亚 (St. Lucia)"
+                - option "(+00)圣马丁岛 (Saint-Martin)"
+                - option "(+378)圣马力诺 (San Marino)"
+                - option "(+508)圣皮埃尔和密克隆群岛 (Saint-Pierre-et-Miquelon)"
+                - option "(+1784)圣文森特和格林纳丁斯 (St. Vincent & Grenadines)"
+                - option "(+94)斯里兰卡 (ශ්‍රී ලංකාව)"
+                - option "(+421)斯洛伐克 (Slovensko)"
+                - option "(+386)斯洛文尼亚 (Slovenija)"
+                - option "(+268)斯威士兰 (Swaziland)"
+                - option "(+249)苏丹 (‫السودان‬‎)"
+                - option "(+597)苏里南 (Suriname)"
+                - option "(+252)索马里 (Soomaaliya)"
+                - option "(+677)所罗门群岛 (Solomon Islands)"
+                - option "(+992)塔吉克斯坦 (Tajikistan)"
+                - option "(+66)泰国 (ไทย)"
+                - option "(+255)坦桑尼亚 (Tanzania)"
+                - option "(+676)汤加 (Tonga)"
+                - option "(+1649)特克斯和凯科斯群岛 (Turks & Caicos Islands)"
+                - option "(+1868)特立尼达和多巴哥 (Trinidad & Tobago)"
+                - option "(+216)突尼斯 (Tunisia)"
+                - option "(+688)图瓦卢 (Tuvalu)"
+                - option "(+90)土耳其 (Türkiye)"
+                - option "(+993)土库曼斯坦 (Turkmenistan)"
+                - option "(+690)托克劳 (Tokelau)"
+                - option "(+681)瓦利斯和富图纳 (Wallis & Futuna)"
+                - option "(+502)危地马拉 (Guatemala)"
+                - option "(+58)委内瑞拉 (Venezuela)"
+                - option "(+673)文莱 (Brunei)"
+                - option "(+256)乌干达 (Uganda)"
+                - option "(+380)乌克兰 (Україна)"
+                - option "(+598)乌拉圭 (Uruguay)"
+                - option "(+998)乌兹别克斯坦 (Oʻzbekiston)"
+                - option "(+34)西班牙 (España)"
+                - option "(+30)希腊 (Ελλάδα)"
+                - option "(+65)新加坡 (Singapore)"
+                - option "(+687)新喀里多尼亚 (Nouvelle-Calédonie)"
+                - option "(+64)新西兰 (New Zealand)"
+                - option "(+36)匈牙利 (Magyarország)"
+                - option "(+963)叙利亚 (‫سوريا‬‎)"
+                - option "(+1876)牙买加 (Jamaica)"
+                - option "(+374)亚美尼亚 (Հայաստան)"
+                - option "(+967)也门 (‫اليمن‬‎)"
+                - option "(+964)伊拉克 (‫العراق‬‎)"
+                - option "(+98)伊朗 (‫ایران‬‎)"
+                - option "(+972)以色列 (‫ישראל‬‎)"
+                - option "(+39)意大利 (Italia)"
+                - option "(+91)印度 (भारत)"
+                - option "(+62)印度尼西亚 (Indonesia)"
+                - option "(+44)英国 (United Kingdom)"
+                - option "(+1284)英属维尔京群岛 (British Virgin Islands)"
+                - option "(+246)英属印度洋领地 (British Indian Ocean Territory)"
+                - option "(+962)约旦 (‫الأردن‬‎)"
+                - option "(+84)越南 (Việt Nam)"
+                - option "(+260)赞比亚 (Zambia)"
+                - option "(+235)乍得 (Tchad)"
+                - option "(+350)直布罗陀 (Gibraltar)"
+                - option "(+56)智利 (Chile)"
+                - option "(+236)中非共和国 (République centrafricaine)"
+                - option "(+674)瑙鲁 (Nauru)"
+                - option "(+379)梵蒂冈 (Città del Vaticano)"
+                - option "(+679)斐济 (Fiji)"
+              - textbox "请输入您的手机号码" [ref=e545]
+          - generic:
+            - generic [ref=e546]: "* 意见投诉"
+            - textbox "请详细填写，以便我们更加详细地了解您的诉求。(不多于128字)" [ref=e548]
+        - button "立即提交" [disabled] [ref=e549]

@@ -1,0 +1,602 @@
+[
+  {
+    "text": "王",
+    "speaker": 0,
+    "start_ms": 0,
+    "end_ms": 260
+  },
+  {
+    "text": "王律师",
+    "speaker": 0,
+    "start_ms": 200,
+    "end_ms": 600
+  },
+  {
+    "text": "王律师你好",
+    "speaker": 1,
+    "start_ms": 0,
+    "end_ms": 1330
+  },
+  {
+    "text": "我是",
+    "speaker": 0,
+    "start_ms": 1330,
+    "end_ms": 1630
+  },
+  {
+    "text": "我是朋友介绍",
+    "speaker": 0,
+    "start_ms": 1460,
+    "end_ms": 1980
+  },
+  {
+    "text": "，我是朋友介绍来的",
+    "speaker": 0,
+    "start_ms": 1330,
+    "end_ms": 2890
+  },
+  {
+    "text": "我",
+    "speaker": 0,
+    "start_ms": 3040,
+    "end_ms": 3300
+  },
+  {
+    "text": "我被公司",
+    "speaker": 0,
+    "start_ms": 3200,
+    "end_ms": 3680
+  },
+  {
+    "text": "我被公司突然",
+    "speaker": 0,
+    "start_ms": 3240,
+    "end_ms": 4040
+  },
+  {
+    "text": "，我被公司突然辞退了",
+    "speaker": 0,
+    "start_ms": 3040,
+    "end_ms": 5100
+  },
+  {
+    "text": "说",
+    "speaker": 0,
+    "start_ms": 5100,
+    "end_ms": 5360
+  },
+  {
+    "text": "说组织架构",
+    "speaker": 0,
+    "start_ms": 5340,
+    "end_ms": 6060
+  },
+  {
+    "text": "，说组织架构调整",
+    "speaker": 0,
+    "start_ms": 5100,
+    "end_ms": 7040
+  },
+  {
+    "text": "让我",
+    "speaker": 0,
+    "start_ms": 7040,
+    "end_ms": 7340
+  },
+  {
+    "text": "让我当天",
+    "speaker": 0,
+    "start_ms": 7200,
+    "end_ms": 7680
+  },
+  {
+    "text": "让我当天签字",
+    "speaker": 0,
+    "start_ms": 7240,
+    "end_ms": 8040
+  },
+  {
+    "text": "，让我当天签字走人",
+    "speaker": 0,
+    "start_ms": 7040,
+    "end_ms": 8870
+  },
+  {
+    "text": "你",
+    "speaker": 0,
+    "start_ms": 9440,
+    "end_ms": 9700
+  },
+  {
+    "text": "你先别",
+    "speaker": 0,
+    "start_ms": 9600,
+    "end_ms": 10080
+  },
+  {
+    "text": "你先别急",
+    "speaker": 0,
+    "start_ms": 9640,
+    "end_ms": 10440
+  },
+  {
+    "text": "你先别急，咱们",
+    "speaker": 0,
+    "start_ms": 9660,
+    "end_ms": 10760
+  },
+  {
+    "text": "。你先别急，咱们慢慢说",
+    "speaker": 0,
+    "start_ms": 9440,
+    "end_ms": 11670
+  },
+  {
+    "text": "你",
+    "speaker": 0,
+    "start_ms": 11880,
+    "end_ms": 12140
+  },
+  {
+    "text": "你在这家",
+    "speaker": 0,
+    "start_ms": 12040,
+    "end_ms": 12520
+  },
+  {
+    "text": "你在这家公司",
+    "speaker": 0,
+    "start_ms": 12080,
+    "end_ms": 12880
+  },
+  {
+    "text": "你在这家公司工作",
+    "speaker": 0,
+    "start_ms": 12100,
+    "end_ms": 13200
+  },
+  {
+    "text": "。你在这家公司工作多久了",
+    "speaker": 0,
+    "start_ms": 11880,
+    "end_ms": 14080
+  },
+  {
+    "text": "月",
+    "speaker": 0,
+    "start_ms": 14330,
+    "end_ms": 14590
+  },
+  {
+    "text": "月薪大概",
+    "speaker": 0,
+    "start_ms": 14530,
+    "end_ms": 14930
+  },
+  {
+    "text": "？月薪大概多少",
+    "speaker": 0,
+    "start_ms": 14330,
+    "end_ms": 15790
+  },
+  {
+    "text": "两",
+    "speaker": 0,
+    "start_ms": 16380,
+    "end_ms": 16640
+  },
+  {
+    "text": "两年零",
+    "speaker": 0,
+    "start_ms": 16540,
+    "end_ms": 17020
+  },
+  {
+    "text": "两年零三个",
+    "speaker": 0,
+    "start_ms": 16550,
+    "end_ms": 17400
+  },
+  {
+    "text": "两年零三个月月",
+    "speaker": 0,
+    "start_ms": 16600,
+    "end_ms": 18140
+  },
+  {
+    "text": "两年零三个月月薪两万",
+    "speaker": 0,
+    "start_ms": 16620,
+    "end_ms": 18540
+  },
+  {
+    "text": "？两年零3个月月薪25,000",
+    "speaker": 1,
+    "start_ms": 16380,
+    "end_ms": 19310
+  },
+  {
+    "text": "和",
+    "speaker": 0,
+    "start_ms": 19500,
+    "end_ms": 19760
+  },
+  {
+    "text": "合同签",
+    "speaker": 0,
+    "start_ms": 19700,
+    "end_ms": 20100
+  },
+  {
+    "text": "，合同签了三年",
+    "speaker": 0,
+    "start_ms": 19500,
+    "end_ms": 21110
+  },
+  {
+    "text": "结果上周",
+    "speaker": 0,
+    "start_ms": 21110,
+    "end_ms": 21710
+  },
+  {
+    "text": "结果上周三",
+    "speaker": 0,
+    "start_ms": 21350,
+    "end_ms": 22070
+  },
+  {
+    "text": "结果上周三hr",
+    "speaker": 0,
+    "start_ms": 21370,
+    "end_ms": 22410
+  },
+  {
+    "text": "结果上周三hr突然",
+    "speaker": 0,
+    "start_ms": 21390,
+    "end_ms": 22790
+  },
+  {
+    "text": "结果上周三hr突然让",
+    "speaker": 0,
+    "start_ms": 21410,
+    "end_ms": 23210
+  },
+  {
+    "text": "结果上周三hr突然让我办",
+    "speaker": 0,
+    "start_ms": 21390,
+    "end_ms": 23630
+  },
+  {
+    "text": "，结果上周三hr突然让我办离职",
+    "speaker": 0,
+    "start_ms": 21110,
+    "end_ms": 24440
+  },
+  {
+    "text": "有没有给",
+    "speaker": 0,
+    "start_ms": 25040,
+    "end_ms": 25640
+  },
+  {
+    "text": "有没有给你发",
+    "speaker": 0,
+    "start_ms": 25240,
+    "end_ms": 26040
+  },
+  {
+    "text": "有没有给你发正式的",
+    "speaker": 0,
+    "start_ms": 25240,
+    "end_ms": 26440
+  },
+  {
+    "text": "有没有给你发正式的书面",
+    "speaker": 0,
+    "start_ms": 25260,
+    "end_ms": 26800
+  },
+  {
+    "text": "，有没有给你发正式的书面解除通知",
+    "speaker": 0,
+    "start_ms": 25040,
+    "end_ms": 27880
+  },
+  {
+    "text": "还是只是",
+    "speaker": 0,
+    "start_ms": 28090,
+    "end_ms": 28690
+  },
+  {
+    "text": "？还是只是口头说",
+    "speaker": 0,
+    "start_ms": 28090,
+    "end_ms": 29730
+  },
+  {
+    "text": "给",
+    "speaker": 0,
+    "start_ms": 30320,
+    "end_ms": 30580
+  },
+  {
+    "text": "给了一份",
+    "speaker": 0,
+    "start_ms": 30450,
+    "end_ms": 30970
+  },
+  {
+    "text": "给了一份解除",
+    "speaker": 0,
+    "start_ms": 30490,
+    "end_ms": 31340
+  },
+  {
+    "text": "给了一份解除通知",
+    "speaker": 0,
+    "start_ms": 30570,
+    "end_ms": 32070
+  },
+  {
+    "text": "给了一份解除通知上面写",
+    "speaker": 0,
+    "start_ms": 30560,
+    "end_ms": 32480
+  },
+  {
+    "text": "给了一份解除通知上面写着",
+    "speaker": 0,
+    "start_ms": 30570,
+    "end_ms": 32820
+  },
+  {
+    "text": "给了一份解除通知，上面写着经",
+    "speaker": 0,
+    "start_ms": 30580,
+    "end_ms": 33180
+  },
+  {
+    "text": "给了一份解除通知，上面写着经双方",
+    "speaker": 0,
+    "start_ms": 30590,
+    "end_ms": 33560
+  },
+  {
+    "text": "给了一份解除通知，上面写着经双方协商",
+    "speaker": 0,
+    "start_ms": 30600,
+    "end_ms": 33960
+  },
+  {
+    "text": "给了一份解除通知，上面写着经双方协商一致",
+    "speaker": 0,
+    "start_ms": 30610,
+    "end_ms": 34380
+  },
+  {
+    "text": "给了一份解除通知，上面写着经双方协商一致解除",
+    "speaker": 1,
+    "start_ms": 30320,
+    "end_ms": 35270
+  },
+  {
+    "text": " Hr",
+    "speaker": 0,
+    "start_ms": 35430,
+    "end_ms": 35950
+  },
+  {
+    "text": " Hr一直",
+    "speaker": 0,
+    "start_ms": 35730,
+    "end_ms": 36330
+  },
+  {
+    "text": " Hr一直催我",
+    "speaker": 0,
+    "start_ms": 35690,
+    "end_ms": 36730
+  },
+  {
+    "text": "，hr一直催我签字",
+    "speaker": 0,
+    "start_ms": 35430,
+    "end_ms": 37580
+  },
+  {
+    "text": "我",
+    "speaker": 0,
+    "start_ms": 37580,
+    "end_ms": 37840
+  },
+  {
+    "text": "我当时脑子",
+    "speaker": 0,
+    "start_ms": 37740,
+    "end_ms": 38220
+  },
+  {
+    "text": "我当时脑子很乱",
+    "speaker": 0,
+    "start_ms": 37750,
+    "end_ms": 38600
+  },
+  {
+    "text": "，我当时脑子很乱就签了",
+    "speaker": 0,
+    "start_ms": 37580,
+    "end_ms": 39610
+  },
+  {
+    "text": "这个很",
+    "speaker": 0,
+    "start_ms": 40220,
+    "end_ms": 40820
+  },
+  {
+    "text": "，这个很重要",
+    "speaker": 0,
+    "start_ms": 40220,
+    "end_ms": 41490
+  },
+  {
+    "text": "签了字",
+    "speaker": 0,
+    "start_ms": 41700,
+    "end_ms": 42340
+  },
+  {
+    "text": "签了字不代表",
+    "speaker": 0,
+    "start_ms": 41870,
+    "end_ms": 42720
+  },
+  {
+    "text": "签了字不代表就",
+    "speaker": 0,
+    "start_ms": 41900,
+    "end_ms": 43100
+  },
+  {
+    "text": "签了字不代表就不能",
+    "speaker": 0,
+    "start_ms": 41920,
+    "end_ms": 43460
+  },
+  {
+    "text": "签了字不代表就不能主张",
+    "speaker": 0,
+    "start_ms": 41940,
+    "end_ms": 43860
+  },
+  {
+    "text": "，签了字不代表就不能主张权利了",
+    "speaker": 0,
+    "start_ms": 41700,
+    "end_ms": 44590
+  },
+  {
+    "text": "除了辞退",
+    "speaker": 0,
+    "start_ms": 44860,
+    "end_ms": 45460
+  },
+  {
+    "text": "除了辞退加班费",
+    "speaker": 0,
+    "start_ms": 45180,
+    "end_ms": 46140
+  },
+  {
+    "text": "除了辞退加班费这些",
+    "speaker": 0,
+    "start_ms": 45190,
+    "end_ms": 46510
+  },
+  {
+    "text": "除了辞退加班费这些有没有",
+    "speaker": 0,
+    "start_ms": 45200,
+    "end_ms": 46900
+  },
+  {
+    "text": "。除了辞退加班费这些有没有结清",
+    "speaker": 0,
+    "start_ms": 44860,
+    "end_ms": 47980
+  },
+  {
+    "text": "？没有",
+    "speaker": 1,
+    "start_ms": 48550,
+    "end_ms": 49520
+  },
+  {
+    "text": "加了六",
+    "speaker": 0,
+    "start_ms": 49710,
+    "end_ms": 50350
+  },
+  {
+    "text": "加了六十多个",
+    "speaker": 0,
+    "start_ms": 49860,
+    "end_ms": 50760
+  },
+  {
+    "text": "加了六十多个小时的",
+    "speaker": 0,
+    "start_ms": 49870,
+    "end_ms": 51150
+  },
+  {
+    "text": "加了六十多个小时的班",
+    "speaker": 0,
+    "start_ms": 49890,
+    "end_ms": 51510
+  },
+  {
+    "text": "加了六十多个小时的班加班费一分",
+    "speaker": 0,
+    "start_ms": 49910,
+    "end_ms": 52310
+  },
+  {
+    "text": "。加了60多个小时的班，加班费一分没给",
+    "speaker": 0,
+    "start_ms": 49710,
+    "end_ms": 53280
+  },
+  {
+    "text": "我",
+    "speaker": 0,
+    "start_ms": 53450,
+    "end_ms": 53710
+  },
+  {
+    "text": "我跟",
+    "speaker": 0,
+    "start_ms": 53650,
+    "end_ms": 54050
+  },
+  {
+    "text": "。我跟hr提",
+    "speaker": 0,
+    "start_ms": 53450,
+    "end_ms": 55070
+  },
+  {
+    "text": "对方",
+    "speaker": 0,
+    "start_ms": 55070,
+    "end_ms": 55330
+  },
+  {
+    "text": "对方说",
+    "speaker": 0,
+    "start_ms": 55270,
+    "end_ms": 55670
+  },
+  {
+    "text": "对方说公司困难",
+    "speaker": 0,
+    "start_ms": 55270,
+    "end_ms": 56070
+  },
+  {
+    "text": "，对方说公司困难让我体谅",
+    "speaker": 0,
+    "start_ms": 55070,
+    "end_ms": 57530
+  },
+  {
+    "text": "。",
+    "speaker": 0,
+    "start_ms": 55070,
+    "end_ms": 57530
+  }
+]
