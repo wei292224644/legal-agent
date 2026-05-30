@@ -127,3 +127,14 @@ class TestSetSummary:
         await manager.set_summary(sid, "summary text")
         # 快照已写入后端
         assert manager._backend.load(sid)["summary"] == "summary text"
+
+    async def test_set_summary_on_backend_only(self, manager):
+        """session 已从内存释放时，set_summary 应直接操作后端保存数据。"""
+        sid = await manager.create_session(_dummy_enrollment())
+        await manager._snapshot(sid)
+        # 模拟进程重启后内存被清空
+        manager._sessions.pop(sid, None)
+
+        await manager.set_summary(sid, "backend summary")
+        data = manager._backend.load(sid)
+        assert data["summary"] == "backend summary"

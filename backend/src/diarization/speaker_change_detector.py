@@ -80,18 +80,32 @@ def detect_speaker_changes(
         if not seeded:
             cur_state = "lawyer" if s_l >= lawyer_threshold else "other"
         else:
-            # Phase 3 dual comparison; will be implemented in next task
-            cur_state = "other"
+            s_c = float(np.dot(emb, voiceprint.client))
+            diff = s_l - s_c
+            if diff > margin:
+                cur_state = "lawyer"
+            elif diff < -margin:
+                cur_state = "client"
+            else:
+                cur_state = "uncertain"
 
-        if prev_state is not None and prev_state != cur_state and not seeded:
-            if prev_s is not None and abs(prev_s - s_l) > delta_threshold:
-                if (prev_s >= lawyer_threshold and s_l < lawyer_threshold) or (
-                    prev_s < lawyer_threshold and s_l >= lawyer_threshold
-                ):
+        if prev_state is not None and prev_state != cur_state:
+            if not seeded:
+                if prev_s is not None and abs(prev_s - s_l) > delta_threshold:
+                    if (prev_s >= lawyer_threshold and s_l < lawyer_threshold) or (
+                        prev_s < lawyer_threshold and s_l >= lawyer_threshold
+                    ):
+                        changes_idx.append(i)
+                        if prev_s > 0.50 and s_l < 0.20:
+                            voiceprint.client = emb.copy()
+                            seeded = True
+            else:
+                if {prev_state, cur_state} == {"lawyer", "client"}:
                     changes_idx.append(i)
-                    if prev_s > 0.50 and s_l < 0.20:
-                        voiceprint.client = emb.copy()
-                        seeded = True
+                    s_c = float(np.dot(emb, voiceprint.client))
+                    diff = s_l - s_c
+                    if diff < -0.30:
+                        voiceprint.client = _ema_update(voiceprint.client, emb, weight=0.15)
 
         prev_state = cur_state
         prev_s = s_l

@@ -1,13 +1,19 @@
-import asyncio, os, time
-from openai import AsyncOpenAI
+import asyncio
+import os
+import sys
+import time
+from pathlib import Path
+
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+from agent.llm_client import build_deepseek_client  # noqa: E402
 
 load_dotenv()
 
-client = AsyncOpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-)
+client = build_deepseek_client()
+if client is None:
+    raise RuntimeError("DEEPSEEK_API_KEY not set")
 
 FACT_PROMPT = """从对话中提取法律事实，只输出 JSON key-value。不要引用法条，不要给建议。
 格式示例：{"facts": [{"key": "合同", "value": "未签订"}]}
@@ -53,7 +59,7 @@ async def main():
     print("\n=== full analyze (当前, max_tokens=2000) ===")
     a_times = [await test("full", FULL_PROMPT, 2000) for _ in range(3)]
 
-    print(f"\n=== 汇总 ===")
+    print("\n=== 汇总 ===")
     print(f"fact_extract 平均: {sum(f_times)/len(f_times):.0f}ms  (各次: {[f'{t:.0f}' for t in f_times]})")
     print(f"full analyze 平均: {sum(a_times)/len(a_times):.0f}ms  (各次: {[f'{t:.0f}' for t in a_times]})")
 

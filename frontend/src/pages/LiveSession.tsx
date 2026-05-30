@@ -31,15 +31,22 @@ type Suggestion =
   | {
       kind: "pending";
       requestId: string;
-      intentType: string;
-      lawDomain: string | null;
+      topic: string;
+      rationale: string;
+    }
+  | {
+      // 律师点了"生成深度分析"后到 ready 之间的过渡态。
+      // 不加这层时,点击后 UI 没任何变化,LLM 跑十几秒,看起来像"点不动"。
+      kind: "running";
+      requestId: string;
+      topic: string;
     }
   | {
       kind: "ready";
       id: string;
       requestId?: string;
       text: string;
-      intentType: string;
+      topic: string;
     };
 
 type TranscriptData = {
@@ -165,12 +172,13 @@ const SuggestionCard = memo(function SuggestionCard({
           style={{ backgroundColor: "#d4a85350" }}
         />
         <span className="text-xs font-mono uppercase tracking-wide text-[#d4a853]">
-          <HelpCircle className="w-3 h-3 inline" /> 检测到可分析意图
+          <HelpCircle className="w-3 h-3 inline" /> {s.topic || "检测到可分析意图"}
         </span>
-        <p className="text-xs text-[#8a8a8a] leading-relaxed my-2">
-          {s.intentType}
-          {s.lawDomain ? ` · ${s.lawDomain}` : ""}
-        </p>
+        {s.rationale && (
+          <p className="text-xs text-[#8a8a8a] leading-relaxed my-2">
+            {s.rationale}
+          </p>
+        )}
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -191,6 +199,23 @@ const SuggestionCard = memo(function SuggestionCard({
       </div>
     );
   }
+  if (s.kind === "running") {
+    return (
+      <div className="relative pl-5 py-3">
+        <div
+          className="absolute left-0 top-2 bottom-0 w-px"
+          style={{ backgroundColor: "#d4a85318" }}
+        />
+        <div
+          className="absolute left-[-2px] top-2.5 w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{ backgroundColor: "#d4a853" }}
+        />
+        <span className="text-xs font-mono uppercase tracking-wide text-[#d4a853] animate-pulse">
+          <Activity className="w-3 h-3 inline" /> 分析中…{s.topic ? ` · ${s.topic}` : ""}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="relative pl-5 py-3">
       <div
@@ -202,7 +227,7 @@ const SuggestionCard = memo(function SuggestionCard({
         style={{ backgroundColor: "#6b8ec450" }}
       />
       <span className="text-xs font-mono uppercase tracking-wide text-[#6b8ec4]">
-        <CheckCircle2 className="w-3 h-3 inline" /> {s.intentType}
+        <CheckCircle2 className="w-3 h-3 inline" /> {s.topic || "深度分析"}
       </span>
       <p className="text-xs text-[#e5e5e5] leading-relaxed whitespace-pre-wrap mt-2">
         {s.text}
@@ -249,35 +274,65 @@ export default function LiveSession() {
         const pending: Suggestion = {
           kind: "pending",
           requestId: data.meta.request_id ?? "",
-          intentType: data.meta.intent_type,
-          lawDomain: data.meta.law_domain,
+          topic: data.meta.preview?.topic ?? "",
+          rationale: data.meta.preview?.rationale ?? "",
         };
         return [pending, ...prev];
+      }
+      // ready 不携带 preview;尝试从对应 pending/running 卡片继承 topic 作为标题
+      const rid = data.meta.request_id;
+      if (rid) {
+        return prev.map((s) => {
+          if ((s.kind !== "pending" && s.kind !== "running") || s.requestId !== rid) return s;
+          const ready: Suggestion = {
+            kind: "ready",
+            id: crypto.randomUUID(),
+            requestId: rid,
+            text: data.text ?? "",
+            topic: s.topic,
+          };
+          return ready;
+        });
       }
       const ready: Suggestion = {
         kind: "ready",
         id: crypto.randomUUID(),
-        requestId: data.meta.request_id,
         text: data.text ?? "",
-        intentType: data.meta.intent_type,
+        topic: "",
       };
-      if (data.meta.request_id) {
-        return prev.map((s) =>
-          s.kind === "pending" && s.requestId === data.meta.request_id
-            ? ready
-            : s
-        );
-      }
       return [ready, ...prev];
     });
   }, []);
 
-  const { isConnected, sendAudioChunk, confirmIntent, dismissIntent } =
+  const { isConnected, error: wsError, sendAudioChunk, confirmIntent, dismissIntent } =
     useWebSocket("ws://localhost:8000/ws/demo-session", {
       onTranscript,
       onAnalysis,
       onSuggestion,
+      onConfirmAck: ({ ok, request_id }) => {
+        if (!ok) {
+          setSuggestions((prev) =>
+            prev.filter(
+              (s) => !((s.kind === "pending" || s.kind === "running") && s.requestId === request_id)
+            )
+          );
+        }
+      },
     });
+
+  const handleConfirm = useCallback(
+    (requestId: string) => {
+      confirmIntent(requestId);
+      setSuggestions((prev) =>
+        prev.map((s) =>
+          s.kind === "pending" && s.requestId === requestId
+            ? { kind: "running" as const, requestId, topic: s.topic }
+            : s
+        )
+      );
+    },
+    [confirmIntent]
+  );
 
   const handleDismiss = useCallback(
     (requestId: string) => {
@@ -300,9 +355,9 @@ export default function LiveSession() {
       <div className="space-y-5">
         {suggestions.map((s) => (
           <SuggestionCard
-            key={s.kind === "pending" ? s.requestId : s.id}
+            key={s.kind === "running" ? `running-${s.requestId}` : s.kind === "pending" ? s.requestId : s.id}
             s={s}
-            onConfirm={confirmIntent}
+            onConfirm={handleConfirm}
             onDismiss={handleDismiss}
           />
         ))}
@@ -357,11 +412,23 @@ export default function LiveSession() {
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide">
             <span
               className={`w-2 h-2 rounded-full ${
-                isConnected ? "bg-[#6b8f6b]" : "bg-[#d4a853]"
+                wsError
+                  ? "bg-[#c45c5c]"
+                  : isConnected
+                  ? "bg-[#6b8f6b]"
+                  : "bg-[#d4a853]"
               }`}
             />
-            <span className={isConnected ? "text-[#6b8f6b]" : "text-[#d4a853]"}>
-              {isConnected ? "已连接" : "连接中…"}
+            <span
+              className={
+                wsError
+                  ? "text-[#c45c5c]"
+                  : isConnected
+                  ? "text-[#6b8f6b]"
+                  : "text-[#d4a853]"
+              }
+            >
+              {wsError ? `连接失败:${wsError}` : isConnected ? "已连接" : "连接中…"}
             </span>
             <span className="text-[#525252]">·</span>
             <span className="text-[#8a8a8a]">{status}</span>
@@ -378,8 +445,13 @@ export default function LiveSession() {
           </h1>
           <span
             className={`w-2 h-2 rounded-full ${
-              isConnected ? "bg-[#6b8f6b]" : "bg-[#d4a853]"
+              wsError
+                ? "bg-[#c45c5c]"
+                : isConnected
+                ? "bg-[#6b8f6b]"
+                : "bg-[#d4a853]"
             }`}
+            title={wsError ?? (isConnected ? "已连接" : "连接中…")}
           />
         </div>
         <AudioControls onChunk={sendAudioChunk} />

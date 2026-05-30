@@ -1,0 +1,32 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "实时会谈" [level=1] [ref=e6]
+      - generic [ref=e7]:
+        - generic [ref=e9]: 连接中…
+        - generic [ref=e10]: ·
+        - generic [ref=e11]: 待连接…
+    - generic [ref=e12]:
+      - button "开始录音" [ref=e13]:
+        - img
+        - text: 开始录音
+      - button "上传音频" [ref=e14]:
+        - img
+        - text: 上传音频
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - heading "实时洞察" [level=2] [ref=e18]
+        - paragraph [ref=e19]: 0 条分析结果
+      - generic [ref=e21]:
+        - img [ref=e22]
+        - paragraph [ref=e24]: 系统正在监听并分析对话内容…
+        - paragraph [ref=e25]: 分析结果将随对话自动呈现
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - heading "转写记录" [level=2] [ref=e28]
+        - generic [ref=e29]: 0 条
+      - generic [ref=e31]:
+        - img [ref=e32]
+        - paragraph [ref=e34]: 开始说话，转写文本将实时显示…
+        - paragraph [ref=e35]: 录音开始后，对话内容将出现在此处

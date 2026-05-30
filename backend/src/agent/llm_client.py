@@ -14,7 +14,7 @@ QWEN_MODEL = _cfg.QWEN_MODEL
 DEEPSEEK_MODEL = _cfg.DEEPSEEK_MODEL
 
 
-def build_qwen_client() -> AsyncOpenAI | None:
+def build_qwen_client(timeout: float | None = None) -> AsyncOpenAI | None:
     """构造千问（DashScope）异步客户端。未设置 DASHSCOPE_API_KEY 时返回 None。"""
     key = os.getenv("DASHSCOPE_API_KEY")
     if not key:
@@ -22,7 +22,7 @@ def build_qwen_client() -> AsyncOpenAI | None:
     return AsyncOpenAI(
         api_key=key,
         base_url=_cfg.DASHSCOPE_BASE_URL,
-        timeout=_cfg.LLM_TIMEOUT_QWEN,
+        timeout=timeout or _cfg.LLM_TIMEOUT_QWEN,
     )
 
 

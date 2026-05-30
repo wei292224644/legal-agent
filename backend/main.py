@@ -158,92 +158,100 @@ async def legal_session(ws: WebSocket, session_id: str):
         return
     print(f"[WS] attached sid={session_id}")
 
-    # --- 恢复或新建 Agent 状态 ---
-    if state.context_store and state.orchestrator:
-        ctx = ContextStore.from_dict(state.context_store)
-        orch = Orchestrator.from_dict(
-            state.orchestrator, ctx=ctx, session_id=session_id, user_id="lawyer-default"
-        )
-    else:
-        ctx = ContextStore()
-        orch = Orchestrator(ctx, session_id=session_id, user_id="lawyer-default")
-
-    bus = UtteranceBus(maxsize=10)
-    orch.attach_bus(bus)
-
-    async def on_suggestion(text, meta):
-        try:
-            if meta.get("kind") == "pending":
-                await ws.send_json({
-                    "type": "suggestion.pending",
-                    "text": None,
-                    "meta": {
-                        "utt_id": meta["utt_id"],
-                        "request_id": meta["request_id"],
-                        "preview": meta.get("preview", {}),
-                    },
-                })
-            else:
-                await ws.send_json({
-                    "type": "suggestion.ready",
-                    "text": text,
-                    "meta": {
-                        "utt_id": meta["utt_id"],
-                        **({"request_id": meta["request_id"]} if "request_id" in meta else {}),
-                    },
-                })
-        except (WebSocketDisconnect, RuntimeError):
-            # WS 已断开,不应崩溃也不必告警(常规连接关闭)
-            pass
-        except Exception as exc:
-            logger.warning("Suggestion callback failed: %s", exc)
-
-    orch.set_suggestion_callback(on_suggestion)
-    await orch.start()
-
-    # --- 音频管道 ---
-    enrollment = SessionSerializer.enrollment_from_dict(state.enrollment)
-    audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] = asyncio.Queue()
-    t0 = time.monotonic()
-
-    async def audio_iter():
-        while True:
-            item = await audio_q.get()
-            if item is None:
-                return
-            yield item
-
-    async def consume_stt():
-        # 包一层 try 把异常显式 log 出来。否则 stt_task 异常被 finally 里的
-        # contextlib.suppress(Exception) 吞掉,排查时完全看不到。
-        try:
-            async for utt in stream_stt(audio_iter(), enrollment=enrollment):
-                logger.info("STT produced utt: %s", utt.text[:50])
-                await _safe_send_json(
-                    ws,
-                    {
-                        "type": "transcript",
-                        "id": utt.id,
-                        "text": utt.text,
-                        "t_start": utt.t_start,
-                        "t_end": utt.t_end,
-                        "speaker": utt.speaker,
-                        "closed_by": utt.closed_by,
-                        "is_final": True,
-                    },
-                )
-                ok = await bus.put(utt)
-                if not ok:
-                    logger.warning("Utterance bus full, dropping utt %s", utt.id)
-        except Exception:
-            logger.exception("consume_stt died")
-            raise
-
-    stt_task = asyncio.create_task(consume_stt())
-    print(f"[WS] entering receive loop sid={session_id}")
-
-    # --- 主循环 ---
+    # attach 成功后所有路径都必须保证 detach_ws 被调用,否则 _ws_map 泄漏,
+    # 下次同 session_id 重连永远被 1008 拒绝。所以 try 从这里就开始包,
+    # 而不是只包 receive loop —— setup 阶段(Orchestrator.from_dict / orch.start /
+    # HeavyAgent → get_agno_db 等)抛异常都得能走到 finally 清理。
+    ctx: ContextStore | None = None
+    orch: Orchestrator | None = None
+    audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] | None = None
+    stt_task: asyncio.Task | None = None
     try:
+        # --- 恢复或新建 Agent 状态 ---
+        if state.context_store and state.orchestrator:
+            ctx = ContextStore.from_dict(state.context_store)
+            orch = Orchestrator.from_dict(
+                state.orchestrator, ctx=ctx, session_id=session_id, user_id="lawyer-default"
+            )
+        else:
+            ctx = ContextStore()
+            orch = Orchestrator(ctx, session_id=session_id, user_id="lawyer-default")
+
+        bus = UtteranceBus(maxsize=10)
+        orch.attach_bus(bus)
+
+        async def on_suggestion(text, meta):
+            try:
+                if meta.get("kind") == "pending":
+                    await ws.send_json({
+                        "type": "suggestion.pending",
+                        "text": None,
+                        "meta": {
+                            "utt_id": meta["utt_id"],
+                            "request_id": meta["request_id"],
+                            "preview": meta.get("preview", {}),
+                        },
+                    })
+                else:
+                    await ws.send_json({
+                        "type": "suggestion.ready",
+                        "text": text,
+                        "meta": {
+                            "utt_id": meta["utt_id"],
+                            **({"request_id": meta["request_id"]} if "request_id" in meta else {}),
+                        },
+                    })
+            except (WebSocketDisconnect, RuntimeError):
+                # WS 已断开,不应崩溃也不必告警(常规连接关闭)
+                pass
+            except Exception as exc:
+                logger.warning("Suggestion callback failed: %s", exc)
+
+        orch.set_suggestion_callback(on_suggestion)
+        await orch.start()
+
+        # --- 音频管道 ---
+        enrollment = SessionSerializer.enrollment_from_dict(state.enrollment)
+        audio_q = asyncio.Queue()
+        t0 = time.monotonic()
+
+        async def audio_iter():
+            while True:
+                item = await audio_q.get()
+                if item is None:
+                    return
+                yield item
+
+        async def consume_stt():
+            # 包一层 try 把异常显式 log 出来。否则 stt_task 异常被 finally 里的
+            # contextlib.suppress(Exception) 吞掉,排查时完全看不到。
+            try:
+                async for utt in stream_stt(audio_iter(), enrollment=enrollment):
+                    logger.info("STT produced utt: %s", utt.text[:50])
+                    await _safe_send_json(
+                        ws,
+                        {
+                            "type": "transcript",
+                            "id": utt.id,
+                            "text": utt.text,
+                            "t_start": utt.t_start,
+                            "t_end": utt.t_end,
+                            "speaker": utt.speaker,
+                            "closed_by": utt.closed_by,
+                            "is_final": True,
+                        },
+                    )
+                    ok = await bus.put(utt)
+                    if not ok:
+                        logger.warning("Utterance bus full, dropping utt %s", utt.id)
+            except Exception:
+                logger.exception("consume_stt died")
+                raise
+
+        stt_task = asyncio.create_task(consume_stt())
+        print(f"[WS] entering receive loop sid={session_id}")
+
+        # --- 主循环 ---
         while True:
             data = await ws.receive()
 
@@ -273,19 +281,25 @@ async def legal_session(ws: WebSocket, session_id: str):
 
     except (WebSocketDisconnect, RuntimeError):
         pass
-    except Exception as exc:
-        logger.warning("WS main loop unexpected error: %s", exc, exc_info=True)
+    except Exception:
+        logger.exception("WS handler error sid=%s", session_id)
     finally:
-        await audio_q.put(None)
-        # 保存 Agent 状态 → SessionManager → 持久化
-        # 无论 update_agent_state 是否成功，都必须 detach_ws，否则 _ws_map 泄漏
-        state = await session_manager.get_state(session_id)
-        if state is not None and state.status != "closed":
+        # 按"启动反序"清理,且每段独立 guard —— setup 异常时只清理已建立的部分。
+        if audio_q is not None:
             with contextlib.suppress(Exception):
-                await session_manager.update_agent_state(session_id, ctx, orch)
+                await audio_q.put(None)
+        if stt_task is not None:
             with contextlib.suppress(Exception):
-                await session_manager.detach_ws(session_id)
+                await stt_task
+        if orch is not None:
+            with contextlib.suppress(Exception):
+                await orch.shutdown()
+        if ctx is not None and orch is not None:
+            cur_state = await session_manager.get_state(session_id)
+            if cur_state is not None and cur_state.status != "closed":
+                with contextlib.suppress(Exception):
+                    await session_manager.update_agent_state(session_id, ctx, orch)
+        # detach_ws 必须无条件执行 —— attach 成功就一定要 detach,
+        # 否则 _ws_map 泄漏死 ws 引用,后续重连永远 1008。
         with contextlib.suppress(Exception):
-            await orch.shutdown()
-        with contextlib.suppress(Exception):
-            await stt_task
+            await session_manager.detach_ws(session_id)

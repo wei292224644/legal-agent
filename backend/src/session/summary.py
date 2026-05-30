@@ -6,16 +6,13 @@ Session 关闭时调用 HeavyAgent 生成结构化摘要。
 from __future__ import annotations
 
 import logging
-import os
-
-from openai import AsyncOpenAI
 
 from agent.context_store import ContextStore
+from agent.llm_client import build_qwen_client
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "qwen-turbo"
-_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 
 async def generate_summary(ctx: ContextStore) -> str | None:
@@ -23,8 +20,8 @@ async def generate_summary(ctx: ContextStore) -> str | None:
 
     返回 Markdown 格式的摘要；LLM 调用失败时返回 None。
     """
-    api_key = os.getenv("DASHSCOPE_API_KEY")
-    if not api_key:
+    client = build_qwen_client()
+    if client is None:
         logger.warning("DASHSCOPE_API_KEY not set, skipping summary generation")
         return None
 
@@ -57,7 +54,6 @@ async def generate_summary(ctx: ContextStore) -> str | None:
 """
 
     try:
-        client = AsyncOpenAI(api_key=api_key, base_url=_BASE_URL)
         response = await client.chat.completions.create(
             model=_DEFAULT_MODEL,
             messages=[

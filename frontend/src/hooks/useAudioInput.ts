@@ -205,6 +205,7 @@ export function useAudioInput(
         audioContextRef.current = audioContext
 
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+        console.log('sampleRate:', audioBuffer.sampleRate)
         const channelData = audioBuffer.getChannelData(0)
         totalSamplesRef.current = channelData.length
 

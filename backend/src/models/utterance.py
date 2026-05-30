@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 Speaker = Literal["lawyer", "client", "uncertain"]
-ClosedBy = Literal["vad", "soft_cap"]
+ClosedBy = Literal["vad", "soft_cap", "scd"]
 
 
 @dataclass

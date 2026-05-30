@@ -1,0 +1,36 @@
+# 本地 dev 依赖。生产部署不走这个 compose。
+#
+# 用法:
+#   docker compose up -d              # 启动 postgres
+#   docker compose ps                 # 查状态(healthy = 可连)
+#   docker compose logs -f postgres   # 看日志
+#   docker compose down               # 停容器(数据保留在 named volume)
+#   docker compose down -v            # 停容器且删数据(慎用)
+
+# 项目名 = container group 名,Docker Desktop 里会归到 "legal-agent" 分组下。
+# 不设的话默认用当前目录名 "backend",跟其他项目混淆。
+name: legal-agent
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: legal-agent-pg
+    # 凭据与 config.py:74 的 AGNO_DB_URL 默认串对齐:
+    # postgresql+psycopg://legal:legal@localhost:5432/legal_agent
+    environment:
+      POSTGRES_USER: legal
+      POSTGRES_PASSWORD: legal
+      POSTGRES_DB: legal_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - legal_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legal -d legal_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  legal_pg_data:

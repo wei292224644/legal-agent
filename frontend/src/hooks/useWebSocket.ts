@@ -4,6 +4,7 @@ type Callbacks = {
   onTranscript?: (data: TranscriptData) => void
   onAnalysis?: (data: AnalysisData) => void
   onSuggestion?: (data: SuggestionData) => void
+  onConfirmAck?: (data: { request_id: string; ok: boolean }) => void
 }
 
 type TranscriptData = {
@@ -23,18 +24,19 @@ export type SuggestionData = {
   type: 'suggestion.pending' | 'suggestion.ready'
   text: string | null
   meta: {
-    severity: string
-    intent_type: string
-    law_domain: string | null
-    entities: string[]
     utt_id: string
     request_id?: string
+    // 仅 pending 携带,由 child agent 通过 deep_analysis 工具产出
+    preview?: {
+      topic: string
+      rationale: string
+    }
   }
 }
 
 export interface WsLike {
   set onopen(fn: (() => void) | null)
-  set onclose(fn: (() => void) | null)
+  set onclose(fn: ((e: CloseEvent) => void) | null)
   set onmessage(fn: ((e: MessageEvent) => void) | null)
   readonly readyState: number
   send(data: string | ArrayBuffer | Uint8Array): void
@@ -62,12 +64,19 @@ export function useWebSocket(
   sessionId?: string,
 ) {
   const [isConnected, setIsConnected] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [sessionIdState] = useState<string>(() => sessionId ?? getOrCreateSessionId())
   const wsRef = useRef<WsLike | null>(null)
   const pingRef = useRef<ReturnType<typeof setInterval>>(null)
   const reconnectRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const stableTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const callbacksRef = useRef(callbacks)
   const connectRef = useRef<() => void>(() => {})
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 3
+  // 连接稳定多少毫秒后才算"成功"并允许重置重连计数。
+  // 不加这个的话:open → close 立刻发生时计数器永远重置 → 无限循环重连。
+  const stableConnectionMs = 5_000
 
   // 把 url 最后一段替换为 sessionId，保持 host/path 不变
   const baseUrl = url.replace(/\/[^/]*$/, '')
@@ -75,6 +84,7 @@ export function useWebSocket(
 
   const cleanup = useCallback(() => {
     clearTimeout(reconnectRef.current)
+    clearTimeout(stableTimerRef.current)
     clearInterval(pingRef.current)
     wsRef.current?.close()
     wsRef.current = null
@@ -86,6 +96,12 @@ export function useWebSocket(
 
     ws.onopen = () => {
       setIsConnected(true)
+      setError(null)
+      // 只有连接稳定保持 stableConnectionMs 才把计数器重置。
+      // open 立即重置的话 → close 立即触发 → 重连 → open 又重置 → 无限循环。
+      stableTimerRef.current = setTimeout(() => {
+        reconnectAttemptsRef.current = 0
+      }, stableConnectionMs)
       pingRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }))
@@ -95,9 +111,24 @@ export function useWebSocket(
       }, 15_000)
     }
 
-    ws.onclose = () => {
+    ws.onclose = (e: CloseEvent) => {
       setIsConnected(false)
-      reconnectRef.current = setTimeout(() => connectRef.current(), 2000)
+      clearTimeout(stableTimerRef.current)
+      // 调试日志:为什么连接关了。CloseEvent.code 是关键信号。
+      console.warn(
+        `[ws] closed code=${e.code} reason=${e.reason || '(empty)'} wasClean=${e.wasClean}`,
+      )
+      // code 1008 = 排他连接被拒绝（session 已有活跃连接）
+      if (e.code === 1008) {
+        setError(e.reason || 'Session already connected')
+        return
+      }
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current += 1
+        reconnectRef.current = setTimeout(() => connectRef.current(), 2000)
+      } else {
+        setError(`连接重试 ${maxReconnectAttempts} 次后放弃 (code=${e.code})`)
+      }
     }
 
     ws.onmessage = (e: MessageEvent) => {
@@ -124,6 +155,11 @@ export function useWebSocket(
         callbacksRef.current.onSuggestion?.(msg as unknown as SuggestionData)
         return
       }
+
+      if (msg.type === 'confirm_ack') {
+        callbacksRef.current.onConfirmAck?.(msg as { request_id: string; ok: boolean })
+        return
+      }
     }
 
     wsRef.current = ws
@@ -141,16 +177,22 @@ export function useWebSocket(
   }, [connect, cleanup])
 
   const sendAudioChunk = useCallback((chunk: Uint8Array) => {
-    wsRef.current?.send(chunk)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(chunk)
+    }
   }, [])
 
   const confirmIntent = useCallback((requestId: string) => {
-    wsRef.current?.send(JSON.stringify({ type: 'confirm', request_id: requestId }))
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'confirm', request_id: requestId }))
+    }
   }, [])
 
   const dismissIntent = useCallback((requestId: string) => {
-    wsRef.current?.send(JSON.stringify({ type: 'dismiss', request_id: requestId }))
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'dismiss', request_id: requestId }))
+    }
   }, [])
 
-  return { isConnected, sendAudioChunk, confirmIntent, dismissIntent, sessionId: sessionIdState }
+  return { isConnected, error, sendAudioChunk, confirmIntent, dismissIntent, sessionId: sessionIdState }
 }

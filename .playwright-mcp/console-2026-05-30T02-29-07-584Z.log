@@ -1,0 +1,4 @@
+[      96ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=0967e2d3:14336
+[     117ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/1b105b63-02ca-413c-8198-2765cf1fd227' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/hooks/useWebSocket.ts?t=1780107507936:32
+[     119ms] [WARNING] [ws] closed code=1006 reason=(empty) wasClean=false @ http://localhost:5173/src/hooks/useWebSocket.ts?t=1780107507936:58
+[     154ms] [WARNING] [ws] closed code=1008 reason=Session already connected wasClean=true @ http://localhost:5173/src/hooks/useWebSocket.ts?t=1780107507936:58

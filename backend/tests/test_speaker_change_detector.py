@@ -108,3 +108,69 @@ def test_small_delta_no_switch(monkeypatch, lawyer_emb):
     vp = VoiceprintState(lawyer=lawyer_emb)
     changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
     assert changes == []
+
+
+def test_phase2_seeding(monkeypatch, lawyer_emb, client_emb):
+    """阶段2：高置信度 lawyer→非 lawyer 触发 client 种子化。"""
+    from diarization import speaker_change_detector as scd
+
+    fake = _make_fake_extractor([lawyer_emb, lawyer_emb, client_emb])
+    monkeypatch.setattr(scd, "extract_embedding", fake)
+
+    seg = np.full(16000 * 3, 0.01, dtype=np.float32)
+    vp = VoiceprintState(lawyer=lawyer_emb)
+    changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
+
+    assert len(changes) == 1
+    assert changes[0] == 2000
+    assert vp.client is not None
+    np.testing.assert_array_almost_equal(vp.client, client_emb)
+
+
+def test_phase3_dual_flip(monkeypatch, lawyer_emb, client_emb):
+    """阶段3：双声纹下 diff 正负翻检测切换。"""
+    from diarization import speaker_change_detector as scd
+
+    fake = _make_fake_extractor([client_emb, client_emb, lawyer_emb, lawyer_emb])
+    monkeypatch.setattr(scd, "extract_embedding", fake)
+
+    seg = np.full(16000 * 4, 0.01, dtype=np.float32)
+    vp = VoiceprintState(lawyer=lawyer_emb, client=client_emb)
+    changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
+
+    assert len(changes) == 1
+    assert changes[0] == 2000
+
+
+def test_merge_nearby_changes(monkeypatch, lawyer_emb, client_emb):
+    """间距 < window_ms 的邻近切换点应合并去重。"""
+    from diarization import speaker_change_detector as scd
+
+    fake = _make_fake_extractor(
+        [lawyer_emb, client_emb, lawyer_emb, lawyer_emb, lawyer_emb, lawyer_emb]
+    )
+    monkeypatch.setattr(scd, "extract_embedding", fake)
+
+    seg = np.full(16000 * 4, 0.01, dtype=np.float32)
+    vp = VoiceprintState(lawyer=lawyer_emb, client=client_emb)
+    changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1500, step_ms=500)
+
+    # 默认 window_ms=1500，两个切换点间距 500ms < 1500ms，应合并为 1 个
+    assert len(changes) == 1
+
+
+def test_phase3_ema_update(monkeypatch, lawyer_emb, client_emb):
+    """阶段3：高置信度 client 窗口触发 EMA 更新。"""
+    from diarization import speaker_change_detector as scd
+
+    fake = _make_fake_extractor([client_emb, client_emb, client_emb, client_emb])
+    monkeypatch.setattr(scd, "extract_embedding", fake)
+
+    seg = np.full(16000 * 4, 0.01, dtype=np.float32)
+    vp = VoiceprintState(lawyer=lawyer_emb, client=client_emb.copy())
+    original_client = vp.client.copy()
+    detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
+
+    assert vp.client is not None
+    with pytest.raises(AssertionError):
+        np.testing.assert_array_almost_equal(vp.client, original_client)

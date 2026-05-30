@@ -252,6 +252,7 @@ async def stream_stt(
         # 把相对窗口的时间戳翻译回绝对时间轴
         raw_segs = [(s + window_start_ms, e + window_start_ms) for s, e in raw_segs_rel]
         bounds = merge_with_close_reason(raw_segs, snapshot)
+        print(f"[STT] total_ms={total_ms}, window={len(window_audio)}, raw_segs={raw_segs}, bounds={bounds}, final={final}")
 
         for s_ms, e_ms, closed_by in bounds:
             if e_ms <= yielded_until_ms + 100:
@@ -309,18 +310,26 @@ async def stream_stt(
             t0 = t_rel
         audio_buffer.frombytes(chunk.astype(np.float32).tobytes())
         total_ms = int(len(audio_buffer) * 1000 / SR)
+        print(f"[STT] chunk received: len={len(chunk)}, buffer_ms={total_ms}")
 
         if total_ms - last_vad_audio_ms < VAD_RECHECK_INTERVAL_MS:
             continue
         last_vad_audio_ms = total_ms
 
-        snapshot = np.frombuffer(audio_buffer, dtype=np.float32)
+        # 注意:必须 np.array(...) 拷贝,不能用 np.frombuffer。
+        # np.frombuffer 是 zero-copy view,会锁住 audio_buffer 的内存导出;
+        # 下一轮 audio_buffer.frombytes(chunk) 会抛 BufferError 杀掉本 task,
+        # 而异常会被 WS handler 的 contextlib.suppress(Exception) 吞掉,无任何提示。
+        snapshot = np.array(audio_buffer, dtype=np.float32)
         async for utt in _emit_stable_or_final(snapshot, final=False):
+            print(f"[STT] yield utt: {utt.text[:30]}...")
             yield utt
 
     # 流末尾 flush
-    snapshot = np.frombuffer(audio_buffer, dtype=np.float32)
+    print("[STT] flush remaining audio")
+    snapshot = np.array(audio_buffer, dtype=np.float32)
     async for utt in _emit_stable_or_final(snapshot, final=True):
+        print(f"[STT] yield utt (final): {utt.text[:30]}...")
         yield utt
 
     # 取消未消费的 spec task(避免资源泄漏)

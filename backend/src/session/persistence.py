@@ -62,7 +62,8 @@ class SQLiteBackend(PersistenceBackend):
         self._ensure_table()
 
     def _ensure_table(self) -> None:
-        with sqlite3.connect(self._db_path) as conn:
+        conn = sqlite3.connect(self._db_path)
+        try:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -77,54 +78,66 @@ class SQLiteBackend(PersistenceBackend):
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_status_updated ON sessions(status, updated_at)"
             )
+            conn.commit()
+        finally:
+            conn.close()
 
     def save(self, session_id: str, data: dict) -> None:
+        conn = sqlite3.connect(self._db_path)
         try:
             payload = json.dumps(data, ensure_ascii=False)
             created_at = data.get("created_at", 0.0)
             updated_at = data.get("last_active_at", 0.0)
             status = data.get("status", "unknown")
-            with sqlite3.connect(self._db_path) as conn:
-                conn.execute(
-                    """
-                    INSERT INTO sessions (session_id, data, created_at, updated_at, status)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(session_id) DO UPDATE SET
-                        data = excluded.data,
-                        updated_at = excluded.updated_at,
-                        status = excluded.status
-                    """,
-                    (session_id, payload, created_at, updated_at, status),
-                )
+            conn.execute(
+                """
+                INSERT INTO sessions (session_id, data, created_at, updated_at, status)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    data = excluded.data,
+                    updated_at = excluded.updated_at,
+                    status = excluded.status
+                """,
+                (session_id, payload, created_at, updated_at, status),
+            )
+            conn.commit()
         except Exception as exc:
-            # Snapshot 失败只记录日志，不抛异常
             logger.warning("Session snapshot failed for %s: %s", session_id, exc)
+        finally:
+            conn.close()
 
     def load(self, session_id: str) -> dict | None:
+        conn = sqlite3.connect(self._db_path)
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                row = conn.execute(
-                    "SELECT data FROM sessions WHERE session_id = ?", (session_id,)
-                ).fetchone()
-                if row is None:
-                    return None
-                return json.loads(row[0])
+            row = conn.execute(
+                "SELECT data FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            return json.loads(row[0])
         except Exception as exc:
             logger.warning("Session load failed for %s: %s", session_id, exc)
             return None
+        finally:
+            conn.close()
 
     def delete(self, session_id: str) -> None:
+        conn = sqlite3.connect(self._db_path)
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            conn.commit()
         except Exception as exc:
             logger.warning("Session delete failed for %s: %s", session_id, exc)
+        finally:
+            conn.close()
 
     def list_ids(self) -> list[str]:
+        conn = sqlite3.connect(self._db_path)
         try:
-            with sqlite3.connect(self._db_path) as conn:
-                rows = conn.execute("SELECT session_id FROM sessions").fetchall()
-                return [r[0] for r in rows]
+            rows = conn.execute("SELECT session_id FROM sessions").fetchall()
+            return [r[0] for r in rows]
         except Exception as exc:
             logger.warning("Session list_ids failed: %s", exc)
             return []
+        finally:
+            conn.close()
