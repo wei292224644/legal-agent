@@ -1,10 +1,10 @@
 """Tests for RelevanceGate — 二分类相关性闸门。
 
-设计意图:输出只有 bool,不含任何产品策略字段。这样接入 BERT 时训练目标
+设计意图：输出只有 bool，不含任何产品策略字段。接入 BERT 后训练目标
 不需要随产品迭代变动。
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -16,50 +16,53 @@ def _utt(text: str, speaker: str) -> Utterance:
     return Utterance(id="u_x", text=text, speaker=speaker, t_start=0.0, t_end=1.0)
 
 
-def _stub_client(content: str):
-    client = MagicMock()
-    client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content=content))])
-    )
-    return client
-
+# ── BERT 推理测试（mock _sync_predict，不依赖真实模型加载）──
 
 @pytest.mark.asyncio
 async def test_relevance_true_returns_bool_true():
-    gate = RelevanceGate(client=_stub_client("true"))
-    assert await gate.is_relevant(_utt("违法解除赔多少？", "client")) is True
+    gate = RelevanceGate()
+    with patch.object(gate, "_sync_predict", return_value=0.9):
+        assert await gate.is_relevant(_utt("违法解除赔多少？", "client")) is True
 
 
 @pytest.mark.asyncio
 async def test_relevance_false_returns_bool_false():
-    gate = RelevanceGate(client=_stub_client("false"))
-    assert await gate.is_relevant(_utt("律师你好", "client")) is False
+    gate = RelevanceGate()
+    with patch.object(gate, "_sync_predict", return_value=0.1):
+        assert await gate.is_relevant(_utt("律师你好", "client")) is False
 
 
 @pytest.mark.asyncio
-async def test_relevance_strips_punctuation_and_case():
-    """Qwen 可能输出 "True." 或 "  YES " 这类噪声,gate 必须归一化。"""
-    gate = RelevanceGate(client=_stub_client("True."))
-    assert await gate.is_relevant(_utt("竞业限制最长多久", "client")) is True
-
-    gate2 = RelevanceGate(client=_stub_client(" NO "))
-    assert await gate2.is_relevant(_utt("好的我懂了", "client")) is False
+async def test_relevance_threshold_boundary():
+    """刚好 0.5 返回 True。"""
+    gate = RelevanceGate()
+    with patch.object(gate, "_sync_predict", return_value=0.5):
+        assert await gate.is_relevant(_utt("某个边界文本", "client")) is True
 
 
 @pytest.mark.asyncio
-async def test_relevance_unparseable_defaults_false():
-    """LLM 输出无法解析时按 False 处理:漏判一句的代价(画像兜底捞回)远小于
-    误唤醒 HeavyAgent 的成本。"""
-    gate = RelevanceGate(client=_stub_client("我不知道"))
-    assert await gate.is_relevant(_utt("…", "client")) is False
+async def test_relevance_exception_defaults_false():
+    """BERT 推理异常时按 False 处理，和现有 Qwen 抖动行为一致。"""
+    gate = RelevanceGate()
+    with patch.object(gate, "_sync_predict", side_effect=RuntimeError("mock error")):
+        assert await gate.is_relevant(_utt("…", "client")) is False
 
 
 @pytest.mark.asyncio
 async def test_gate_contract_no_severity_no_intent_type():
-    """红线契约:gate 的返回值类型是且仅是 bool。新增字段必须不通过 type check。"""
-    gate = RelevanceGate(client=_stub_client("true"))
-    result = await gate.is_relevant(_utt("劳动法第87条怎么说", "client"))
+    """红线契约：gate 的返回值类型是且仅是 bool。"""
+    gate = RelevanceGate()
+    with patch.object(gate, "_sync_predict", return_value=0.9):
+        result = await gate.is_relevant(_utt("劳动法第87条怎么说", "client"))
     assert isinstance(result, bool)
-    # 不允许任何属性访问
     assert not hasattr(result, "severity")
     assert not hasattr(result, "intent_type")
+
+
+# ── 模型未加载时的降级行为 ──
+
+@pytest.mark.asyncio
+async def test_model_not_loaded_returns_false():
+    """模型未加载时 is_relevant 返回 False，不抛异常。"""
+    gate = RelevanceGate()
+    assert await gate.is_relevant(_utt("任意文本", "client")) is False
