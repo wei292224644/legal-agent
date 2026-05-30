@@ -207,43 +207,51 @@ async def _transcribe(
     sentences: list[dict[str, object]] = []
     sid = ""
 
-    async with websockets.connect(url) as ws:
+    async with websockets.connect(url, ping_interval=None) as ws:
         # 等待握手响应
         handshake = await ws.recv()
         hs_data = json.loads(handshake)
-        if hs_data.get("action") == "started":
-            sid = hs_data.get("sid", "")
+        # 讯飞 RTASR 握手消息格式为 {"msg_type": "action", "data": {"action": "started", ...}}
+        data = hs_data.get("data", hs_data)
+        if data.get("action") == "started":
+            sid = data.get("sessionId", data.get("sid", ""))
             print(f"[握手成功] sid={sid}")
         else:
             raise RuntimeError(f"WebSocket 握手失败: {handshake}")
 
-        # 分块发送音频：40ms = 16000 * 0.04 * 2 bytes = 1280 bytes
+        # 发送和接收并行：一个 task 发音频，一个 task 收结果
         chunk_size = int(TARGET_SR * 0.04 * 2)
-        for i in range(0, len(pcm_bytes), chunk_size):
-            chunk = pcm_bytes[i : i + chunk_size]
-            await ws.send(chunk)
-            await asyncio.sleep(0.04)  # 模拟实时流
 
-        # 发送结束标识
-        await ws.send(json.dumps({"end": True, "sessionId": sid}))
+        async def _send_audio() -> None:
+            for i in range(0, len(pcm_bytes), chunk_size):
+                chunk = pcm_bytes[i : i + chunk_size]
+                await ws.send(chunk)
+                await asyncio.sleep(0.04)  # 模拟实时流
+            # 发送结束标识
+            await ws.send(json.dumps({"end": True, "sessionId": sid}))
 
-        # 持续接收结果直到连接关闭
-        try:
-            async for message in ws:
-                if isinstance(message, bytes):
-                    continue
-                data = json.loads(message)
-                action = data.get("action")
-                if action == "result":
-                    sentence = _parse_transcription_result(data.get("data", {}))
-                    if sentence["text"]:
-                        sentences.append(sentence)
-                        _print_sentence(sentence)
-                elif action == "error":
-                    print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
-                    break
-        except websockets.exceptions.ConnectionClosed:
-            pass
+        async def _receive_results() -> None:
+            nonlocal sentences
+            try:
+                async for message in ws:
+                    if isinstance(message, bytes):
+                        continue
+                    payload = json.loads(message)
+                    # 讯飞 RTASR 结果格式: {"msg_type": "result", "data": {...}}
+                    msg_type = payload.get("msg_type", "")
+                    data = payload.get("data", {})
+                    if msg_type == "result":
+                        sentence = _parse_transcription_result(data)
+                        if sentence["text"]:
+                            sentences.append(sentence)
+                            _print_sentence(sentence)
+                    elif msg_type == "error":
+                        print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
+                        break
+            except websockets.exceptions.ConnectionClosed:
+                pass
+
+        await asyncio.gather(_send_audio(), _receive_results())
 
     return sentences
 
@@ -284,7 +292,7 @@ def main() -> None:
         print("  XUNFEI_APISECRET=xxx")
         raise SystemExit(1)
 
-    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师声纹注册.wav"
+    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "two_utterances.wav"
     if not fixture_path.exists():
         print(f"错误：找不到测试音频 {fixture_path}")
         raise SystemExit(1)
