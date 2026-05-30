@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
@@ -57,9 +58,37 @@ def test_register_voiceprint():
     assert feature_id == "feat_123"
     mock_post.assert_called_once()
     call_args = mock_post.call_args
-    assert "register" in call_args[0][0]
+    assert call_args[0][0] == "https://office-api-personal-dx.iflyaisol.com/res/feature/v1/register"
     assert call_args[1]["headers"]["Content-Type"] == "application/json"
+    assert "signature" in call_args[1]["headers"]
+    params = call_args[1]["params"]
+    assert params["appId"] == "app_123"
+    assert params["accessKeyId"] == "key_123"
+    assert "dateTime" in params
+    assert "signatureRandom" in params
     assert "signature" in call_args[1]["headers"]
     body = call_args[1]["json"]
     assert body["audio_data"] == "dGVzdA=="
     assert body["audio_type"] == "raw"
+    mock_resp.raise_for_status.assert_called_once()
+
+
+def test_register_voiceprint_error_code():
+    """Verify RuntimeError is raised when API returns non-success code."""
+    mock_resp = Mock()
+    mock_resp.json.return_value = {
+        "code": "999999",
+        "desc": "系统错误",
+        "data": "{}",
+    }
+    mock_resp.raise_for_status = Mock()
+
+    with patch("demo_xunfei_rtasr.requests.post", return_value=mock_resp):
+        with pytest.raises(RuntimeError, match="声纹注册失败"):
+            _register_voiceprint(
+                audio_base64="dGVzdA==",
+                audio_type="raw",
+                app_id="app_123",
+                access_key_id="key_123",
+                access_key_secret="secret_123",
+            )

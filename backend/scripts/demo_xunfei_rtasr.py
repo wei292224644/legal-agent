@@ -103,7 +103,8 @@ def _register_voiceprint(
     result = resp.json()
     if result.get("code") != "000000":
         raise RuntimeError(f"声纹注册失败: {result.get('code')} - {result.get('desc')}")
-    data = json.loads(result["data"]) if isinstance(result.get("data"), str) else result.get("data", {})
+    raw_data = result.get("data", "{}")
+    data = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
     if data.get("status") != 1:
         raise RuntimeError(f"声纹注册状态异常: {data}")
     return data["feature_id"]
