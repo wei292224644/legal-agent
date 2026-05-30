@@ -14,6 +14,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -28,6 +29,9 @@ from db.base import Base
 
 class Session(Base):
     __tablename__ = "sessions"
+    __table_args__ = (
+        Index("idx_sessions_status_lastactive", "status", "last_active_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     lawyer_id: Mapped[str] = mapped_column(String, nullable=False, default="lawyer-default")
@@ -68,6 +72,7 @@ class Suggestion(Base):
     __tablename__ = "suggestions"
     __table_args__ = (
         UniqueConstraint("session_id", "request_id", name="uq_sug_session_req"),
+        Index("idx_suggestions_session_created", "session_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
@@ -88,12 +93,18 @@ class Suggestion(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
     )
 
 
 class ProfileEntry(Base):
     __tablename__ = "profile_entries"
+    __table_args__ = (
+        Index("idx_profile_session_timestamp", "session_id", "timestamp"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     session_id: Mapped[uuid.UUID] = mapped_column(
