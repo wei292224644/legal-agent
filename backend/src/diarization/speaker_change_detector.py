@@ -89,23 +89,29 @@ def detect_speaker_changes(
             else:
                 cur_state = "uncertain"
 
-        if prev_state is not None and prev_state != cur_state:
-            if not seeded:
-                if prev_s is not None and abs(prev_s - s_l) > delta_threshold:
-                    if (prev_s >= lawyer_threshold and s_l < lawyer_threshold) or (
-                        prev_s < lawyer_threshold and s_l >= lawyer_threshold
-                    ):
-                        changes_idx.append(i)
-                        if prev_s > 0.50 and s_l < 0.20:
-                            voiceprint.client = emb.copy()
-                            seeded = True
-            else:
-                if {prev_state, cur_state} == {"lawyer", "client"}:
-                    changes_idx.append(i)
-                    s_c = float(np.dot(emb, voiceprint.client))
-                    diff = s_l - s_c
-                    if diff < -0.30:
-                        voiceprint.client = _ema_update(voiceprint.client, emb, weight=0.15)
+        state_changed = prev_state is not None and prev_state != cur_state
+        phase1_cross = (
+            not seeded
+            and prev_s is not None
+            and abs(prev_s - s_l) > delta_threshold
+            and (
+                (prev_s >= lawyer_threshold and s_l < lawyer_threshold)
+                or (prev_s < lawyer_threshold and s_l >= lawyer_threshold)
+            )
+        )
+        phase3_cross = seeded and {prev_state, cur_state} == {"lawyer", "client"}
+
+        if state_changed and phase1_cross:
+            changes_idx.append(i)
+            if prev_s > 0.50 and s_l < 0.20:
+                voiceprint.client = emb.copy()
+                seeded = True
+        elif state_changed and phase3_cross:
+            changes_idx.append(i)
+            s_c = float(np.dot(emb, voiceprint.client))
+            diff = s_l - s_c
+            if diff < -0.30:
+                voiceprint.client = _ema_update(voiceprint.client, emb, weight=0.15)
 
         if seeded and cur_state == "client" and prev_state == "client":
             s_c = float(np.dot(emb, voiceprint.client))
