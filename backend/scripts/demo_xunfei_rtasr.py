@@ -26,10 +26,11 @@ def _load_audio_as_pcm16(path: str) -> tuple[bytes, float]:
         ratio = TARGET_SR / sr
         n = int(len(data) * ratio)
         indices = np.linspace(0, len(data) - 1, n)
+        # 使用线性插值快速重采样；演示脚本不追求 Hi-Fi 音质
         data = np.interp(indices, np.arange(len(data)), data)
     # float32 [-1, 1] -> int16
-    data_int16 = (data * 32767).astype(np.int16)
-    pcm_bytes = data_int16.tobytes()
+    data_int16 = np.clip(data * 32767, -32768, 32767).astype(np.int16)
+    pcm_bytes = data_int16.astype("<i2").tobytes()
     duration_ms = len(data_int16) / TARGET_SR * 1000
     return pcm_bytes, duration_ms
 
