@@ -60,12 +60,12 @@ async def test_suggestion_request_id_unique(db_session):
     await db_session.commit()
     db_session.add(Suggestion(
         id=uuid.uuid4(), session_id=sid, utt_id="utt-1",
-        request_id="req-1", kind="pending",
+        request_id="req-1", status="pending",
     ))
     await db_session.commit()
     db_session.add(Suggestion(
         id=uuid.uuid4(), session_id=sid, utt_id="utt-1",
-        request_id="req-1", kind="ready", text="ok",
+        request_id="req-1", status="ready", text="ok",
     ))
     with pytest.raises(IntegrityError):
         await db_session.commit()

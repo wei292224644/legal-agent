@@ -20,7 +20,7 @@ async def test_upsert_pending_then_ready(db_session):
     await repo.upsert_ready(sid, request_id="r1", text="answer")
     items = await repo.list_by_session(sid)
     assert len(items) == 1
-    assert items[0]["kind"] == "ready"
+    assert items[0]["status"] == "ready"
     assert items[0]["text"] == "answer"
     assert items[0]["preview_topic"] == "A"
 

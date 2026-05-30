@@ -84,14 +84,23 @@ class Suggestion(Base):
     utt_id: Mapped[str] = mapped_column(
         String, ForeignKey("utterances.id", ondelete="CASCADE"), nullable=False
     )
-    request_id: Mapped[str] = mapped_column(String, nullable=False)
-    kind: Mapped[str] = mapped_column(String, nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(
+        String, nullable=False, default="gated"
+    )  # 'direct'（实时洞察）| 'gated'（深度分析）
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending"
+    )  # 'pending' | 'running' | 'ready' | 'expired' | 'dismissed'
     preview_topic: Mapped[str | None] = mapped_column(Text)
     preview_rationale: Mapped[str | None] = mapped_column(Text)
-    text: Mapped[str | None] = mapped_column(Text)
+    text: Mapped[str | None] = mapped_column(Text)       # 结果正文
+    error: Mapped[str | None] = mapped_column(Text)       # 执行异常信息
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )  # 用户确认时间；直接洞察为 NULL
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

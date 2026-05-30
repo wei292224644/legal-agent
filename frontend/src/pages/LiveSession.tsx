@@ -298,23 +298,32 @@ export default function LiveSession() {
         );
         // 回填 suggestions
         setSuggestions(
-          h.suggestions.map((s): Suggestion => {
-            if (s.kind === "pending") {
+          h.suggestions
+            .filter((s) => s.status !== "expired" && s.status !== "dismissed")
+            .map((s): Suggestion => {
+            if (s.status === "pending") {
               return {
                 kind: "pending",
-                requestId: s.request_id,
+                requestId: s.request_id ?? "",
                 topic: s.preview_topic ?? "",
                 rationale: s.preview_rationale ?? "",
+              };
+            }
+            if (s.status === "running") {
+              return {
+                kind: "running",
+                requestId: s.request_id ?? "",
+                topic: s.preview_topic ?? "",
               };
             }
             return {
               kind: "ready",
               id: s.id,
-              requestId: s.request_id,
+              requestId: s.request_id ?? undefined,
               text: s.text ?? "",
               topic: s.preview_topic ?? "",
             };
-          })
+          }))
         );
         setHydrated(true);
       })

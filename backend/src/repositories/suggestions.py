@@ -1,4 +1,8 @@
-"""Suggestion 仓储：用 (session_id, request_id) 作为业务幂等键 upsert。"""
+"""Suggestion 仓储：直接洞察（direct）与深度分析（gated）的统一持久化。
+
+gated 生命周期: pending → running → ready / expired / dismissed
+direct 生命周期: 直接 ready，无 request_id,无确认流程
+"""
 from __future__ import annotations
 
 import uuid
@@ -14,6 +18,8 @@ class SuggestionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
+    # ── gated: pending ────────────────────────────────────────────
+
     async def upsert_pending(
         self,
         session_id: uuid.UUID,
@@ -23,18 +29,28 @@ class SuggestionRepository:
         preview_topic: str | None,
         preview_rationale: str | None,
     ) -> None:
-        row = await self._find(session_id, request_id)
+        row = await self._find_gated(session_id, request_id)
         if row is None:
             self._s.add(Suggestion(
                 id=uuid.uuid4(), session_id=session_id, utt_id=utt_id,
-                request_id=request_id, kind="pending",
+                request_id=request_id, source="gated", status="pending",
                 preview_topic=preview_topic, preview_rationale=preview_rationale,
             ))
         else:
-            row.kind = "pending"
+            row.status = "pending"
             row.preview_topic = preview_topic
             row.preview_rationale = preview_rationale
-            row.updated_at = datetime.now(UTC)
+        await self._s.commit()
+
+    # ── gated: 状态切换 ────────────────────────────────────────────
+
+    async def mark_running(self, session_id: uuid.UUID, request_id: str) -> None:
+        """用户点击确认后标记为执行中。"""
+        row = await self._find_gated(session_id, request_id)
+        if row is None:
+            return
+        row.status = "running"
+        row.confirmed_at = datetime.now(UTC)
         await self._s.commit()
 
     async def upsert_ready(
@@ -45,21 +61,48 @@ class SuggestionRepository:
         text: str,
         utt_id: str | None = None,
     ) -> None:
-        row = await self._find(session_id, request_id)
+        """gated 分析结果就绪。没有 pending 行时兜底新建（进程重启后 pending 丢失）。"""
+        row = await self._find_gated(session_id, request_id)
         if row is None:
             if utt_id is None:
                 raise ValueError("upsert_ready without pending requires utt_id")
             self._s.add(Suggestion(
                 id=uuid.uuid4(), session_id=session_id, utt_id=utt_id,
-                request_id=request_id, kind="ready", text=text,
+                request_id=request_id, source="gated", status="ready", text=text,
             ))
         else:
-            row.kind = "ready"
+            row.status = "ready"
             row.text = text
-            row.updated_at = datetime.now(UTC)
         await self._s.commit()
 
-    async def _find(self, session_id: uuid.UUID, request_id: str) -> Suggestion | None:
+    async def mark_dismissed(self, session_id: uuid.UUID, request_id: str) -> None:
+        row = await self._find_gated(session_id, request_id)
+        if row is None:
+            return
+        row.status = "dismissed"
+        await self._s.commit()
+
+    async def mark_expired(self, session_id: uuid.UUID, request_id: str) -> None:
+        row = await self._find_gated(session_id, request_id)
+        if row is None:
+            return
+        row.status = "expired"
+        await self._s.commit()
+
+    # ── direct: 实时洞察（无 request_id,无确认流程）────────────────
+
+    async def insert_direct(
+        self, session_id: uuid.UUID, *, utt_id: str, text: str,
+    ) -> None:
+        self._s.add(Suggestion(
+            id=uuid.uuid4(), session_id=session_id, utt_id=utt_id,
+            request_id=None, source="direct", status="ready", text=text,
+        ))
+        await self._s.commit()
+
+    # ── 查询 ─────────────────────────────────────────────────────
+
+    async def _find_gated(self, session_id: uuid.UUID, request_id: str) -> Suggestion | None:
         stmt = select(Suggestion).where(
             Suggestion.session_id == session_id,
             Suggestion.request_id == request_id,
@@ -78,10 +121,13 @@ class SuggestionRepository:
                 "id": str(r.id),
                 "utt_id": r.utt_id,
                 "request_id": r.request_id,
-                "kind": r.kind,
+                "source": r.source,
+                "status": r.status,
                 "preview_topic": r.preview_topic,
                 "preview_rationale": r.preview_rationale,
                 "text": r.text,
+                "error": r.error,
+                "confirmed_at": r.confirmed_at.isoformat() if r.confirmed_at else None,
                 "created_at": r.created_at.isoformat(),
             }
             for r in rows

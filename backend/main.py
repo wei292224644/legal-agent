@@ -120,7 +120,13 @@ async def _startup() -> None:
     load_relevance_model()
 
     global session_manager, _maker
+    from db.base import Base  # noqa: E402
+    import db.models  # noqa: E402, F401
+
     engine = create_engine_from_env()
+    # 确保表存在——测试套件跑完后可能已 drop_all
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     _maker = get_sessionmaker(engine)
     session_manager = SessionManager(_maker, ttl=600.0)
     await session_manager.start()
@@ -171,6 +177,9 @@ async def _handle_text_message(
     if msg_type == "confirm":
         request_id = msg.get("request_id")
         if request_id:
+            async with _maker() as s:
+                from repositories.suggestions import SuggestionRepository
+                await SuggestionRepository(s).mark_running(session_id, request_id)
             ok = await orch.confirm_analysis(request_id)
             await _safe_send_json(ws, {"type": "confirm_ack", "request_id": request_id, "ok": ok})
         return False
@@ -178,6 +187,9 @@ async def _handle_text_message(
     if msg_type == "dismiss":
         request_id = msg.get("request_id")
         if request_id:
+            async with _maker() as s:
+                from repositories.suggestions import SuggestionRepository
+                await SuggestionRepository(s).mark_dismissed(session_id, request_id)
             await orch.dismiss_pending(request_id)
         return False
 
@@ -250,6 +262,7 @@ async def legal_session(ws: WebSocket, session_id: str):
             request_id = meta.get("request_id")
             try:
                 if meta.get("kind") == "pending":
+                    # gated deep_analysis：挂起等待用户确认
                     if utt_id and request_id:
                         preview = meta.get("preview", {})
                         async with _maker() as s:
@@ -270,8 +283,9 @@ async def legal_session(ws: WebSocket, session_id: str):
                             "preview": meta.get("preview", {}),
                         },
                     })
-                else:
-                    if request_id and text:
+                elif request_id:
+                    # gated ready：深度分析结果就绪
+                    if text:
                         async with _maker() as s:
                             from repositories.suggestions import SuggestionRepository
                             await SuggestionRepository(s).upsert_ready(
@@ -282,8 +296,21 @@ async def legal_session(ws: WebSocket, session_id: str):
                         "text": text,
                         "meta": {
                             "utt_id": utt_id,
-                            **({"request_id": request_id} if request_id else {}),
+                            "request_id": request_id,
                         },
+                    })
+                else:
+                    # direct 洞察：HeavyAgent 非 gated 直接输出,无 request_id
+                    if utt_id and text:
+                        async with _maker() as s:
+                            from repositories.suggestions import SuggestionRepository
+                            await SuggestionRepository(s).insert_direct(
+                                sid_uuid, utt_id=utt_id, text=text,
+                            )
+                    await ws.send_json({
+                        "type": "suggestion.ready",
+                        "text": text,
+                        "meta": {"utt_id": utt_id},
                     })
             except (WebSocketDisconnect, RuntimeError):
                 # WS 已断开,不应崩溃也不必告警(常规连接关闭)
@@ -292,6 +319,14 @@ async def legal_session(ws: WebSocket, session_id: str):
                 logger.warning("Suggestion callback failed: %s", exc)
 
         orch.set_suggestion_callback(on_suggestion)
+
+        async def on_expired(request_ids: list[str]) -> None:
+            async with _maker() as s:
+                from repositories.suggestions import SuggestionRepository
+                for rid in request_ids:
+                    await SuggestionRepository(s).mark_expired(sid_uuid, rid)
+
+        orch.set_expiry_callback(on_expired)
         await orch.start()
 
         # --- 音频管道 ---

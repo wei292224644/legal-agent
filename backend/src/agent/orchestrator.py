@@ -69,6 +69,7 @@ class Orchestrator:
         self._pa = pa or ProfileAgent()
         self._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
         self._suggestion_callback = None
+        self._expiry_callback = None
         self._pending: dict[str, PendingRequest] = {}
         self._inflight: set[asyncio.Task] = set()  # 在飞 child task,防 GC + 收集异常
         self._bus = None
@@ -84,6 +85,9 @@ class Orchestrator:
 
     def set_suggestion_callback(self, callback) -> None:
         self._suggestion_callback = callback
+
+    def set_expiry_callback(self, callback) -> None:
+        self._expiry_callback = callback
 
     async def start(self) -> None:
         await self._ctx.start_profile_worker()
@@ -303,6 +307,13 @@ class Orchestrator:
                 break
             now = time.time()
             stale = [rid for rid, p in self._pending.items() if now - p.created_at > ttl]
+            if stale and self._expiry_callback is not None:
+                try:
+                    result = self._expiry_callback(stale)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.warning("expiry callback failed", exc_info=True)
             for rid in stale:
                 pending = self._pending.pop(rid, None)
                 if pending:

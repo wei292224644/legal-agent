@@ -10,11 +10,14 @@ export type HistoryUtterance = {
 export type HistorySuggestion = {
   id: string;
   utt_id: string;
-  request_id: string;
-  kind: "pending" | "ready";
+  request_id: string | null;
+  source: "direct" | "gated";
+  status: "pending" | "running" | "ready" | "expired" | "dismissed";
   preview_topic: string | null;
   preview_rationale: string | null;
   text: string | null;
+  error: string | null;
+  confirmed_at: string | null;
   created_at: string;
 };
 
