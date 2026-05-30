@@ -118,10 +118,12 @@ class SessionManager:
     # ------------------------------------------------------------------
 
     async def attach_ws(self, session_id: str, ws: object) -> bool:
-        """将 WebSocket 绑定到 session。排他连接：已有连接返回 False。"""
+        """将 WebSocket 绑定到 session。排他连接：已有连接或已关闭返回 False。"""
         async with self._lock:
             state = self._sessions.get(session_id)
             if state is None:
+                return False
+            if state.status == "closed":
                 return False
             if session_id in self._ws_map:
                 return False
@@ -131,11 +133,17 @@ class SessionManager:
             return True
 
     async def detach_ws(self, session_id: str) -> None:
-        """WebSocket 断开，标记 disconnected 并立即触发快照。"""
+        """WebSocket 断开，标记 disconnected 并立即触发快照。
+
+        若 session 已被 close_session 标为 "closed",detach 不能再覆盖回 "disconnected"
+        ——否则会丢失"律师主动结束"的终态语义,且 close 时保存的 summary 也会被
+        后续逻辑误以为是普通断线状态。close 与 detach 在 main.py 的关闭路径上
+        天然并发(close 触发 background task,client 立即关 ws → detach 触发)。
+        """
         async with self._lock:
             self._ws_map.pop(session_id, None)
             state = self._sessions.get(session_id)
-            if state is not None:
+            if state is not None and state.status != "closed":
                 state.status = "disconnected"
                 state.touch()
 
@@ -159,6 +167,27 @@ class SessionManager:
             state.context_store = ctx.to_dict()
             state.orchestrator = orch.to_dict()
             state.touch()
+
+    async def set_summary(self, session_id: str, summary: str | None) -> None:
+        """设置 session 的 AI 摘要并触发快照保存到持久化后端。
+
+        session 可能已被 close_session 从内存释放，此时直接操作后端。
+        """
+        async with self._lock:
+            state = self._sessions.get(session_id)
+            if state is not None:
+                state.summary = summary
+                data = SessionSerializer.to_dict(state)
+                # 锁外执行 IO
+                self._backend.save(session_id, data)
+                return
+
+        # 内存中不存在，直接操作后端
+        data = self._backend.load(session_id)
+        if data is None:
+            return
+        data["summary"] = summary
+        self._backend.save(session_id, data)
 
     # ------------------------------------------------------------------
     # 快照与清理
@@ -203,13 +232,14 @@ class SessionManager:
                 await self._snapshot(sid)
 
     async def cleanup_expired(self) -> None:
-        """清理超过 TTL 的 disconnected session。"""
+        """清理超过 TTL 的 disconnected / closed session。"""
         now = time.monotonic()
         async with self._lock:
             expired = [
                 sid
                 for sid, s in self._sessions.items()
-                if s.status == "disconnected" and (now - s.last_active_at) > self._ttl
+                if s.status in ("disconnected", "closed")
+                and (now - s.last_active_at) > self._ttl
             ]
             for sid in expired:
                 self._sessions.pop(sid, None)
