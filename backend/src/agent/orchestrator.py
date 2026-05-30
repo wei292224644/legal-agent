@@ -1,20 +1,31 @@
-"""Orchestrator — 协调 ContextStore、IntentRouter、ProfileAgent、HeavyAgent 的中央调度器。
+"""Orchestrator — 纯机械管道:零语义判断,只对 RelevanceGate 与 child run 状态反应。
 
-处理流程：
-1. 接收 Utterance → 写入上下文
-2. 并行执行意图分类（IntentRouter）+ 画像提取（ProfileAgent）
-3. 根据分类结果决定：忽略 / 快速响应（simple） / 挂起等待确认（complex）
+控制流:
+1. 每条 utterance → append context(单写者), 并行触发 gate + PA(仅 client 句)
+2. PA 结果异步入画像写口(单写者)
+3. gate=true → spawn child run(并发); gate=false → 仅记录,不响应
+4. child run 完成:
+   - 未 paused → 直推 ready(stale generation 时丢弃)
+   - paused(踩了 gated deep_analysis)→ emit pending,等律师 confirm
+5. confirm → continue_run 续跑同一 run;dismiss/超时 → abandon
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
+
+from agno.run.base import RunStatus
 
 from agent.context_store import ContextStore
 from agent.heavy_agent import HeavyAgent
-from agent.intent_router import IntentRouter
 from agent.profile_agent import ProfileAgent
+from agent.relevance_gate import RelevanceGate
+from config import RUN_TIMEOUT
 from models.utterance import Utterance
 
 logger = logging.getLogger(__name__)
@@ -24,98 +35,118 @@ PROFILE_WINDOW_SIZE = 6
 
 @dataclass
 class PendingRequest:
-    """待律师确认后执行的深度分析请求。"""
+    """挂起的 child run。
+
+    `run_output` 是 Agno RunOutput 引用,confirm/reject 时直接调它的
+    `.requirements[i].confirm()/.reject()`(纯内存操作,Agno db 状态由
+    `agent.acontinue_run(...)` 自己 upsert)。**不序列化**——RunOutput 含
+    模型/工具/消息等大量运行期对象,跨进程恢复也无 Agno API 支持。
+    """
 
     request_id: str
-    utt: Utterance
-    intent_type: str
+    run_id: str
+    utt_id: str
     generation: int
-    meta: dict = field(default_factory=dict)
+    preview: dict
+    # wall-clock 秒。TTL 比较用 time.time() 统一基线,跨进程也有意义。
+    created_at: float = field(default_factory=time.time)
+    # 仅内存。to_dict / from_dict 不带这个字段。
+    run_output: Any = None
 
     def to_dict(self) -> dict:
         return {
             "request_id": self.request_id,
-            "utt": self.utt.to_dict(),
-            "intent_type": self.intent_type,
+            "run_id": self.run_id,
+            "utt_id": self.utt_id,
             "generation": self.generation,
-            "meta": self.meta,
+            "preview": self.preview,
+            "created_at": self.created_at,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "PendingRequest":
+        # run_output 永远为 None(不可序列化),恢复出来的 pending 没有可
+        # confirm 的 requirements,只能等 TTL sweep 自然过期或主动 dismiss。
+        # Orchestrator.from_dict 会决定要不要把它带回来,见下方注释。
         return cls(
             request_id=d["request_id"],
-            utt=Utterance.from_dict(d["utt"]),
-            intent_type=d["intent_type"],
+            run_id=d["run_id"],
+            utt_id=d["utt_id"],
             generation=d["generation"],
-            meta=d.get("meta", {}),
+            preview=d.get("preview", {}),
+            created_at=d.get("created_at", time.time()),
+            run_output=None,
         )
 
 
 class Orchestrator:
-    """中央调度器。
-
-    使用示例：
-        orch = Orchestrator(ctx)
-        await orch.start()
-        await orch.handle_utterance(utt)
-        await orch.shutdown()
-    """
-
     def __init__(
         self,
         ctx: ContextStore,
-        ir: IntentRouter | None = None,
+        gate: RelevanceGate | None = None,
         pa: ProfileAgent | None = None,
         ha: HeavyAgent | None = None,
+        session_id: str = "default",
+        user_id: str = "default",
     ):
         self._ctx = ctx
-        self._ir = ir or IntentRouter()
+        self._gate = gate or RelevanceGate()
         self._pa = pa or ProfileAgent()
-        self._ha = ha or HeavyAgent(ctx)
+        self._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
         self._suggestion_callback = None
         self._pending: dict[str, PendingRequest] = {}
+        self._inflight: set[asyncio.Task] = set()  # 在飞 child task,防 GC + 收集异常
         self._bus = None
         self._bus_task = None
+        self._ttl_task = None
+
+    # ------------------------------------------------------------------
+    # lifecycle
+    # ------------------------------------------------------------------
 
     def attach_bus(self, bus) -> None:
-        """附加事件总线。start() 后会自动启动 consumer task。"""
         self._bus = bus
 
+    def set_suggestion_callback(self, callback) -> None:
+        self._suggestion_callback = callback
+
     async def start(self) -> None:
-        """启动内部 worker（如 profile worker、bus consumer）。应在事件循环中显式调用。"""
         await self._ctx.start_profile_worker()
         if self._bus is not None and self._bus_task is None:
             self._bus_task = asyncio.create_task(self._consume_bus())
+        if self._ttl_task is None:
+            self._ttl_task = asyncio.create_task(self._sweep_pending_ttl())
 
-    def set_suggestion_callback(self, callback) -> None:
-        """设置建议回调。callback(text: str | None, meta: dict)。"""
-        self._suggestion_callback = callback
+    async def shutdown(self) -> None:
+        await self._ctx.stop_profile_worker()
+        for task in (self._bus_task, self._ttl_task):
+            if task is not None:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        # 等所有在飞 child task 结束(它们已经走 logger,不会抛到这里)
+        if self._inflight:
+            await asyncio.gather(*self._inflight, return_exceptions=True)
+        self._inflight.clear()
+        self._pending.clear()
+
+    # ------------------------------------------------------------------
+    # main path
+    # ------------------------------------------------------------------
 
     async def handle_utterance(self, utt: Utterance) -> int:
-        """处理单句发言，返回所属 generation。
-
-        IR + PA 并行执行后串行等待结果；HeavyAgent.analyze_quick 改为后台
-        asyncio.create_task 并发，避免慢速 LLM 阻塞后续 utterance 的消费。
-        """
-        # speaker 由声纹判定填入 lawyer/client/uncertain。
-        # None 不是合法运行态:match_speaker 永不返回 None,出现 None 说明
-        # enrollment 没接上或上游漏分类——是 bug,告警后降级保活,绝不静默吞。
+        # speaker 归一:None 是 bug 信号,uncertain 是合法的"非律师"标签
         if utt.speaker is None:
-            logger.warning(
-                "utterance %s speaker=None,声纹链路可能未接通(已降级为 client)", utt.id
-            )
-        # uncertain 是合法结果(声纹拿不准):2 方会谈"非律师即客户",按 client 处理,
-        # 宁可多提取后让律师删,也别让 PA 因 speaker 不是 [client] 而静默丢事实。
-        # 前端转写在进 bus 前已拿到真实 speaker,此处归一只影响 agent 侧。
+            logger.warning("utterance %s speaker=None,声纹链路可能未接通(已降级为 client)", utt.id)
         if utt.speaker not in ("lawyer", "client"):
             utt.speaker = "client"
 
         generation = await self._ctx.append_utterance(utt)
 
-        ir_task = asyncio.create_task(self._ir.classify(text=utt.text, speaker=utt.speaker))
-        # 律师发言不做事实提取:PA 是 LLM 调用,且只提取客户陈述的事实,
-        # 对律师的话提取纯属浪费 token。IR 仍照常分类(后续将换为本地 BERT)。
+        # gate 与 PA 并行,gate 不阻塞 PA(画像兜底)
+        gate_task = asyncio.create_task(self._safe_gate(utt))
         pa_task = None
         if utt.speaker != "lawyer":
             pa_task = asyncio.create_task(
@@ -130,133 +161,239 @@ class Orchestrator:
 
         if pa_task is not None:
             try:
-                pa_entries = await pa_task
-                if pa_entries:
-                    for entry in pa_entries:
+                entries = await pa_task
+                if entries:
+                    for entry in entries:
                         entry.timestamp = utt.t_start
-                    await self._ctx.enqueue_profile_update(utt.id, pa_entries)
-            except Exception as exc:
-                # PA 提取失败不应阻塞 IR 结果和建议推送
-                logger.warning("ProfileAgent extraction failed: %s", exc)
+                    await self._ctx.enqueue_profile_update(utt.id, entries)
+            except Exception as e:
+                # 画像兜底失败要大声说,不能静默:CLAUDE.md 第 12 条
+                logger.warning("ProfileAgent.extract failed for utt %s: %s", utt.id, e)
 
-        ir_result = await ir_task
-
-        if ir_result.severity == "ignore":
-            return generation
-
-        if not self._suggestion_callback:
-            return generation
-
-        meta = {
-            "severity": ir_result.severity,
-            "intent_type": ir_result.intent_type,
-            "law_domain": ir_result.law_domain,
-            "entities": ir_result.entities,
-            "utt_id": utt.id,
-        }
-
-        if ir_result.severity == "simple":
-            if ir_result.intent_type == "record_only":
-                return generation
-            asyncio.create_task(self._run_quick_analysis(utt, ir_result.intent_type, generation, meta))
-        else:
-            request_id = f"req_{uuid.uuid4().hex[:8]}"
-            self._pending[request_id] = PendingRequest(
-                request_id=request_id,
-                utt=utt,
-                intent_type=ir_result.intent_type,
-                generation=generation,
-                meta=meta,
-            )
-            meta["kind"] = "pending"
-            meta["request_id"] = request_id
-            await self._emit_suggestion(None, meta)
+        should_spawn = await gate_task
+        if should_spawn:
+            self._spawn_inflight(self._run_child(utt, generation), label=f"child:{utt.id}")
 
         return generation
 
+    def _spawn_inflight(self, coro, *, label: str) -> None:
+        """统一的 fire-and-forget 入口:保存引用防 GC + 异常入 log。"""
+        task = asyncio.create_task(coro, name=label)
+        self._inflight.add(task)
+
+        def _done(t: asyncio.Task) -> None:
+            self._inflight.discard(t)
+            if t.cancelled():
+                return
+            exc = t.exception()
+            if exc is not None:
+                logger.exception("inflight task %s crashed", label, exc_info=exc)
+
+        task.add_done_callback(_done)
+
+    async def _safe_gate(self, utt: Utterance) -> bool:
+        try:
+            return await self._gate.is_relevant(utt)
+        except Exception as e:
+            # gate 抖动按 False 处理(画像兜底捞回事实),但必须留下抖动证据
+            logger.warning("RelevanceGate failed for utt %s: %s", utt.id, e)
+            return False
+
+    async def _run_child(self, utt: Utterance, generation: int) -> None:
+        try:
+            run = await asyncio.wait_for(self._ha.arun(utt), timeout=RUN_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.warning("child run timeout (>%ss) for utt %s", RUN_TIMEOUT, utt.id)
+            return
+        except Exception:
+            logger.exception("child run failed for utt %s", utt.id)
+            return
+
+        # 两个分支都要查 generation:paused 也可能因新 utterance 而 stale,
+        # 此时弹 pending 卡片只会污染新对话。
+        if self._ctx.get_generation() != generation:
+            return
+
+        if not run.is_paused:
+            await self._emit({"kind": "ready", "utt_id": utt.id}, text=getattr(run, "content", None))
+            return
+
+        # paused: 取首个 requirement 的预览给律师
+        req = run.active_requirements[0] if run.active_requirements else None
+        preview = {}
+        if req is not None and req.tool_execution is not None:
+            preview = dict(req.tool_execution.tool_args or {})
+
+        request_id = f"req_{uuid.uuid4().hex[:8]}"
+        self._pending[request_id] = PendingRequest(
+            request_id=request_id,
+            run_id=run.run_id,
+            utt_id=utt.id,
+            generation=generation,
+            preview=preview,
+            run_output=run,  # 保留引用,confirm/reject 时用
+        )
+        await self._emit(
+            {
+                "kind": "pending",
+                "utt_id": utt.id,
+                "request_id": request_id,
+                "preview": preview,
+            },
+            text=None,
+        )
+
+    # ------------------------------------------------------------------
+    # confirm / dismiss / cleanup
+    # ------------------------------------------------------------------
+
     async def confirm_analysis(self, request_id: str) -> bool:
-        """律师确认 pending 请求后，触发 HeavyAgent 深度分析并推送结果。"""
         pending = self._pending.pop(request_id, None)
         if pending is None:
             return False
+        if pending.run_output is None:
+            # 从 db 恢复出来的 pending 没有 RunOutput 引用 → 无法 confirm,
+            # 直接 abandon。前端应当避免对恢复后的 pending 发 confirm。
+            await self._abandon_run(pending)
+            return False
 
-        result = await self._ha.analyze(pending.utt, pending.intent_type, pending.generation)
-        if result is not None:
-            ready_meta = {**pending.meta, "kind": "ready", "request_id": request_id}
-            await self._emit_suggestion(result, ready_meta)
+        if self._ctx.get_generation() != pending.generation:
+            await self._abandon_run(pending)
+            return False
+
+        # 在内存里 confirm 所有 active_requirement,再调 acontinue_run。
+        # Agno 文档约定:requirements 直接从 run_output.requirements 传入。
+        for req in pending.run_output.active_requirements or []:
+            try:
+                req.confirm()
+            except Exception:
+                logger.warning("requirement.confirm() failed", exc_info=True)
+
+        try:
+            run = await asyncio.wait_for(
+                self._ha.acontinue_run(
+                    run_id=pending.run_id,
+                    requirements=pending.run_output.requirements,
+                ),
+                timeout=RUN_TIMEOUT,
+            )
+        except Exception:
+            logger.exception("continue_run failed for run_id=%s", pending.run_id)
+            await self._abandon_run(pending)
+            return False
+
+        text = getattr(run, "content", None)
+        await self._emit({"kind": "ready", "utt_id": pending.utt_id, "request_id": request_id}, text=text)
         return True
 
-    def dismiss_pending(self, request_id: str) -> None:
-        """律师关闭建议卡片，直接丢弃 pending 请求。"""
-        self._pending.pop(request_id, None)
+    async def dismiss_pending(self, request_id: str) -> None:
+        pending = self._pending.pop(request_id, None)
+        if pending is None:
+            return
+        await self._abandon_run(pending)
 
-    async def shutdown(self) -> None:
-        """清理资源：取消 profile worker、bus consumer，清空 pending。"""
-        await self._ctx.stop_profile_worker()
-        if self._bus_task is not None:
-            self._bus_task.cancel()
+    async def _abandon_run(self, pending: PendingRequest) -> None:
+        """放弃挂起 run:reject 内存中的 requirements + 把 Agno db 的 run 状态标 CANCELLED。
+
+        注意:Agno SqliteDb/PostgresDb 没有 get_run/delete_run 这类 API。
+        真实可用 API 是 update_approval_run_status(run_id, RunStatus.*) 与
+        delete_approval(approval_id)。这里只动 run_status,approvals 行让
+        Agno 内部 GC,避免我们替它管 approval_id 生命周期。
+        """
+        # 1) 内存中 reject(若有 run_output)
+        if pending.run_output is not None:
+            for req in pending.run_output.active_requirements or []:
+                try:
+                    req.reject("abandoned")
+                except Exception:
+                    pass
+        # 2) db 中把 run 标 CANCELLED,避免 paused 状态永久滞留
+        db = self._ha._db
+        try:
+            if hasattr(db, "update_approval_run_status"):
+                db.update_approval_run_status(run_id=pending.run_id, run_status=RunStatus.cancelled)
+        except Exception:
+            logger.warning(
+                "update_approval_run_status failed for run_id=%s", pending.run_id, exc_info=True
+            )
+
+    async def _sweep_pending_ttl(self) -> None:
+        """后台扫描:挂起 run 超过 PENDING_TTL 自动 abandon。
+        每轮循环重读 config.PENDING_TTL,让 monkeypatch 在测试里生效。"""
+        while True:
             try:
-                await self._bus_task
+                import config as _cfg  # noqa: PLC0415
+                ttl = _cfg.PENDING_TTL
+                await asyncio.sleep(max(0.05, min(ttl / 4, 30)))
             except asyncio.CancelledError:
-                pass
-        self._pending.clear()
+                break
+            now = time.time()
+            stale = [rid for rid, p in self._pending.items() if now - p.created_at > ttl]
+            for rid in stale:
+                pending = self._pending.pop(rid, None)
+                if pending:
+                    await self._abandon_run(pending)
 
-    async def _run_quick_analysis(self, utt: Utterance, intent_type: str, generation: int, meta: dict) -> None:
-        """后台运行 HeavyAgent.analyze_quick 并 emit suggestion。"""
-        result = await self._ha.analyze_quick(utt, intent_type, generation)
-        if result is not None:
-            ready_meta = {**meta, "kind": "ready"}
-            await self._emit_suggestion(result, ready_meta)
+    # ------------------------------------------------------------------
+    # plumbing
+    # ------------------------------------------------------------------
 
     async def _consume_bus(self) -> None:
-        """事件总线消费者：循环 get utterance 并交给 handle_utterance 处理。"""
         while True:
             try:
                 utt = await self._bus.get()
                 await self.handle_utterance(utt)
             except asyncio.CancelledError:
                 break
-            except Exception as exc:
-                # 单句处理失败（如 LLM 超时）不应杀死消费者，否则整场会谈哑火。
-                logger.error("handle_utterance failed, skipping utterance: %s", exc)
+            except Exception:
+                logger.exception("handle_utterance failed")
 
-    async def _emit_suggestion(self, text: str | None, meta: dict) -> None:
-        """调用 suggestion_callback，自动兼容同步/异步回调。"""
+    async def _emit(self, meta: dict, text: str | None) -> None:
         if self._suggestion_callback is None:
             return
-        cb_result = self._suggestion_callback(text, meta)
-        if asyncio.iscoroutine(cb_result):
-            await cb_result
+        result = self._suggestion_callback(text, meta)
+        if asyncio.iscoroutine(result):
+            await result
 
     # ------------------------------------------------------------------
-    # 序列化（纯数据，不含 Agent 实例 / callback / bus 等运行时对象）
+    # serialization
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict:
-        """序列化为纯 dict；仅含 pending 请求和 ctx 数据。"""
         return {
-            "pending": [req.to_dict() for req in self._pending.values()],
+            "pending": [p.to_dict() for p in self._pending.values()],
             "ctx": self._ctx.to_dict(),
         }
 
     @classmethod
-    def from_dict(cls, d: dict, ctx: ContextStore | None = None) -> "Orchestrator":
-        """从 dict 恢复；ctx 若已在外部恢复则直接传入，否则从 dict 重建。
+    def from_dict(
+        cls,
+        d: dict,
+        ctx: ContextStore | None = None,
+        session_id: str = "default",
+        user_id: str = "default",
+        gate: RelevanceGate | None = None,
+        pa: ProfileAgent | None = None,
+        ha: HeavyAgent | None = None,
+    ):
+        """从快照恢复 Orchestrator。
 
-        恢复后需重新设置：ir / pa / ha（或默认新建）、bus、callback。
+        **不恢复 pending**:RunOutput 含不可序列化的运行期对象(模型/工具
+        实例/消息流引用),跨进程恢复后无法 confirm。如果旧进程崩溃时有
+        挂起 run,Agno db 里的 paused 状态由其内部 GC 与本类的 TTL sweep
+        共同清理。前端 UX 上,会话恢复后律师只能在新对话里重新触发。
         """
         if ctx is None:
             ctx = ContextStore.from_dict(d["ctx"])
         inst = cls.__new__(cls)
         inst._ctx = ctx
-        inst._ir = IntentRouter()
-        inst._pa = ProfileAgent()
-        inst._ha = HeavyAgent(ctx)
+        inst._gate = gate or RelevanceGate()
+        inst._pa = pa or ProfileAgent()
+        inst._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
         inst._suggestion_callback = None
-        inst._pending = {
-            req["request_id"]: PendingRequest.from_dict(req)
-            for req in d.get("pending", [])
-        }
+        inst._pending = {}  # 故意丢弃 d.get("pending", []),见 docstring
+        inst._inflight = set()
         inst._bus = None
         inst._bus_task = None
+        inst._ttl_task = None
         return inst

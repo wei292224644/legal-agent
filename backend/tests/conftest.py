@@ -87,23 +87,15 @@ def _ensure_fixtures():
 
 
 @pytest.fixture
-def mock_ir_client():
-    """Factory fixture: returns a function that creates stub IntentRouter instances."""
-    from agent.intent_router import IntentResult  # noqa: PLC0415
+def mock_relevance_gate():
+    """Factory fixture: 返回一个 RelevanceGate stub,可指定固定的 is_relevant 结果。"""
 
-    def _make(**kwargs):
-        result = IntentResult(
-            severity=kwargs.pop("severity", "ignore"),
-            intent_type=kwargs.pop("intent_type", "none"),
-            rationale=kwargs.pop("rationale", ""),
-            **kwargs,
-        )
+    def _make(is_relevant: bool = True):
+        class StubGate:
+            async def is_relevant(self, utt) -> bool:
+                return is_relevant
 
-        class StubIR:
-            async def classify(self, text: str, speaker: str | None = None) -> IntentResult:
-                return result
-
-        return StubIR()
+        return StubGate()
 
     return _make
 

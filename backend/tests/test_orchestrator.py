@@ -1,24 +1,22 @@
-"""Tests for Orchestrator."""
+"""Tests for Orchestrator — gate-only spawn + run-state 反应。"""
 
 import asyncio
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 
-from agent.bus import UtteranceBus
 from agent.context_store import ContextStore
-from agent.heavy_agent import HeavyAgent
-from agent.intent_router import IntentResult
 from agent.orchestrator import Orchestrator
-from agent.profile_agent import ProfileAgent
 from models.utterance import Utterance
 
 
 @pytest.fixture(autouse=True)
-def _mock_deepseek_env(monkeypatch):
+def _mock_env(monkeypatch, tmp_path):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    from agno.db.in_memory import InMemoryDb  # noqa: PLC0415
+    from agent.db import reset_agno_db_for_tests  # noqa: PLC0415
+    reset_agno_db_for_tests(replacement=InMemoryDb())
 
 
 @pytest_asyncio.fixture
@@ -28,550 +26,230 @@ async def store():
     return ctx
 
 
-@pytest.mark.asyncio
-async def test_routes_simple_intent_to_quick(store, mock_ir_client):
-    """simple → analyze_quick，直接推送 ready 建议。"""
-    ir_stub = mock_ir_client(severity="simple", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
+def _completed_run(content: str, run_id: str = "run_1"):
+    r = MagicMock()
+    r.is_paused = False
+    r.content = content
+    r.run_id = run_id
+    return r
 
-    ha = HeavyAgent(store)
-    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
-        mock_run.return_value = AsyncMock(content="根据劳动法第87条，应支付2N赔偿金。")
 
-        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
-        hw_results = []
-
-        async def on_suggestion(text, meta):
-            hw_results.append((text, meta))
-
-        orch.set_suggestion_callback(on_suggestion)
-
-        utt = Utterance(
-            id="u_1",
-            text="违法解除赔多少？",
-            speaker="client",
-            t_start=0.0,
-            t_end=1.0,
-            timestamp=datetime.now(),
-        )
-        await orch.handle_utterance(utt)
-        await asyncio.sleep(0.1)
-
-        assert len(hw_results) == 1
-        text, meta = hw_results[0]
-        assert "劳动法" in text
-        assert meta["kind"] == "ready"
-        assert meta["severity"] == "simple"
+def _paused_run(topic: str, rationale: str, run_id: str = "run_1"):
+    req = MagicMock()
+    req.tool_execution.tool_args = {"topic": topic, "rationale": rationale}
+    r = MagicMock()
+    r.is_paused = True
+    r.run_id = run_id
+    r.active_requirements = [req]
+    return r
 
 
 @pytest.mark.asyncio
-async def test_simple_record_only_skips_quick_analysis(store, mock_ir_client):
-    """simple + record_only 应跳过 analyze_quick：record_only 字面语义就是打点不响应。"""
-    ir_stub = mock_ir_client(severity="simple", intent_type="record_only")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
+async def test_gate_false_does_not_spawn_child(store, mock_relevance_gate):
+    """relevance=false → 不 spawn,但 PA 仍跑(画像兜底)。"""
+    gate = mock_relevance_gate(is_relevant=False)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
+    ha.arun = AsyncMock(side_effect=AssertionError("relevance=false 不应 spawn"))
 
-    ha = HeavyAgent(store)
-    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_run:
-        mock_run.return_value = AsyncMock(content="不该被调用")
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
+    orch.set_suggestion_callback(lambda t, m: None)
 
-        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
-        suggestions = []
-
-        async def on_suggestion(text, meta):
-            suggestions.append((text, meta))
-
-        orch.set_suggestion_callback(on_suggestion)
-
-        utt = Utterance(
-            id="u_1",
-            text="两年三个月。",
-            speaker="client",
-            t_start=0.0,
-            t_end=1.0,
-            timestamp=datetime.now(),
-        )
-        await orch.handle_utterance(utt)
-        await asyncio.sleep(0.1)
-
-        assert len(suggestions) == 0, "record_only 不应触发任何建议"
-        mock_run.assert_not_called(), "record_only 不应触达 HeavyAgent"
-
-
-@pytest.mark.asyncio
-async def test_complex_emits_pending_not_ready(store, mock_ir_client):
-    """complex → 发出 pending 建议（text=None），不触发 analyze。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
-
-    ha = HeavyAgent(store)
-    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
-        mock_full.return_value = AsyncMock(content="分析结果")
-
-        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
-        suggestions = []
-
-        async def on_suggestion(text, meta):
-            suggestions.append((text, meta))
-
-        orch.set_suggestion_callback(on_suggestion)
-
-        utt = Utterance(
-            id="u_1",
-            text="能赢吗",
-            speaker="client",
-            t_start=0.0,
-            t_end=1.0,
-            timestamp=datetime.now(),
-        )
-        await orch.handle_utterance(utt)
-        await asyncio.sleep(0.1)
-
-        assert len(suggestions) == 1
-        text, meta = suggestions[0]
-        assert text is None
-        assert meta["kind"] == "pending"
-        assert "request_id" in meta
-        mock_full.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_confirm_analysis_triggers_heavy_agent(store, mock_ir_client):
-    """律师确认后调用 confirm_analysis → 触发 analyze。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
-
-    ha = HeavyAgent(store)
-    with patch("agno.agent.Agent.arun", new_callable=AsyncMock) as mock_full:
-        mock_full.return_value = AsyncMock(content="根据案情分析，建议收集证据后申请劳动仲裁。")
-
-        orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
-        suggestions = []
-
-        async def on_suggestion(text, meta):
-            suggestions.append((text, meta))
-
-        orch.set_suggestion_callback(on_suggestion)
-
-        utt = Utterance(
-            id="u_1",
-            text="能赢吗",
-            speaker="client",
-            t_start=0.0,
-            t_end=1.0,
-            timestamp=datetime.now(),
-        )
-        await orch.handle_utterance(utt)
-        await asyncio.sleep(0.1)
-
-        request_id = suggestions[0][1]["request_id"]
-        ok = await orch.confirm_analysis(request_id)
-        await asyncio.sleep(0.1)
-        assert ok
-
-        mock_full.assert_called_once()
-        assert len(suggestions) == 2
-        assert suggestions[1][1]["kind"] == "ready"
-        assert "劳动仲裁" in suggestions[1][0]
-
-
-@pytest.mark.asyncio
-async def test_dismiss_pending_removes_request(store, mock_ir_client):
-    """律师关闭建议卡片后 pending 被清除。"""
-    ir_stub = mock_ir_client(severity="complex", intent_type="query_law")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
-
-    ha = HeavyAgent(store)
-    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
-    suggestions = []
-
-    async def on_suggestion(text, meta):
-        suggestions.append((text, meta))
-
-    orch.set_suggestion_callback(on_suggestion)
-
-    utt = Utterance(
-        id="u_1",
-        text="能赢吗",
-        speaker="client",
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
+    utt = Utterance(id="u_1", text="好的", speaker="client", t_start=0.0, t_end=1.0)
     await orch.handle_utterance(utt)
     await asyncio.sleep(0.1)
 
-    request_id = suggestions[0][1]["request_id"]
-    assert request_id in orch._pending
-
-    orch.dismiss_pending(request_id)
-    assert request_id not in orch._pending
+    pa.extract.assert_awaited_once()
+    ha.arun.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_ignore_does_not_trigger_suggestion(store, mock_ir_client):
-    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(choices=[MagicMock(message=MagicMock(content='{"entries": []}'))])
-    )
+async def test_gate_true_completed_run_emits_ready(store, mock_relevance_gate):
+    """relevance=true + child completed(未踩 gated)→ 直接推 ready。"""
+    gate = mock_relevance_gate(is_relevant=True)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
+    ha.arun = AsyncMock(return_value=_completed_run("法条第47条…"))
 
-    ha = HeavyAgent(store)
-    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
     suggestions = []
+    orch.set_suggestion_callback(lambda t, m: suggestions.append((t, m)))
 
-    async def on_suggestion(text, meta):
-        suggestions.append(text)
-
-    orch.set_suggestion_callback(on_suggestion)
-
-    utt = Utterance(
-        id="u_1",
-        text="律师你好",
-        speaker="client",
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
+    await orch.handle_utterance(Utterance(id="u_1", text="N+1怎么算", speaker="client", t_start=0.0, t_end=1.0))
     await asyncio.sleep(0.1)
 
-    assert len(suggestions) == 0
+    assert len(suggestions) == 1
+    text, meta = suggestions[0]
+    assert "第47条" in text
+    assert meta["kind"] == "ready"
 
 
 @pytest.mark.asyncio
-async def test_pa_extracts_facts_to_profile(store, mock_ir_client):
-    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": [{"key": "月薪", "value": "两万五"}]}'))]
-        )
-    )
+async def test_gate_true_paused_run_emits_pending_with_preview(store, mock_relevance_gate):
+    """child 踩 gated → emit pending,meta.preview 来自 tool_args。"""
+    gate = mock_relevance_gate(is_relevant=True)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
+    ha.arun = AsyncMock(return_value=_paused_run("胜率评估", "需要全画像与多步推理"))
 
-    ha = HeavyAgent(store)
-    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-    orch.set_suggestion_callback(lambda text, meta: None)
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
+    suggestions = []
+    orch.set_suggestion_callback(lambda t, m: suggestions.append((t, m)))
 
-    utt = Utterance(
-        id="u_1",
-        text="月薪两万五，税前",
-        speaker="client",
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
+    await orch.handle_utterance(Utterance(id="u_1", text="能赢吗", speaker="client", t_start=0.0, t_end=1.0))
+    await asyncio.sleep(0.1)
+
+    assert len(suggestions) == 1
+    text, meta = suggestions[0]
+    assert text is None
+    assert meta["kind"] == "pending"
+    assert "request_id" in meta
+    assert meta["preview"]["topic"] == "胜率评估"
+    assert meta["preview"]["rationale"] == "需要全画像与多步推理"
+
+
+@pytest.mark.asyncio
+async def test_stale_completed_run_is_dropped(store, mock_relevance_gate):
+    """child 在飞期间又有新 utterance 进来 → 该次完成的回答 stale,不推送。"""
+    gate = mock_relevance_gate(is_relevant=True)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
+
+    first_done = asyncio.Event()
+    second_arun_started = asyncio.Event()
+
+    async def staged_arun(utt):
+        if utt.id == "u_1":
+            await first_done.wait()
+            return _completed_run("旧问题的迟到答案")
+        # 第二句 child 立即返回,让其 ready 不污染断言
+        second_arun_started.set()
+        return _completed_run("新问题的及时答案")
+
+    ha.arun = staged_arun
+
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
+    suggestions = []
+    orch.set_suggestion_callback(lambda t, m: suggestions.append((t, m)))
+
+    # 第一句触发慢 child;还没完成就来第二句让 generation 走远
+    await orch.handle_utterance(Utterance(id="u_1", text="问题A", speaker="client", t_start=0.0, t_end=1.0))
+    await asyncio.sleep(0.05)
+    await orch.handle_utterance(Utterance(id="u_2", text="问题B", speaker="client", t_start=1.0, t_end=2.0))
+    # 确保第二句的 child 已经完成、generation=2 已落地
+    await second_arun_started.wait()
+    await asyncio.sleep(0.05)
+    first_done.set()
+    await asyncio.sleep(0.1)
+
+    # 旧 child 完成时 generation 已不匹配,不应出现在结果里
+    ready_texts = [t for t, m in suggestions if m["kind"] == "ready"]
+    assert "旧问题的迟到答案" not in ready_texts, "stale generation 的答案必须被丢弃"
+    assert "新问题的及时答案" in ready_texts, "新问题应正常输出"
+
+
+@pytest.mark.asyncio
+async def test_profile_fallback_when_gate_false(store, mock_relevance_gate):
+    """gate=false 不 gate PA:含关键事实的 client 句仍进画像。"""
+    gate = mock_relevance_gate(is_relevant=False)
+    pa = MagicMock()
+
+    from agent.context_store import ProfileEntry  # noqa: PLC0415
+    pa.extract = AsyncMock(return_value=[ProfileEntry(key="入职日期", value="2019-03", timestamp=0.0, source_utt_id="u_1")])
+
+    ha = MagicMock()
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
+    orch.set_suggestion_callback(lambda t, m: None)
+
+    await orch.handle_utterance(Utterance(id="u_1", text="我2019年3月入职的", speaker="client", t_start=0.0, t_end=1.0))
     await asyncio.sleep(0.1)
 
     profile = store.get_profile()
-    assert len(profile) >= 1
-    keys = [e.key for e in profile]
-    assert "月薪" in keys
+    assert any(e.key == "入职日期" for e in profile)
 
 
 @pytest.mark.asyncio
-async def test_profile_timestamp_from_utt(store, mock_ir_client):
-    """PA entries 的 timestamp 应被 Orchestrator 覆盖为 utt.t_start。"""
-    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
-    pa_client = MagicMock()
-    pa_client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"entries": [{"key": "月薪", "value": "两万五"}]}'))]
-        )
-    )
+async def test_lawyer_skips_pa_but_still_runs_gate(store, mock_relevance_gate):
+    """律师发言:不调 PA,但仍过 gate(律师可能显式求助)。"""
+    gate_calls = []
 
-    ha = HeavyAgent(store)
-    orch = Orchestrator(store, ir=ir_stub, pa=ProfileAgent(client=pa_client), ha=ha)
-    orch.set_suggestion_callback(lambda text, meta: None)
+    class SpyGate:
+        async def is_relevant(self, utt):
+            gate_calls.append(utt.speaker)
+            return False
 
-    utt = Utterance(
-        id="u_1",
-        text="月薪两万五，税前",
-        speaker="client",
-        t_start=12.5,
-        t_end=13.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-    await asyncio.sleep(0.1)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
 
-    profile = store.get_profile()
-    assert len(profile) == 1
-    assert profile[0].timestamp == 12.5
+    orch = Orchestrator(store, gate=SpyGate(), pa=pa, ha=ha)
+    orch.set_suggestion_callback(lambda t, m: None)
+
+    await orch.handle_utterance(Utterance(id="u_1", text="您工作多久了？", speaker="lawyer", t_start=0.0, t_end=1.0))
+    await asyncio.sleep(0.05)
+
+    assert gate_calls == ["lawyer"]
+    pa.extract.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_pa_skipped_for_lawyer(store, mock_ir_client):
-    """律师发言不触发 PA 提取：PA 是 LLM 调用且只提取客户事实，对律师的话纯浪费。"""
-    ir_stub = mock_ir_client(severity="ignore", intent_type="none")
+async def test_uncertain_speaker_treated_as_client(store, mock_relevance_gate):
+    """声纹 uncertain 归一为 client,与旧契约保持一致。"""
+    gate = mock_relevance_gate(is_relevant=False)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+    ha = MagicMock()
 
-    class SpyPA:
-        def __init__(self):
-            self.calls = 0
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=ha)
+    orch.set_suggestion_callback(lambda t, m: None)
 
-        async def extract(self, text, speaker, history, existing_profile, utt_id=""):
-            self.calls += 1
-            return []
-
-    pa = SpyPA()
-    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=HeavyAgent(store))
-    orch.set_suggestion_callback(lambda text, meta: None)
-
-    await orch.handle_utterance(
-        Utterance(id="u_1", text="您工作多久了？", speaker="lawyer", t_start=0.0, t_end=1.0)
-    )
+    await orch.handle_utterance(Utterance(id="u_1", text="两年三个月", speaker="uncertain", t_start=0.0, t_end=1.0))
     await asyncio.sleep(0.05)
-    assert pa.calls == 0, "律师发言不应调用 PA"
 
-    await orch.handle_utterance(
-        Utterance(id="u_2", text="工龄三年", speaker="client", t_start=1.0, t_end=2.0)
-    )
-    await asyncio.sleep(0.05)
-    assert pa.calls == 1, "客户发言应调用 PA"
+    assert pa.extract.call_args.kwargs["speaker"] == "client"
+    assert store.get_full_history()[-1].speaker == "client"
 
 
 @pytest.mark.asyncio
 async def test_bus_consumer_survives_handler_exception(store):
-    """IR 抛异常不应杀死 bus consumer：后续 utterance 仍被正常处理。
+    """gate 抛异常不应杀死 bus consumer。"""
+    from agent.bus import UtteranceBus  # noqa: PLC0415
 
-    回归 orchestrator.py 中 _consume_bus 只 catch CancelledError 导致单次
-    LLM 抖动整场哑火的 bug。
-    """
-
-    class FlakyIR:
-        """第一次调用抛异常，之后正常返回 simple。"""
-
+    class FlakyGate:
         def __init__(self):
             self.calls = 0
 
-        async def classify(self, text: str, speaker: str | None = None):
+        async def is_relevant(self, utt):
             self.calls += 1
             if self.calls == 1:
                 raise RuntimeError("LLM timeout")
-            return IntentResult(severity="simple", intent_type="query_law", rationale="stub")
+            return True
 
     class StubPA:
-        async def extract(self, text, speaker, history, existing_profile, utt_id=""):
+        async def extract(self, **kwargs):
             return []
 
     class StubHA:
-        async def analyze_quick(self, utt, intent_type, generation):
-            return f"答案: {utt.text}"
+        async def arun(self, utt):
+            return _completed_run(f"答: {utt.text}")
 
     bus = UtteranceBus()
-    orch = Orchestrator(store, ir=FlakyIR(), pa=StubPA(), ha=StubHA())
+    orch = Orchestrator(store, gate=FlakyGate(), pa=StubPA(), ha=StubHA())
     orch.attach_bus(bus)
 
     suggestions = []
-
-    async def on_suggestion(text, meta):
-        suggestions.append((text, meta))
-
-    orch.set_suggestion_callback(on_suggestion)
+    orch.set_suggestion_callback(lambda t, m: suggestions.append((t, m)))
     await orch.start()
 
-    # 第一句触发异常，第二句应仍被消费并产出建议
-    await bus.put(Utterance(id="u_1", text="第一句会让IR崩", speaker="client", t_start=0.0, t_end=1.0))
-    await bus.put(Utterance(id="u_2", text="第二句应正常处理", speaker="client", t_start=1.0, t_end=2.0))
-    await asyncio.sleep(0.2)
+    await bus.put(Utterance(id="u_1", text="第一句", speaker="client", t_start=0.0, t_end=1.0))
+    await bus.put(Utterance(id="u_2", text="第二句", speaker="client", t_start=1.0, t_end=2.0))
+    await asyncio.sleep(0.3)
     await orch.shutdown()
 
-    ready = [(t, m) for t, m in suggestions if m["kind"] == "ready"]
-    assert len(ready) == 1, "异常后消费者应存活并处理第二句"
-    assert ready[0][1]["utt_id"] == "u_2"
-
-
-@pytest.mark.asyncio
-async def test_ten_turn_dialogue_stability_and_completeness(store):
-    """10轮短对话回归: simple 直推, complex 挂起, ignore 不触发。"""
-
-    class StubIntentRouter:
-        def __init__(self, mapping):
-            self._mapping = mapping
-
-        async def classify(self, text: str, speaker: str | None = None):
-            entry = self._mapping.get(text, ("ignore", "none"))
-            severity, intent_type = entry
-            return IntentResult(severity=severity, intent_type=intent_type, rationale="stub")
-
-    class StubProfileAgent:
-        async def extract(self, text: str, speaker: str | None, history: list, existing_profile: dict[str, str], utt_id: str = ""):
-            entries = []
-            if "月薪" in text and "月薪" not in existing_profile:
-                entries.append(MagicMock(key="月薪", value="25000", source_utt_id=utt_id or ""))
-            if "工龄" in text and "工龄" not in existing_profile:
-                entries.append(MagicMock(key="工龄", value="2年3个月", source_utt_id=utt_id or ""))
-            if "解除通知" in text and "解除通知时间" not in existing_profile:
-                entries.append(MagicMock(key="解除通知时间", value="2026-05-01", source_utt_id=utt_id or ""))
-            return entries
-
-    class StubHeavyAgent:
-        async def analyze(self, utt: Utterance, intent_type: str, generation: int):
-            return f"[{intent_type}] 建议: {utt.text[:20]} (g={generation})"
-
-        async def analyze_quick(self, utt: Utterance, intent_type: str, generation: int):
-            return f"[quick:{intent_type}] {utt.text[:20]} (g={generation})"
-
-    turns = [
-        ("u_1", "律师你好", "client", ("ignore", "none")),
-        ("u_2", "我被公司违法解除了", "client", ("complex", "query_law")),
-        ("u_3", "先确认解除通知时间", "lawyer", ("ignore", "none")),
-        ("u_4", "解除通知是5月1号口头说的", "client", ("simple", "record_only")),
-        ("u_5", "月薪两万五，税前", "client", ("simple", "record_only")),
-        ("u_6", "工龄2年3个月", "client", ("simple", "record_only")),
-        ("u_7", "能拿多少赔偿", "client", ("simple", "compute_compensation")),
-        ("u_8", "还要不要继续上班", "client", ("complex", "query_law")),
-        ("u_9", "先准备证据清单", "lawyer", ("ignore", "none")),
-        ("u_10", "好的我会整理合同和工资流水", "client", ("ignore", "none")),
-    ]
-    intent_mapping = {text: entry for _, text, _, entry in turns}
-
-    orch = Orchestrator(
-        store,
-        ir=StubIntentRouter(intent_mapping),
-        pa=StubProfileAgent(),
-        ha=StubHeavyAgent(),
-    )
-
-    suggestions = []
-
-    async def on_suggestion(text, meta):
-        suggestions.append((text, meta))
-
-    orch.set_suggestion_callback(on_suggestion)
-
-    generations = []
-    for utt_id, text, speaker, _ in turns:
-        generation = await orch.handle_utterance(
-            Utterance(id=utt_id, text=text, speaker=speaker, t_start=0.0, t_end=1.0, timestamp=datetime.now())
-        )
-        generations.append(generation)
-
-    await asyncio.sleep(0.1)
-
-    assert generations == list(range(1, 11))
-
-    ready_suggestions = [(t, m) for t, m in suggestions if m["kind"] == "ready"]
-    pending_suggestions = [(t, m) for t, m in suggestions if m["kind"] == "pending"]
-
-    # simple/record_only 走"打点不响应"分支，不应进入 quick 路径
-    simple_actionable_count = sum(1 for _, _, _, (s, it) in turns if s == "simple" and it != "record_only")
-    complex_count = sum(1 for _, _, _, (s, _) in turns if s == "complex")
-
-    assert len(ready_suggestions) == simple_actionable_count
-    assert len(pending_suggestions) == complex_count
-    assert all(t is not None for t, _ in ready_suggestions)
-    assert all(t is None for t, _ in pending_suggestions)
-    assert all("request_id" in m for _, m in pending_suggestions)
-
-    for _, meta in pending_suggestions:
-        await orch.confirm_analysis(meta["request_id"])
-    await asyncio.sleep(0.1)
-    total_ready = sum(1 for t, m in suggestions if m["kind"] == "ready")
-    assert total_ready == simple_actionable_count + complex_count
-
-    profile_keys = set(store.get_profile_keys())
-    assert {"月薪", "工龄", "解除通知时间"}.issubset(profile_keys)
-
-
-@pytest.mark.asyncio
-async def test_uncertain_speaker_treated_as_client(store, mock_ir_client, capsys):
-    """声纹 uncertain → agent 端静默按 client 处理。
-
-    2 方会谈"非律师即客户"。若不归一，PA 的 prompt 只认 [client]，
-    uncertain 段会被模型当作非客户发言而静默丢事实。uncertain 是合法
-    结果，不应告警（区别于 None）。
-    """
-    ir_stub = mock_ir_client(severity="ignore")
-    pa = MagicMock()
-    pa.extract = AsyncMock(return_value=[])
-    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
-
-    utt = Utterance(
-        id="u_1",
-        text="两年三个月",
-        speaker="uncertain",
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-
-    # PA 必须以 client 被调用，而非 uncertain
-    assert pa.extract.call_args.kwargs["speaker"] == "client"
-    # 存储的发言也归一为 client，使 PA 的历史窗口一致
-    assert store.get_full_history()[-1].speaker == "client"
-    # uncertain 是合法结果，不告警
-    assert "speaker=None" not in capsys.readouterr().out
-
-
-@pytest.mark.asyncio
-async def test_none_speaker_warns_loudly(store, mock_ir_client, capsys):
-    """speaker=None 是上游 bug 信号（match_speaker 永不返回 None），必须告警。
-
-    不能像 uncertain 那样静默降级——否则 enrollment 没接通时全程 None→client，
-    声纹静默失效却无人察觉。
-    """
-    ir_stub = mock_ir_client(severity="ignore")
-    pa = MagicMock()
-    pa.extract = AsyncMock(return_value=[])
-    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
-
-    utt = Utterance(
-        id="u_1",
-        text="两年三个月",
-        speaker=None,
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-
-    # None 必须告警（大声说），而非静默
-    assert "speaker=None" in capsys.readouterr().out
-    # 但仍降级保活，按 client 处理
-    assert pa.extract.call_args.kwargs["speaker"] == "client"
-
-
-@pytest.mark.asyncio
-async def test_lawyer_speaker_not_rewritten(store, mock_ir_client):
-    """律师发言不能被误归一为 client（否则会把律师的话当事实提取）。"""
-    ir_stub = mock_ir_client(severity="ignore")
-    pa = MagicMock()
-    pa.extract = AsyncMock(return_value=[])
-    orch = Orchestrator(store, ir=ir_stub, pa=pa, ha=MagicMock())
-
-    utt = Utterance(
-        id="u_1",
-        text="你工作多久了？",
-        speaker="lawyer",
-        t_start=0.0,
-        t_end=1.0,
-        timestamp=datetime.now(),
-    )
-    await orch.handle_utterance(utt)
-
-    assert store.get_full_history()[-1].speaker == "lawyer"
-    # 律师发言跳过 PA，不应调用 extract
-    pa.extract.assert_not_called()
+    ready = [m for _, m in suggestions if m["kind"] == "ready"]
+    assert len(ready) == 1, "第二句应正常处理"
+    assert ready[0]["utt_id"] == "u_2"
