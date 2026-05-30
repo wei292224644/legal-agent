@@ -38,4 +38,77 @@ def detect_speaker_changes(
     margin: float = 0.10,
 ) -> list[int]:
     """检测 seg_audio 内的说话人切换点，返回毫秒切分位置列表（相对 seg_audio 起点）。"""
-    return []
+    window_samples = int(sr * window_ms / 1000)
+    step_samples = int(sr * step_ms / 1000)
+
+    if len(seg_audio) < window_samples:
+        return []
+
+    embeddings: list[np.ndarray | None] = []
+    window_starts_ms: list[int] = []
+
+    for start in range(0, len(seg_audio) - window_samples + 1, step_samples):
+        w = seg_audio[start : start + window_samples]
+        energy = float(np.sqrt(np.mean(w.astype(np.float64) ** 2)))
+        if energy < 0.0:
+            embeddings.append(None)
+        else:
+            embeddings.append(extract_embedding(w, sr))
+        window_starts_ms.append(int(start * 1000 / sr))
+
+    n = len(embeddings)
+    if n < 2:
+        return []
+
+    s_ls: list[float | None] = [None] * n
+    for i, emb in enumerate(embeddings):
+        if emb is not None:
+            s_ls[i] = float(np.dot(emb, voiceprint.lawyer))
+
+    changes_idx: list[int] = []
+    prev_state: str | None = None
+    prev_s: float | None = None
+    seeded = voiceprint.client is not None
+
+    for i in range(n):
+        emb = embeddings[i]
+        s_l = s_ls[i]
+        if emb is None or s_l is None:
+            continue
+
+        if not seeded:
+            cur_state = "lawyer" if s_l >= lawyer_threshold else "other"
+        else:
+            # Phase 3 placeholder for type consistency; seeded=False here
+            cur_state = "other"
+
+        if prev_state is not None and prev_state != cur_state and not seeded:
+            if prev_s is not None and abs(prev_s - s_l) > delta_threshold:
+                if (prev_s >= lawyer_threshold and s_l < lawyer_threshold) or (
+                    prev_s < lawyer_threshold and s_l >= lawyer_threshold
+                ):
+                    changes_idx.append(i)
+                    if prev_s > 0.50 and s_l < 0.20:
+                        voiceprint.client = emb.copy()
+                        seeded = True
+
+        prev_state = cur_state
+        prev_s = s_l
+
+    result_ms: list[int] = []
+    for idx in changes_idx:
+        if idx == 0:
+            continue
+        split_ms = int(
+            (window_starts_ms[idx - 1] + window_starts_ms[idx]) / 2 + window_ms / 2
+        )
+        result_ms.append(split_ms)
+
+    if not result_ms:
+        return []
+    merged = [result_ms[0]]
+    for cp in result_ms[1:]:
+        if cp - merged[-1] < window_ms:
+            continue
+        merged.append(cp)
+    return merged
