@@ -5,11 +5,12 @@ import { Mic, Upload, Square, Play, X } from 'lucide-react'
 
 interface AudioControlsProps {
   onChunk: (chunk: Uint8Array) => void
+  onAudioEnd?: () => void
 }
 
-export default function AudioControls({ onChunk }: AudioControlsProps) {
+export default function AudioControls({ onChunk, onAudioEnd }: AudioControlsProps) {
   const { mode, progress, error, startRecording, startFile, stop, clearError } =
-    useAudioInput({ onChunk })
+    useAudioInput({ onChunk, onAudioEnd })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -20,36 +21,17 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
     e.target.value = ''
   }
 
-  const primaryBtn =
-    'bg-gradient-to-b from-[#e0b86a] to-[#c9a04a] text-[#0d0b08] ' +
-    'border-t border-b border-t-white/15 border-b-black/20 ' +
-    'hover:from-[#e8c47a] hover:to-[#d4a853] ' +
-    'active:from-[#c9a04a] active:to-[#b08d3f] ' +
-    'transition-all'
-
-  const secondaryBtn =
-    'border border-[rgba(255,255,255,0.08)] text-[#e5e5e5] ' +
-    'hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] ' +
-    'transition-colors'
-
-  const dangerBtn =
-    'border border-[#c45c5c]/40 text-[#c45c5c] bg-[#c45c5c]/5 ' +
-    'hover:bg-[#c45c5c]/15 hover:border-[#c45c5c]/60 ' +
-    'transition-colors'
-
   return (
     <div className="flex items-center gap-3">
       {mode === 'idle' ? (
         <>
-          <Button size="sm" onClick={startRecording} className={primaryBtn}>
+          <Button onClick={startRecording}>
             <Mic className="w-4 h-4" />
             开始录音
           </Button>
           <Button
-            size="sm"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            className={secondaryBtn}
           >
             <Upload className="w-4 h-4" />
             上传音频
@@ -66,12 +48,12 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
 
       {mode === 'mic' ? (
         <div className="flex items-center gap-3">
-          <Button size="sm" variant="outline" onClick={stop} className={dangerBtn}>
+          <Button variant="destructive" onClick={stop}>
             <Square className="w-4 h-4" />
             停止
           </Button>
-          <span className="flex items-center gap-2 text-sm text-[#c45c5c]">
-            <span className="w-2 h-2 bg-[#c45c5c] rounded-full animate-pulse" />
+          <span className="flex items-center gap-2 text-sm text-danger">
+            <span className="w-2 h-2 bg-danger rounded-full motion-safe:animate-pulse" />
             录音中…
           </span>
         </div>
@@ -79,24 +61,24 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
 
       {mode === 'file' ? (
         <div className="flex items-center gap-3">
-          <Button size="sm" variant="outline" onClick={stop} className={secondaryBtn}>
+          <Button variant="outline" onClick={stop}>
             <Square className="w-4 h-4" />
             停止
           </Button>
-          <span className="flex items-center gap-2 text-sm text-[#e5e5e5]">
+          <span className="flex items-center gap-2 text-sm text-foreground">
             <Play className="w-4 h-4" />
             播放中…
           </span>
           {progress !== null ? (
-            <div className="w-32 h-1.5 bg-[#1e1b15] rounded-full overflow-hidden">
+            <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#d4a853] transition-all duration-300"
+                className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
           ) : null}
           {progress !== null ? (
-            <span className="text-xs text-[#525252] font-mono w-10 text-right">
+            <span className="text-xs text-muted-foreground font-mono w-10 text-right">
               {progress}%
             </span>
           ) : null}
@@ -104,15 +86,16 @@ export default function AudioControls({ onChunk }: AudioControlsProps) {
       ) : null}
 
       {error ? (
-        <div className="flex items-center gap-2 text-xs text-[#c45c5c] animate-in fade-in slide-in-from-top-1">
+        <div className="flex items-center gap-2 text-xs text-danger animate-in fade-in slide-in-from-top-1">
           <span>{error}</span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={clearError}
-            className="p-0.5 hover:text-[#e5e5e5] transition-colors"
             aria-label="关闭错误提示"
           >
             <X className="w-3 h-3" />
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>

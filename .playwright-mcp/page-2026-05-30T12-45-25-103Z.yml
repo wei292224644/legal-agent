@@ -1,0 +1,7 @@
+- generic [ref=e4]:
+  - heading "法律 AI 辅助会谈" [level=1] [ref=e5]
+  - paragraph [ref=e6]:
+    - text: 实时转写、智能分析、风险识别，
+    - text: 做您会谈中的第二大脑。
+  - button "开始新会谈" [ref=e7]
+  - button "声纹注册" [ref=e8]

@@ -1,0 +1,126 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "法律 AI 辅助会谈" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 视觉设计稿 — 供预览确认
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Entry Page" [level=2] [ref=e8]
+      - generic [ref=e9]: 1440 × 900
+    - generic [ref=e12]:
+      - heading "法律 AI 辅助会谈" [level=1] [ref=e13]
+      - paragraph [ref=e14]: 实时转写 · 智能分析 · 风险识别
+      - button "开始新会谈" [ref=e15] [cursor=pointer]
+      - link "声纹注册" [ref=e16] [cursor=pointer]:
+        - /url: "#"
+  - generic [ref=e17]:
+    - generic [ref=e18]:
+      - heading "Live Session — Desktop" [level=2] [ref=e19]
+      - generic [ref=e20]: 1440 × 900
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - heading "实时会谈" [level=1] [ref=e25]
+          - generic [ref=e28]: 已连接
+        - generic [ref=e29]:
+          - button "开始录音" [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+            - text: 开始录音
+          - button "上传音频" [ref=e34] [cursor=pointer]:
+            - img [ref=e35]
+            - text: 上传音频
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - heading "转写记录" [level=2] [ref=e41]
+            - generic [ref=e42]: 12 条
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - generic [ref=e45]: 律师
+              - paragraph [ref=e47]: 根据《中华人民共和国民法典》第五百七十七条，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。
+            - generic [ref=e48]:
+              - generic [ref=e49]: 当事人
+              - paragraph [ref=e51]: 但是对方主张违约金过高，认为我们只延迟了三天，不应该按合同约定的百分之二十计算。
+            - generic [ref=e52]:
+              - generic [ref=e53]: 律师
+              - paragraph [ref=e55]: 这个抗辩是合理的。最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释第六十五条规定，约定的违约金超过造成的损失的百分之三十的，人民法院可以认定为民法典第五百八十五条规定的"过分高于造成的损失"。
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - heading "实时洞察" [level=2] [ref=e58]
+            - generic [ref=e59]: 3 条分析结果
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e64]: 检测到可分析意图
+              - paragraph [ref=e65]: 当事人提到"违约金过高"，可进一步分析《民法典》合同编司法解释中关于违约金调整的裁量标准。
+              - generic [ref=e69]: 18s
+              - generic [ref=e70]:
+                - button "生成深度分析" [ref=e71] [cursor=pointer]
+                - button "忽略" [ref=e72] [cursor=pointer]
+            - generic [ref=e73]:
+              - generic [ref=e76]: 法规引用
+              - heading "民法典第 577 条 · 违约责任" [level=3] [ref=e77]
+              - paragraph [ref=e78]: 律师引用了违约责任的一般条款，确立了对方需承担违约责任的基本法律框架。这是后续分析的基础。
+              - paragraph [ref=e79]: 《中华人民共和国民法典》第五百七十七条
+            - generic [ref=e80]:
+              - generic [ref=e81]:
+                - generic [ref=e83]: 风险提示
+                - generic [ref=e84]: 中
+              - heading "违约金过高风险" [level=3] [ref=e85]
+              - paragraph [ref=e86]: 合同约定的 20% 违约金可能面临被法院调低的风险。建议准备实际损失的证据材料，以应对对方的调低请求。
+  - generic [ref=e87]:
+    - generic [ref=e88]:
+      - heading "Voiceprint Register" [level=2] [ref=e89]
+      - generic [ref=e90]: 1440 × 900
+    - generic [ref=e93]:
+      - generic [ref=e94]:
+        - heading "声纹注册" [level=1] [ref=e95]
+        - paragraph [ref=e96]: 首次使用前，请朗读以下文本以注册您的声纹
+      - paragraph [ref=e98]: "\"今天天气很好，我们在这里进行法律咨询。根据中华人民共和国相关法律法规，我将为您提供专业的法律服务和建议。\""
+      - button "开始录音 (15秒)" [ref=e99] [cursor=pointer]:
+        - generic [ref=e100]:
+          - img [ref=e101]
+          - text: 开始录音 (15秒)
+  - generic [ref=e104]:
+    - generic [ref=e105]:
+      - heading "Live Session — Mobile" [level=2] [ref=e106]
+      - generic [ref=e107]: 390 × 844
+    - generic [ref=e109]:
+      - generic [ref=e110]:
+        - heading "实时会谈" [level=1] [ref=e112]
+        - button "录音" [ref=e114] [cursor=pointer]:
+          - img [ref=e115]
+          - text: 录音
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - generic [ref=e122]: 检测到可分析意图
+          - paragraph [ref=e123]: 当事人提到"违约金过高"，可进一步分析裁量标准。
+          - generic [ref=e124]:
+            - button "生成分析" [ref=e125] [cursor=pointer]
+            - button "忽略" [ref=e126] [cursor=pointer]
+        - generic [ref=e127]:
+          - generic [ref=e130]: 法规引用
+          - heading "民法典第 577 条" [level=3] [ref=e131]
+          - paragraph [ref=e132]: 确立了违约责任的基本法律框架。
+      - navigation [ref=e133]:
+        - button "洞察 2" [ref=e134] [cursor=pointer]:
+          - img [ref=e135]
+          - text: 洞察
+          - generic [ref=e137]: "2"
+        - button "转写 12" [ref=e138] [cursor=pointer]:
+          - img [ref=e139]
+          - text: 转写
+          - generic [ref=e141]: "12"
+  - generic [ref=e142]:
+    - heading "配色系统" [level=2] [ref=e143]
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - paragraph [ref=e147]: bg-primary
+        - paragraph [ref=e148]: "#0a0a0c"
+      - generic [ref=e149]:
+        - paragraph [ref=e151]: bg-secondary
+        - paragraph [ref=e152]: "#131317"
+      - generic [ref=e153]:
+        - paragraph [ref=e155]: accent
+        - paragraph [ref=e156]: "#7c9cbf"
+      - generic [ref=e157]:
+        - paragraph [ref=e159]: success
+        - paragraph [ref=e160]: "#6b9e8e"

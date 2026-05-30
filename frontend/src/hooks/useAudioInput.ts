@@ -5,6 +5,7 @@ export type AudioMode = 'idle' | 'mic' | 'file'
 
 export interface UseAudioInputOptions {
   onChunk: (chunk: Uint8Array) => void
+  onAudioEnd?: () => void
   chunkIntervalMs?: number
 }
 
@@ -41,6 +42,7 @@ export function useAudioInput(
   const readIdxRef = useRef(0)
   const totalSamplesRef = useRef(0)
   const onChunkRef = useRef(onChunk)
+  const onAudioEndRef = useRef(options.onAudioEnd)
 
   useEffect(() => {
     modeRef.current = mode
@@ -49,6 +51,10 @@ export function useAudioInput(
   useEffect(() => {
     onChunkRef.current = onChunk
   }, [onChunk])
+
+  useEffect(() => {
+    onAudioEndRef.current = options.onAudioEnd
+  }, [options.onAudioEnd])
 
   const reset = useCallback(() => {
     if (chunkTimerRef.current) clearInterval(chunkTimerRef.current)
@@ -78,6 +84,7 @@ export function useAudioInput(
   }, [])
 
   const stop = useCallback(() => {
+    onAudioEndRef.current?.()
     reset()
     setMode('idle')
   }, [reset])

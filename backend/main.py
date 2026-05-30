@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from agent.bus import UtteranceBus  # noqa: E402
@@ -38,6 +39,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _lawyer_enrollment: Enrollment | None = None
 session_manager: SessionManager | None = None
@@ -64,6 +72,14 @@ def _session_enrollment() -> Enrollment:
     会话 A 的客户声纹种子会泄漏污染会话 B 的说话人判定。
     """
     return copy.deepcopy(_get_lawyer_enrollment())
+
+
+@app.post("/api/sessions")
+async def create_session():
+    """创建新会话并返回 session_id。前端拿到 id 后通过 WS 连接。"""
+    enrollment = await asyncio.to_thread(_session_enrollment)
+    session_id = await session_manager.create_session(enrollment)
+    return {"session_id": session_id}
 
 
 @app.on_event("startup")
@@ -96,7 +112,7 @@ async def _safe_send_json(ws: WebSocket, payload: dict) -> None:
 
 
 async def _safe_ws_close(ws: WebSocket, code: int = 1000, reason: str = "") -> None:
-    with contextlib.suppress(AttributeError):
+    with contextlib.suppress(AttributeError, RuntimeError):
         await ws.close(code=code, reason=reason)
 
 
@@ -111,6 +127,7 @@ async def _handle_text_message(
     orch: Orchestrator,
     session_id: str,
     ctx: ContextStore,
+    audio_q: asyncio.Queue | None,
 ) -> bool:
     """处理客户端文本消息。返回 True 表示会话应该关闭。"""
     msg_type = msg.get("type")
@@ -132,6 +149,12 @@ async def _handle_text_message(
             await orch.dismiss_pending(request_id)
         return False
 
+    if msg_type == "audio_end":
+        if audio_q is not None:
+            with contextlib.suppress(Exception):
+                await audio_q.put(None)
+        return False
+
     if msg_type == "close":
         asyncio.create_task(_generate_summary_and_save(session_id, ctx))
         await session_manager.close_session(session_id)
@@ -145,27 +168,27 @@ async def legal_session(ws: WebSocket, session_id: str):
     await ws.accept()
     print(f"[WS] accepted sid={session_id}")
 
-    # --- Session 获取 / 创建 / 恢复 ---
+    # --- Session 验证 ---
     state = await session_manager.get_state(session_id) or await session_manager.restore_session(session_id)
     if state is None:
-        enrollment = await asyncio.to_thread(_session_enrollment)
-        session_id = await session_manager.create_session(enrollment, session_id=session_id)
-        state = await session_manager.get_state(session_id)
-        print(f"[WS] new session created sid={session_id}")
-    else:
-        print(f"[WS] session restored sid={session_id} status={state.status}")
-
-    # 排他连接：已有 WebSocket 时拒绝新连接
-    if not await session_manager.attach_ws(session_id, ws):
-        print(f"[WS] attach REJECTED sid={session_id} (1008)")
-        await _safe_ws_close(ws, code=1008, reason="Session already connected")
+        print(f"[WS] session not found sid={session_id} (4002)")
+        await _safe_ws_close(ws, code=4002, reason="会话不存在")
         return
+    if state.status == "closed":
+        print(f"[WS] session closed sid={session_id} (4001)")
+        await _safe_ws_close(ws, code=4001, reason="会话已结束")
+        return
+    print(f"[WS] session loaded sid={session_id} status={state.status}")
+
+    # 后来者接管：关掉旧 WS（若存在），本连接接管
+    old_ws = await session_manager.attach_ws(session_id, ws)
+    if old_ws is not None:
+        print(f"[WS] replacing old ws sid={session_id}")
+        await _safe_ws_close(old_ws, code=4000, reason="已被新连接接管")
     print(f"[WS] attached sid={session_id}")
 
-    # attach 成功后所有路径都必须保证 detach_ws 被调用,否则 _ws_map 泄漏,
-    # 下次同 session_id 重连永远被 1008 拒绝。所以 try 从这里就开始包,
-    # 而不是只包 receive loop —— setup 阶段(Orchestrator.from_dict / orch.start /
-    # HeavyAgent → get_agno_db 等)抛异常都得能走到 finally 清理。
+    # attach 成功后所有路径都必须保证 detach_ws 被调用。
+    # 传入 ws 防止竞态：若新连接已替换 _ws_map 引用，旧 finally 不应误删新连接。
     ctx: ContextStore | None = None
     orch: Orchestrator | None = None
     audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] | None = None
@@ -279,7 +302,7 @@ async def legal_session(ws: WebSocket, session_id: str):
                 except json.JSONDecodeError:
                     await _safe_send_json(ws, {"type": "error", "message": "Invalid JSON"})
                     continue
-                should_close = await _handle_text_message(ws, msg, orch, session_id, ctx)
+                should_close = await _handle_text_message(ws, msg, orch, session_id, ctx, audio_q)
                 if should_close:
                     break
 
@@ -303,7 +326,6 @@ async def legal_session(ws: WebSocket, session_id: str):
             if cur_state is not None and cur_state.status != "closed":
                 with contextlib.suppress(Exception):
                     await session_manager.update_agent_state(session_id, ctx, orch)
-        # detach_ws 必须无条件执行 —— attach 成功就一定要 detach,
-        # 否则 _ws_map 泄漏死 ws 引用,后续重连永远 1008。
+        # detach_ws 必须执行，传入 ws 防止竞态。
         with contextlib.suppress(Exception):
-            await session_manager.detach_ws(session_id)
+            await session_manager.detach_ws(session_id, ws)

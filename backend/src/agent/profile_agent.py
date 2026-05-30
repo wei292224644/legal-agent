@@ -26,7 +26,9 @@ class ProfileAgent:
     def __init__(self, client: AsyncOpenAI | None = None, model: str | None = None):
         self._client = client or build_qwen_client()
         if self._client is None:
-            raise RuntimeError("ProfileAgent requires a valid LLM client. Set DASHSCOPE_API_KEY or pass a client.")
+            raise RuntimeError(
+                "ProfileAgent requires a valid LLM client. Set DASHSCOPE_API_KEY or pass a client."
+            )
         self._model = model or QWEN_MODEL
 
     async def extract(
@@ -68,7 +70,9 @@ class ProfileAgent:
         content = (response.choices[0].message.content or "").strip()
         return self._parse_response(content, utt_id)
 
-    _QUESTION_WORDS = frozenset(("多久", "多少", "什么", "哪里", "谁", "怎么", "怎样", "如何", "吗", "么"))
+    _QUESTION_WORDS = frozenset(
+        ("多久", "多少", "什么", "哪里", "谁", "怎么", "怎样", "如何", "吗", "么")
+    )
 
     def _is_valid_value(self, value: str) -> bool:
         """校验 value 是否为有效事实值（非空、非纯疑问词、含数字优先）。"""
@@ -79,7 +83,9 @@ class ProfileAgent:
         if stripped in self._QUESTION_WORDS:
             return False
         # Reject values that are mostly question words without numbers
-        has_digit = any(c.isdigit() or c in "两二三四五六七八九十百千万亿零" for c in stripped)
+        has_digit = any(
+            c.isdigit() or c in "两二三四五六七八九十百千万亿零" for c in stripped
+        )
         return has_digit or not any(w in stripped for w in ("多少", "多久", "什么"))
 
     def _parse_response(self, content: str, utt_id: str = "") -> list[ProfileEntry]:
@@ -97,7 +103,9 @@ class ProfileAgent:
                         continue
                     subject = str(e.get("subject", ""))
                     if subject and subject not in _VALID_SUBJECTS:
-                        logger.warning("丢弃非法 subject %r（key=%r）", subject, e["key"])
+                        logger.warning(
+                            "丢弃非法 subject %r（key=%r）", subject, e["key"]
+                        )
                         subject = ""
                     entries.append(
                         ProfileEntry(

@@ -1,0 +1,130 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "法律 AI 辅助会谈" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 视觉设计稿 v2 — 架构重构版
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Entry Page v2" [level=2] [ref=e8]
+      - generic [ref=e9]: 1440 × 900
+    - generic [ref=e11]:
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]: AI-POWERED LEGAL ASSISTANT
+          - heading "法律 AI 辅助会谈" [level=1] [ref=e16]:
+            - text: 法律 AI
+            - text: 辅助会谈
+          - paragraph [ref=e17]:
+            - text: 在专注对话的同时，让系统成为您的第二大脑。
+            - text: 实时转写、法规识别、风险预警，全部自动完成。
+        - generic [ref=e18]:
+          - generic [ref=e19]: 本地声纹识别
+          - generic [ref=e21]: 离线可用
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "开始新会谈" [level=2] [ref=e26]
+          - paragraph [ref=e27]: 创建加密会话，所有数据本地存储
+        - button "开始新会谈" [ref=e28] [cursor=pointer]
+        - link "首次使用？注册您的声纹" [ref=e30] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e31]
+          - text: 首次使用？注册您的声纹
+  - generic [ref=e34]:
+    - generic [ref=e35]:
+      - heading "Live Session v2 — Desktop" [level=2] [ref=e36]
+      - generic [ref=e37]: 1440 × 900
+    - generic [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: 实时会谈
+          - generic [ref=e46]: 已连接
+        - button "开始录音" [ref=e48] [cursor=pointer]:
+          - img [ref=e49]
+          - text: 开始录音
+      - generic [ref=e52]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - heading "TRANSCRIPT_20250530_1430" [level=2] [ref=e56]
+            - heading "会谈记录" [level=1] [ref=e57]
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic [ref=e60]: 律师
+              - paragraph [ref=e61]: 根据《中华人民共和国民法典》第五百七十七条，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。
+            - generic [ref=e62]:
+              - generic [ref=e63]: 当事人
+              - generic [ref=e64]:
+                - paragraph [ref=e65]: 但是对方主张违约金过高，认为我们只延迟了三天，不应该按合同约定的百分之二十计算。
+                - generic [ref=e66]:
+                  - generic [ref=e69]: 可分析意图
+                  - paragraph [ref=e70]: 当事人提到"违约金过高"，可进一步分析《民法典》合同编司法解释中关于违约金调整的裁量标准。
+                  - generic [ref=e71]:
+                    - button "生成分析" [ref=e72] [cursor=pointer]
+                    - button "忽略" [ref=e73] [cursor=pointer]
+            - generic [ref=e74]:
+              - generic [ref=e75]: 律师
+              - paragraph [ref=e76]: 这个抗辩是合理的。最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释第六十五条规定，约定的违约金超过造成的损失的百分之三十的，人民法院可以认定为民法典第五百八十五条规定的"过分高于造成的损失"。
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: 洞察
+            - generic [ref=e80]: "3"
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - generic [ref=e85]: 法规引用
+              - heading "民法典第 577 条" [level=3] [ref=e86]
+              - paragraph [ref=e87]: 确立了违约责任的一般条款，这是后续分析的基础。
+            - generic [ref=e88]:
+              - generic [ref=e89]:
+                - generic [ref=e91]: 风险提示
+                - generic [ref=e92]: 中
+              - heading "违约金过高风险" [level=3] [ref=e93]
+              - paragraph [ref=e94]: 合同约定的 20% 违约金可能面临被法院调低的风险。建议准备实际损失的证据材料。
+            - generic [ref=e95]:
+              - generic [ref=e98]: 合同条款
+              - heading "违约责任条款" [level=3] [ref=e99]
+              - paragraph [ref=e100]: 合同第 8.2 条约定的违约金计算方式存在歧义，建议补充"以实际损失为基准"的表述。
+  - generic [ref=e101]:
+    - generic [ref=e102]:
+      - heading "Voiceprint Register v2" [level=2] [ref=e103]
+      - generic [ref=e104]: 1440 × 900
+    - generic [ref=e107]:
+      - generic [ref=e108]:
+        - generic [ref=e109]: VOICEPRINT ENROLLMENT
+        - heading "声纹注册" [level=1] [ref=e110]
+        - paragraph [ref=e111]: 请用自然的语速朗读以下文本，系统将提取您的声纹特征用于后续会谈中的说话人识别。
+      - paragraph [ref=e113]:
+        - text: "\"今天天气很好，我们在这里进行法律咨询。"
+        - text: 根据中华人民共和国相关法律法规，
+        - text: 我将为您提供专业的法律服务和建议。"
+      - button "开始录音 15 秒" [ref=e114] [cursor=pointer]:
+        - img [ref=e115]
+        - text: 开始录音
+        - generic [ref=e118]: 15 秒
+  - generic [ref=e119]:
+    - generic [ref=e120]:
+      - heading "Live Session v2 — Mobile" [level=2] [ref=e121]
+      - generic [ref=e122]: 390 × 844
+    - generic [ref=e124]:
+      - generic [ref=e125]:
+        - generic [ref=e127]: 实时会谈
+        - button "录音" [ref=e129] [cursor=pointer]:
+          - img [ref=e130]
+          - text: 录音
+      - generic [ref=e134]:
+        - generic [ref=e135]:
+          - generic [ref=e136]: 律师
+          - paragraph [ref=e137]: 根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。
+        - generic [ref=e138]:
+          - generic [ref=e139]: 当事人
+          - paragraph [ref=e140]: 但是对方主张违约金过高，认为只延迟了三天。
+          - generic [ref=e141]:
+            - generic [ref=e144]: 可分析意图
+            - paragraph [ref=e145]: 当事人提到"违约金过高"，可进一步分析裁量标准。
+            - button "生成分析" [ref=e146] [cursor=pointer]
+      - navigation [ref=e147]:
+        - button "洞察 2" [ref=e148] [cursor=pointer]:
+          - img [ref=e149]
+          - text: 洞察
+          - generic [ref=e151]: "2"
+        - button "转写 12" [ref=e152] [cursor=pointer]:
+          - img [ref=e153]
+          - text: 转写
+          - generic [ref=e155]: "12"

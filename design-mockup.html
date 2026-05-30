@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>法律 AI 辅助会谈 — 设计稿</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            bg: {
+              primary: '#0a0a0c',
+              secondary: '#131317',
+              tertiary: '#1b1b20',
+            },
+            ink: {
+              primary: '#e8e8ec',
+              secondary: '#8a8f98',
+              muted: '#555a62',
+            },
+            accent: {
+              DEFAULT: '#7c9cbf',
+              hover: '#95b0d4',
+              muted: 'rgba(124,156,191,0.12)',
+            },
+            success: '#6b9e8e',
+            danger: '#b86b6b',
+            contract: '#8aa4c8',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg-primary: #0a0a0c;
+      --bg-secondary: #131317;
+      --bg-tertiary: #1b1b20;
+      --ink-primary: #e8e8ec;
+      --ink-secondary: #8a8f98;
+      --ink-muted: #555a62;
+      --accent: #7c9cbf;
+      --accent-hover: #95b0d4;
+      --accent-muted: rgba(124,156,191,0.12);
+      --success: #6b9e8e;
+      --danger: #b86b6b;
+      --contract: #8aa4c8;
+      --border: rgba(255,255,255,0.10);
+      --border-hover: rgba(255,255,255,0.18);
+    }
+
+    body {
+      background: #050506;
+      color: var(--ink-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page-frame {
+      border: 1px solid #222;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .dot-grid {
+      background-image: radial-gradient(circle, rgba(124,156,191,0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .label-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+
+    .speaker-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    .analysis-item + .analysis-item {
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body class="min-h-screen py-12 px-6">
+
+  <div class="max-w-6xl mx-auto space-y-16">
+
+    <!-- 标题区 -->
+    <div class="text-center mb-12">
+      <h1 class="text-2xl font-semibold tracking-tight text-ink-primary mb-2">法律 AI 辅助会谈</h1>
+      <p class="text-sm text-ink-muted">视觉设计稿 — 供预览确认</p>
+    </div>
+
+    <!-- ========== EntryPage ========== -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-medium text-ink-secondary uppercase tracking-wider">Entry Page</h2>
+        <span class="text-xs text-ink-muted font-mono">1440 × 900</span>
+      </div>
+
+      <div class="page-frame" style="aspect-ratio: 16/10; max-height: 600px;">
+        <div class="relative w-full h-full bg-bg-primary dot-grid flex items-center justify-center">
+          <!-- 极淡的环境光 -->
+          <div class="absolute inset-0 pointer-events-none"
+               style="background: radial-gradient(ellipse 50% 40% at 50% 35%, rgba(124,156,191,0.06) 0%, transparent 70%);"></div>
+
+          <div class="relative z-10 flex flex-col items-center text-center gap-6 max-w-md px-6">
+            <h1 class="text-4xl font-semibold tracking-tight text-ink-primary">
+              法律 AI 辅助会谈
+            </h1>
+            <p class="text-base text-ink-secondary leading-relaxed">
+              实时转写 · 智能分析 · 风险识别
+            </p>
+
+            <button class="mt-2 w-full max-w-[280px] h-11 px-6 rounded-md text-sm font-medium transition-colors"
+                    style="background: var(--accent); color: var(--bg-primary);"
+                    onmouseover="this.style.background='var(--accent-hover)'"
+                    onmouseout="this.style.background='var(--accent)'">
+              开始新会谈
+            </button>
+
+            <a href="#" class="text-sm text-ink-secondary hover:text-ink-primary transition-colors">
+              声纹注册
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== LiveSession Desktop ========== -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-medium text-ink-secondary uppercase tracking-wider">Live Session — Desktop</h2>
+        <span class="text-xs text-ink-muted font-mono">1440 × 900</span>
+      </div>
+
+      <div class="page-frame" style="aspect-ratio: 16/10; max-height: 600px;">
+        <div class="w-full h-full bg-bg-primary flex flex-col">
+
+          <!-- Header -->
+          <header class="flex items-center justify-between px-6 h-14 shrink-0" style="border-bottom: 1px solid var(--border);">
+            <div class="flex items-center gap-4">
+              <h1 class="text-lg font-semibold text-ink-primary tracking-tight">实时会谈</h1>
+              <div class="flex items-center gap-2 text-xs" style="color: var(--success);">
+                <span class="w-2 h-2 rounded-full" style="background: var(--success);"></span>
+                <span class="font-mono">已连接</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <button class="h-10 px-4 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+                      style="background: var(--accent); color: var(--bg-primary);"
+                      onmouseover="this.style.background='var(--accent-hover)'"
+                      onmouseout="this.style.background='var(--accent)'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                开始录音
+              </button>
+              <button class="h-10 px-4 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+                      style="border: 1px solid var(--border); color: var(--ink-primary); background: transparent;"
+                      onmouseover="this.style.background='var(--bg-tertiary)'"
+                      onmouseout="this.style.background='transparent'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                上传音频
+              </button>
+            </div>
+          </header>
+
+          <!-- Main Content -->
+          <div class="flex flex-1 overflow-hidden">
+            <!-- Left: Transcript -->
+            <div class="w-[55%] flex flex-col">
+              <div class="px-6 h-12 shrink-0 flex items-center justify-between" style="border-bottom: 1px solid var(--border);">
+                <h2 class="text-sm font-semibold text-ink-primary">转写记录</h2>
+                <span class="label-tag text-ink-muted">12 条</span>
+              </div>
+              <div class="flex-1 overflow-auto px-6 py-5 space-y-5">
+                <!-- Transcript Item 1 -->
+                <div class="flex gap-3">
+                  <div class="shrink-0 pt-0.5">
+                    <span class="speaker-dot" style="background: var(--accent);"></span>
+                    <span class="text-xs font-mono" style="color: var(--accent);">律师</span>
+                  </div>
+                  <p class="text-sm leading-relaxed" style="color: var(--ink-primary); opacity: 0.92;">
+                    根据《中华人民共和国民法典》第五百七十七条，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。
+                  </p>
+                </div>
+                <!-- Transcript Item 2 -->
+                <div class="flex gap-3">
+                  <div class="shrink-0 pt-0.5">
+                    <span class="speaker-dot" style="background: var(--ink-muted);"></span>
+                    <span class="text-xs font-mono text-ink-muted">当事人</span>
+                  </div>
+                  <p class="text-sm leading-relaxed" style="color: var(--ink-primary); opacity: 0.92;">
+                    但是对方主张违约金过高，认为我们只延迟了三天，不应该按合同约定的百分之二十计算。
+                  </p>
+                </div>
+                <!-- Transcript Item 3 -->
+                <div class="flex gap-3">
+                  <div class="shrink-0 pt-0.5">
+                    <span class="speaker-dot" style="background: var(--accent);"></span>
+                    <span class="text-xs font-mono" style="color: var(--accent);">律师</span>
+                  </div>
+                  <p class="text-sm leading-relaxed" style="color: var(--ink-primary); opacity: 0.92;">
+                    这个抗辩是合理的。最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释第六十五条规定，约定的违约金超过造成的损失的百分之三十的，人民法院可以认定为民法典第五百八十五条规定的"过分高于造成的损失"。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Analysis -->
+            <div class="w-[45%] flex flex-col" style="background: var(--bg-secondary); border-left: 1px solid var(--border);">
+              <div class="px-6 h-12 shrink-0 flex flex-col justify-center" style="border-bottom: 1px solid var(--border);">
+                <h2 class="text-sm font-semibold" style="color: var(--accent);">实时洞察</h2>
+                <span class="label-tag text-ink-muted mt-0.5">3 条分析结果</span>
+              </div>
+              <div class="flex-1 overflow-auto px-6 py-5">
+                <!-- Suggestion -->
+                <div class="pb-4 mb-4" style="border-bottom: 1px solid var(--border);">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: var(--accent);"></span>
+                    <span class="text-xs font-medium" style="color: var(--accent);">检测到可分析意图</span>
+                  </div>
+                  <p class="text-sm mb-3" style="color: var(--ink-secondary); line-height: 1.6;">
+                    当事人提到"违约金过高"，可进一步分析《民法典》合同编司法解释中关于违约金调整的裁量标准。
+                  </p>
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--bg-tertiary);">
+                      <div class="h-full rounded-full" style="width: 65%; background: var(--accent);"></div>
+                    </div>
+                    <span class="label-tag text-ink-muted">18s</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="h-10 px-4 rounded-md text-sm font-medium" style="background: var(--accent); color: var(--bg-primary);">生成深度分析</button>
+                    <button class="h-10 px-4 rounded-md text-sm font-medium" style="border: 1px solid var(--border); color: var(--ink-primary); background: transparent;">忽略</button>
+                  </div>
+                </div>
+
+                <!-- Analysis Item 1 -->
+                <div class="analysis-item py-4">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: var(--accent);"></span>
+                    <span class="text-xs font-medium" style="color: var(--accent);">法规引用</span>
+                  </div>
+                  <h3 class="text-sm font-semibold text-ink-primary mb-1">民法典第 577 条 · 违约责任</h3>
+                  <p class="text-sm leading-relaxed" style="color: var(--ink-secondary);">
+                    律师引用了违约责任的一般条款，确立了对方需承担违约责任的基本法律框架。这是后续分析的基础。
+                  </p>
+                  <p class="label-tag mt-2" style="color: var(--accent); opacity: 0.7;">《中华人民共和国民法典》第五百七十七条</p>
+                </div>
+
+                <!-- Analysis Item 2 -->
+                <div class="analysis-item py-4">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: var(--danger);"></span>
+                    <span class="text-xs font-medium" style="color: var(--danger);">风险提示</span>
+                    <span class="label-tag" style="color: var(--danger);">中</span>
+                  </div>
+                  <h3 class="text-sm font-semibold text-ink-primary mb-1">违约金过高风险</h3>
+                  <p class="text-sm leading-relaxed" style="color: var(--ink-secondary);">
+                    合同约定的 20% 违约金可能面临被法院调低的风险。建议准备实际损失的证据材料，以应对对方的调低请求。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== VoiceprintRegister ========== -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-medium text-ink-secondary uppercase tracking-wider">Voiceprint Register</h2>
+        <span class="text-xs text-ink-muted font-mono">1440 × 900</span>
+      </div>
+
+      <div class="page-frame" style="aspect-ratio: 16/10; max-height: 600px;">
+        <div class="relative w-full h-full bg-bg-primary dot-grid flex items-center justify-center">
+          <div class="absolute inset-0 pointer-events-none"
+               style="background: radial-gradient(ellipse 50% 40% at 50% 45%, rgba(124,156,191,0.04) 0%, transparent 70%);"></div>
+
+          <div class="relative z-10 w-[420px] p-8 rounded-lg text-center" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="mb-8">
+              <h1 class="text-2xl font-semibold tracking-tight text-ink-primary mb-2">
+                声纹注册
+              </h1>
+              <p class="text-sm" style="color: var(--ink-secondary);">
+                首次使用前，请朗读以下文本以注册您的声纹
+              </p>
+            </div>
+
+            <div class="p-6 mb-6 rounded-lg text-left" style="background: var(--bg-tertiary); border: 1px solid var(--border);">
+              <p class="text-lg leading-relaxed" style="color: var(--ink-primary); opacity: 0.9;">
+                "今天天气很好，我们在这里进行法律咨询。根据中华人民共和国相关法律法规，我将为您提供专业的法律服务和建议。"
+              </p>
+            </div>
+
+            <button class="w-full h-11 rounded-md text-sm font-medium transition-colors"
+                    style="background: var(--accent); color: var(--bg-primary);"
+                    onmouseover="this.style.background='var(--accent-hover)'"
+                    onmouseout="this.style.background='var(--accent)'">
+              <span class="inline-flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                开始录音 (15秒)
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== LiveSession Mobile ========== -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-medium text-ink-secondary uppercase tracking-wider">Live Session — Mobile</h2>
+        <span class="text-xs text-ink-muted font-mono">390 × 844</span>
+      </div>
+
+      <div class="page-frame mx-auto" style="width: 390px; height: 700px;">
+        <div class="w-full h-full bg-bg-primary flex flex-col">
+          <!-- Mobile Header -->
+          <header class="flex items-center justify-between px-4 h-12 shrink-0" style="border-bottom: 1px solid var(--border);">
+            <div class="flex items-center gap-3">
+              <h1 class="text-base font-semibold text-ink-primary tracking-tight">实时会谈</h1>
+              <span class="w-2 h-2 rounded-full" style="background: var(--success);"></span>
+            </div>
+            <button class="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5" style="background: var(--accent); color: var(--bg-primary);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              录音
+            </button>
+          </header>
+
+          <!-- Tab Content -->
+          <div class="flex-1 overflow-auto px-4 py-4" style="background: var(--bg-secondary);">
+            <div class="pb-4 mb-4" style="border-bottom: 1px solid var(--border);">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--accent);"></span>
+                <span class="text-xs font-medium" style="color: var(--accent);">检测到可分析意图</span>
+              </div>
+              <p class="text-sm mb-3" style="color: var(--ink-secondary); line-height: 1.6;">
+                当事人提到"违约金过高"，可进一步分析裁量标准。
+              </p>
+              <div class="flex gap-2">
+                <button class="h-10 px-4 rounded-md text-sm font-medium" style="background: var(--accent); color: var(--bg-primary);">生成分析</button>
+                <button class="h-10 px-4 rounded-md text-sm font-medium" style="border: 1px solid var(--border); color: var(--ink-primary); background: transparent;">忽略</button>
+              </div>
+            </div>
+
+            <div class="analysis-item py-4">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="w-1.5 h-1.5 rounded-full" style="background: var(--accent);"></span>
+                <span class="text-xs font-medium" style="color: var(--accent);">法规引用</span>
+              </div>
+              <h3 class="text-sm font-semibold text-ink-primary mb-1">民法典第 577 条</h3>
+              <p class="text-sm leading-relaxed" style="color: var(--ink-secondary);">
+                确立了违约责任的基本法律框架。
+              </p>
+            </div>
+          </div>
+
+          <!-- Mobile Tab Bar -->
+          <nav class="flex h-14 shrink-0" style="border-top: 1px solid var(--border); background: var(--bg-secondary);">
+            <button class="flex-1 flex items-center justify-center gap-2 text-sm" style="color: var(--accent); background: var(--accent-muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              洞察
+              <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--accent-muted); color: var(--accent);">2</span>
+            </button>
+            <button class="flex-1 flex items-center justify-center gap-2 text-sm text-ink-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              转写
+              <span class="text-xs px-1.5 py-0.5 rounded" style="background: var(--bg-tertiary); color: var(--ink-muted);">12</span>
+            </button>
+          </nav>
+        </div>
+      </div>
+    </section>
+
+    <!-- 配色说明 -->
+    <section class="pb-12">
+      <h2 class="text-sm font-medium text-ink-secondary uppercase tracking-wider mb-6">配色系统</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="p-4 rounded-lg" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+          <div class="w-full h-8 rounded mb-2" style="background: var(--bg-primary);"></div>
+          <p class="text-xs font-mono text-ink-muted">bg-primary</p>
+          <p class="text-xs text-ink-secondary">#0a0a0c</p>
+        </div>
+        <div class="p-4 rounded-lg" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+          <div class="w-full h-8 rounded mb-2" style="background: var(--bg-secondary);"></div>
+          <p class="text-xs font-mono text-ink-muted">bg-secondary</p>
+          <p class="text-xs text-ink-secondary">#131317</p>
+        </div>
+        <div class="p-4 rounded-lg" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+          <div class="w-full h-8 rounded mb-2" style="background: var(--accent);"></div>
+          <p class="text-xs font-mono text-ink-muted">accent</p>
+          <p class="text-xs text-ink-secondary">#7c9cbf</p>
+        </div>
+        <div class="p-4 rounded-lg" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+          <div class="w-full h-8 rounded mb-2" style="background: var(--success);"></div>
+          <p class="text-xs font-mono text-ink-muted">success</p>
+          <p class="text-xs text-ink-secondary">#6b9e8e</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>

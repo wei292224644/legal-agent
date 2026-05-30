@@ -2,7 +2,7 @@
 
 核心职责：
 - create_session / restore_session
-- attach_ws（排他连接）/ detach_ws（触发快照）
+- attach_ws（后来者接管）/ detach_ws（触发快照）
 - update_agent_state（将 Agent 状态写回 SessionState）
 - 定期快照 + 断开快照
 - TTL 清理过期 disconnected session
@@ -117,30 +117,30 @@ class SessionManager:
     # WebSocket 排他连接
     # ------------------------------------------------------------------
 
-    async def attach_ws(self, session_id: str, ws: object) -> bool:
-        """将 WebSocket 绑定到 session。排他连接：已有连接或已关闭返回 False。"""
+    async def attach_ws(self, session_id: str, ws: object) -> object | None:
+        """接管 session 的 WS 通道。返回旧 ws（若有），调用方负责关掉旧连接。"""
         async with self._lock:
-            state = self._sessions.get(session_id)
-            if state is None:
-                return False
-            if state.status == "closed":
-                return False
-            if session_id in self._ws_map:
-                return False
+            old = self._ws_map.pop(session_id, None)
             self._ws_map[session_id] = ws
-            state.status = "active"
-            state.touch()
-            return True
+            state = self._sessions.get(session_id)
+            if state is not None:
+                state.status = "active"
+                state.touch()
+            return old
 
-    async def detach_ws(self, session_id: str) -> None:
+    async def detach_ws(self, session_id: str, ws: object | None = None) -> None:
         """WebSocket 断开，标记 disconnected 并立即触发快照。
 
-        若 session 已被 close_session 标为 "closed",detach 不能再覆盖回 "disconnected"
-        ——否则会丢失"律师主动结束"的终态语义,且 close 时保存的 summary 也会被
-        后续逻辑误以为是普通断线状态。close 与 detach 在 main.py 的关闭路径上
-        天然并发(close 触发 background task,client 立即关 ws → detach 触发)。
+        ws 参数用于竞态保护：若新连接已替换 _ws_map 中的引用，旧连接的 finally
+        块不应误删新引用。若 session 已被 close_session 标为 "closed"，detach
+        不再覆盖回 "disconnected"——避免丢失"律师主动结束"的终态语义。
         """
         async with self._lock:
+            # 只 pop 当前 ws 对应的引用，防止误删新连接
+            if ws is not None:
+                current = self._ws_map.get(session_id)
+                if current is not ws:
+                    return
             self._ws_map.pop(session_id, None)
             state = self._sessions.get(session_id)
             if state is not None and state.status != "closed":

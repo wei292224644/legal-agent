@@ -9,7 +9,6 @@ import json
 import os
 import random
 import string
-import time
 import urllib.parse
 import uuid as uuid_mod
 from pathlib import Path
@@ -93,11 +92,7 @@ def _parse_transcription_result(data: dict) -> dict[str, object]:
                 elif wp == "p":
                     text_parts.append(w)
                 # rl: 1/2/3... 表示切换到该说话人；0 表示继续上一说话人
-                _rl = cw.get("rl", 0)
-                try:
-                    rl = int(_rl) if _rl is not None else 0
-                except (ValueError, TypeError):
-                    rl = 0
+                rl = cw.get("rl", 0)
                 if rl > 0:
                     speaker = rl
 
@@ -224,54 +219,35 @@ async def _transcribe(
         else:
             raise RuntimeError(f"WebSocket 握手失败: {handshake}")
 
-        # 发送和接收并行：一个 task 发音频，一个 task 收结果
+        # 分块发送音频：40ms = 16000 * 0.04 * 2 bytes = 1280 bytes
         chunk_size = int(TARGET_SR * 0.04 * 2)
-        start_time = time.time()
+        for i in range(0, len(pcm_bytes), chunk_size):
+            chunk = pcm_bytes[i : i + chunk_size]
+            await ws.send(chunk)
+            await asyncio.sleep(0.04)  # 模拟实时流
 
-        async def _send_audio() -> None:
-            for i in range(0, len(pcm_bytes), chunk_size):
-                chunk = pcm_bytes[i : i + chunk_size]
-                await ws.send(chunk)
-                await asyncio.sleep(0.04)  # 模拟实时流
-            # 发送结束标识
-            await ws.send(json.dumps({"end": True, "sessionId": sid}))
+        # 发送结束标识
+        await ws.send(json.dumps({"end": True, "sessionId": sid}))
 
-        async def _receive_results() -> None:
-            nonlocal sentences
-            try:
-                async for message in ws:
-                    if isinstance(message, bytes):
-                        continue
-                    payload = json.loads(message)
-                    # 讯飞 RTASR 结果格式: {"msg_type": "result", "data": {...}}
-                    msg_type = payload.get("msg_type", "")
-                    data = payload.get("data", {})
-                    if msg_type == "result":
-                        sentence = _parse_transcription_result(data)
-                        if sentence["text"]:
-                            sentences.append(sentence)
-                            latency_ms = int((time.time() - start_time) * 1000)
-                            _print_sentence(sentence, latency_ms)
-                    elif msg_type == "error":
-                        print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
-                        break
-            except websockets.exceptions.ConnectionClosed:
-                pass
-
-        await asyncio.gather(_send_audio(), _receive_results())
-        total_duration_ms = int((time.time() - start_time) * 1000)
-        print(f"[统计] 总耗时 {total_duration_ms}ms")
+        # 持续接收结果直到连接关闭
+        try:
+            async for message in ws:
+                if isinstance(message, bytes):
+                    continue
+                data = json.loads(message)
+                action = data.get("action")
+                if action == "result":
+                    sentence = _parse_transcription_result(data.get("data", {}))
+                    if sentence["text"]:
+                        sentences.append(sentence)
+                        _print_sentence(sentence)
+                elif action == "error":
+                    print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
+                    break
+        except websockets.exceptions.ConnectionClosed:
+            pass
 
     return sentences
-
-
-def _save_results(sentences: list[dict[str, object]], output_path: Path) -> None:
-    """将转写结果保存为 JSON 文件。"""
-    output_path.write_text(
-        json.dumps(sentences, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    print(f"[保存结果] {output_path}")
 
 
 def _format_time(ms: int) -> str:
@@ -283,13 +259,13 @@ def _format_time(ms: int) -> str:
     return f"{minutes:02d}:{seconds:02d}.{millis:03d}"
 
 
-def _print_sentence(sentence: dict[str, object], latency_ms: int = 0) -> None:
+def _print_sentence(sentence: dict[str, object]) -> None:
     """打印单句转写结果。"""
     speaker = sentence["speaker"]
     start = _format_time(sentence["start_ms"])
     end = _format_time(sentence["end_ms"])
     text = sentence["text"]
-    print(f"[说话人{speaker}] {start} - {end}  (延迟 {latency_ms}ms)")
+    print(f"[说话人{speaker}] {start} - {end}")
     print(f"  {text}")
 
 
@@ -310,34 +286,23 @@ def main() -> None:
         print("  XUNFEI_APISECRET=xxx")
         raise SystemExit(1)
 
-    # 声纹注册音频（律师声纹，需 10s~60s）
-    enroll_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师声纹注册_30s.wav"
-    if not enroll_path.exists():
-        print(f"错误：找不到声纹注册音频 {enroll_path}")
-        raise SystemExit(1)
-
-    # 实时转写音频（会谈对话）
-    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师客户对话_1min.wav"
+    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "劳动仲裁对话_完整版.wav"
     if not fixture_path.exists():
         print(f"错误：找不到测试音频 {fixture_path}")
         raise SystemExit(1)
 
-    print(f"[加载声纹音频] {enroll_path.name}")
-    enroll_pcm, enroll_duration_ms = _load_audio_as_pcm16(str(enroll_path))
-    print(f"[声纹音频信息] 时长 {enroll_duration_ms / 1000:.1f}s")
-
-    print(f"[加载转写音频] {fixture_path.name}")
+    print(f"[加载音频] {fixture_path.name}")
     pcm_bytes, duration_ms = _load_audio_as_pcm16(str(fixture_path))
-    print(f"[转写音频信息] 时长 {duration_ms / 1000:.1f}s, PCM 大小 {len(pcm_bytes)} bytes")
+    print(f"[音频信息] 时长 {duration_ms / 1000:.1f}s, PCM 大小 {len(pcm_bytes)} bytes")
 
-    if enroll_duration_ms < 10_000:
-        print("警告：声纹音频时长不足 10s，注册可能失败。")
+    if duration_ms < 10_000:
+        print("警告：音频时长不足 10s，声纹注册可能失败。请使用更长的音频。")
 
-    # 声纹注册：截断到 60s
-    register_pcm = enroll_pcm
-    if enroll_duration_ms > 60_000:
-        print("警告：声纹音频超过 60s，只取前 60s")
-        register_pcm = enroll_pcm[: int(60_000 / 1000 * TARGET_SR * 2)]
+    # 声纹注册：音频截断到 60s
+    register_pcm = pcm_bytes
+    if duration_ms > 60_000:
+        print("警告：音频时长超过 60s，声纹注册将只取前 60s")
+        register_pcm = pcm_bytes[: int(60_000 / 1000 * TARGET_SR * 2)]
 
     print("[声纹注册] 正在上传...")
     audio_base64 = base64.b64encode(register_pcm).decode("utf-8")
@@ -366,10 +331,6 @@ def main() -> None:
             )
         )
         print(f"[完成] 共 {len(sentences)} 句")
-
-        # 保存结果到 JSON
-        output_path = Path(__file__).parent / f"{fixture_path.stem}_xunfei_rtasr.json"
-        _save_results(sentences, output_path)
     except Exception as e:
         print(f"[错误] {e}")
         raise SystemExit(1)

@@ -63,6 +63,7 @@ class HeavyAgent:
         """启动一次 run。返回 Agno RunOutput(含 is_paused/active_requirements/run_id)。"""
         prompt = build_child_user_prompt(
             trigger_text=trigger_utt.text,
+            trigger_speaker=trigger_utt.speaker or "unknown",
             profile_summary=self._ctx.get_profile_summary(),
             recent_window=self._ctx.get_recent_window(PROFILE_WINDOW_SIZE_FOR_CHILD),
         )

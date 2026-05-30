@@ -26,7 +26,6 @@ export type SuggestionData = {
   meta: {
     utt_id: string
     request_id?: string
-    // 仅 pending 携带,由 child agent 通过 deep_analysis 工具产出
     preview?: {
       topic: string
       rationale: string
@@ -34,93 +33,56 @@ export type SuggestionData = {
   }
 }
 
-export interface WsLike {
-  set onopen(fn: (() => void) | null)
-  set onclose(fn: ((e: CloseEvent) => void) | null)
-  set onmessage(fn: ((e: MessageEvent) => void) | null)
-  readonly readyState: number
-  send(data: string | ArrayBuffer | Uint8Array): void
-  close(): void
-  addEventListener(type: string, cb: () => void, opts?: { once?: boolean }): void
-}
-
-type WsFactory = (url: string) => WsLike
-
-const defaultFactory: WsFactory = (u) => new WebSocket(u) as unknown as WsLike
-
-function getOrCreateSessionId(): string {
-  const key = 'legal_session_id'
-  const stored = localStorage.getItem(key)
-  if (stored) return stored
-  const id = crypto.randomUUID()
-  localStorage.setItem(key, id)
-  return id
-}
-
-export function useWebSocket(
-  url: string,
-  callbacks: Callbacks = {},
-  factory: WsFactory = defaultFactory,
-  sessionId?: string,
-) {
+export function useWebSocket(sessionId: string, callbacks: Callbacks = {}) {
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sessionIdState] = useState<string>(() => sessionId ?? getOrCreateSessionId())
-  const wsRef = useRef<WsLike | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
   const pingRef = useRef<ReturnType<typeof setInterval>>(null)
   const reconnectRef = useRef<ReturnType<typeof setTimeout>>(null)
-  const stableTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const callbacksRef = useRef(callbacks)
   const connectRef = useRef<() => void>(() => {})
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 3
-  // 连接稳定多少毫秒后才算"成功"并允许重置重连计数。
-  // 不加这个的话:open → close 立刻发生时计数器永远重置 → 无限循环重连。
-  const stableConnectionMs = 5_000
 
-  // 把 url 最后一段替换为 sessionId，保持 host/path 不变
-  const baseUrl = url.replace(/\/[^/]*$/, '')
-  const wsUrl = `${baseUrl}/${sessionIdState}`
+  const wsUrl = `ws://localhost:8000/ws/${sessionId}`
 
   const cleanup = useCallback(() => {
-    clearTimeout(reconnectRef.current)
-    clearTimeout(stableTimerRef.current)
-    clearInterval(pingRef.current)
-    wsRef.current?.close()
+    if (reconnectRef.current) clearTimeout(reconnectRef.current)
+    if (pingRef.current) clearInterval(pingRef.current)
+    const ws = wsRef.current
+    if (ws) {
+      // 解绑 onclose,避免主动关闭触发重连逻辑(StrictMode 双挂载下会形成 2 秒一次的无限循环)
+      ws.onopen = null
+      ws.onmessage = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.close()
+    }
     wsRef.current = null
   }, [])
 
   const connect = useCallback(() => {
     cleanup()
-    const ws = factory(wsUrl)
+    const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
       setIsConnected(true)
       setError(null)
-      // 只有连接稳定保持 stableConnectionMs 才把计数器重置。
-      // open 立即重置的话 → close 立即触发 → 重连 → open 又重置 → 无限循环。
-      stableTimerRef.current = setTimeout(() => {
-        reconnectAttemptsRef.current = 0
-      }, stableConnectionMs)
+      reconnectAttemptsRef.current = 0
       pingRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }))
         } else {
-          clearInterval(pingRef.current)
+          if (pingRef.current) clearInterval(pingRef.current)
         }
       }, 15_000)
     }
 
     ws.onclose = (e: CloseEvent) => {
       setIsConnected(false)
-      clearTimeout(stableTimerRef.current)
-      // 调试日志:为什么连接关了。CloseEvent.code 是关键信号。
-      console.warn(
-        `[ws] closed code=${e.code} reason=${e.reason || '(empty)'} wasClean=${e.wasClean}`,
-      )
-      // code 1008 = 排他连接被拒绝（session 已有活跃连接）
-      if (e.code === 1008) {
-        setError(e.reason || 'Session already connected')
+      // code 4000-4999 = 业务关闭（被接管、已结束、不存在、无权访问），不重连
+      if (e.code >= 4000 && e.code < 5000) {
+        setError(e.reason || `连接已关闭 (code=${e.code})`)
         return
       }
       if (reconnectAttemptsRef.current < maxReconnectAttempts) {
@@ -163,9 +125,8 @@ export function useWebSocket(
     }
 
     wsRef.current = ws
-  }, [wsUrl, factory, cleanup])
+  }, [wsUrl, cleanup])
 
-  // Ref sync pattern (advanced-event-handler-refs / advanced-use-latest)
   useEffect(() => {
     callbacksRef.current = callbacks
     connectRef.current = connect
@@ -178,7 +139,7 @@ export function useWebSocket(
 
   const sendAudioChunk = useCallback((chunk: Uint8Array) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(chunk)
+      wsRef.current.send(chunk.buffer as ArrayBuffer)
     }
   }, [])
 
@@ -194,5 +155,11 @@ export function useWebSocket(
     }
   }, [])
 
-  return { isConnected, error, sendAudioChunk, confirmIntent, dismissIntent, sessionId: sessionIdState }
+  const notifyAudioEnd = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'audio_end' }))
+    }
+  }, [])
+
+  return { isConnected, error, sendAudioChunk, confirmIntent, dismissIntent, notifyAudioEnd }
 }

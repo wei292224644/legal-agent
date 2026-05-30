@@ -37,21 +37,24 @@ class TestCreateAndAttach:
 
     async def test_attach_ws(self, manager):
         sid = await manager.create_session(_dummy_enrollment())
-        ok = await manager.attach_ws(sid, object())
-        assert ok is True
+        old = await manager.attach_ws(sid, object())
+        assert old is None  # 首次 attach，没有旧连接
         state = await manager.get_state(sid)
         assert state.status == "active"
 
-    async def test_attach_ws_exclusive(self, manager):
+    async def test_attach_ws_replaces_old(self, manager):
         sid = await manager.create_session(_dummy_enrollment())
-        ok1 = await manager.attach_ws(sid, object())
-        assert ok1 is True
-        ok2 = await manager.attach_ws(sid, object())
-        assert ok2 is False
+        ws1 = object()
+        old1 = await manager.attach_ws(sid, ws1)
+        assert old1 is None
+        ws2 = object()
+        old2 = await manager.attach_ws(sid, ws2)
+        assert old2 is ws1  # 返回旧连接，调用方负责关掉
 
     async def test_attach_missing_session(self, manager):
-        ok = await manager.attach_ws("nope", object())
-        assert ok is False
+        # attach_ws 本身不做 session 存在性校验——校验在 WS handler 里
+        old = await manager.attach_ws("nope", object())
+        assert old is None
 
 
 @pytest.mark.asyncio

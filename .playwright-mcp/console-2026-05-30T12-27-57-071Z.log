@@ -1,0 +1,2 @@
+[     357ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=6b5e6fe9:14336
+[     482ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/demo-session' failed: WebSocket is closed before the connection is established. @ http://localhost:5174/src/hooks/useWebSocket.ts:22

@@ -257,10 +257,9 @@ class Orchestrator:
             await self._abandon_run(pending)
             return False
 
-        if self._ctx.get_generation() != pending.generation:
-            await self._abandon_run(pending)
-            return False
-
+        # 不再校验 generation:卡片已经展示给用户,paused run 的上下文在 pause 时
+        # 就冻结了,之后新 utterance 不会污染续跑结果。再校验只会让"用户读卡片
+        # 期间又说话"这一常见路径无差别失败。
         # 在内存里 confirm 所有 active_requirement,再调 acontinue_run。
         # Agno 文档约定:requirements 直接从 run_output.requirements 传入。
         for req in pending.run_output.active_requirements or []:

@@ -1,0 +1,189 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "法律 AI 辅助会谈" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 视觉设计稿 v3 — 洞察为主 · 画像为辅 · 转写为参考
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Live Session v3 — Desktop" [level=2] [ref=e8]
+      - generic [ref=e9]: 1440 × 900
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: 实时会谈
+          - generic [ref=e18]: 已连接
+        - button "开始录音" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - text: 开始录音
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e27]: 当事人画像
+          - generic [ref=e28]:
+            - generic [ref=e29]:
+              - heading "基本信息" [level=3] [ref=e30]
+              - generic [ref=e31]:
+                - generic [ref=e32]:
+                  - generic [ref=e33]: 角色
+                  - generic [ref=e34]: 当事人（被告）
+                - generic [ref=e35]:
+                  - generic [ref=e36]: 案件类型
+                  - generic [ref=e37]: 合同纠纷
+                - generic [ref=e38]:
+                  - generic [ref=e39]: 会谈轮次
+                  - generic [ref=e40]: 第 2 次
+            - generic [ref=e41]:
+              - heading "情绪状态" [level=3] [ref=e42]
+              - generic [ref=e46]: 冷静
+              - paragraph [ref=e47]: 较首次会谈明显更理性，愿意接受调解方案。
+            - generic [ref=e48]:
+              - heading "关键主张" [level=3] [ref=e49]
+              - generic [ref=e50]:
+                - generic [ref=e53]: 违约金约定过高，请求法院调低
+                - generic [ref=e56]: 延迟交付系不可抗力导致
+                - generic [ref=e59]: 已支付部分款项，不应承担全部责任
+            - generic [ref=e60]:
+              - heading "风险暴露" [level=3] [ref=e61]
+              - generic [ref=e62]:
+                - generic [ref=e63]:
+                  - generic [ref=e66]: 高
+                  - paragraph [ref=e67]: 自认"延迟三天"，构成违约事实自认
+                - generic [ref=e68]:
+                  - generic [ref=e71]: 中
+                  - paragraph [ref=e72]: 对"不可抗力"的法律构成要件理解模糊
+            - generic [ref=e73]:
+              - heading "已确认事实" [level=3] [ref=e74]
+              - generic [ref=e75]:
+                - generic [ref=e76]:
+                  - img [ref=e77]
+                  - generic [ref=e79]: 合同签订日期：2024-03-15
+                - generic [ref=e80]:
+                  - img [ref=e81]
+                  - generic [ref=e83]: 约定交付日期：2024-06-01
+                - generic [ref=e84]:
+                  - img [ref=e85]
+                  - generic [ref=e87]: 实际交付日期：2024-06-04
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic [ref=e90]: 实时洞察
+            - generic [ref=e91]: 5 条分析
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - generic [ref=e96]: 可分析意图
+              - paragraph [ref=e97]: 当事人提到"违约金过高"，可进一步分析《民法典》合同编司法解释中关于违约金调整的裁量标准。
+              - generic [ref=e101]: 18s
+              - generic [ref=e102]:
+                - button "生成深度分析" [ref=e103] [cursor=pointer]
+                - button "忽略" [ref=e104] [cursor=pointer]
+            - generic [ref=e105]:
+              - generic [ref=e108]: 法规引用
+              - heading "民法典第 577 条 · 违约责任" [level=3] [ref=e109]
+              - paragraph [ref=e110]: 律师引用了违约责任的一般条款，确立了对方需承担违约责任的基本法律框架。这是后续主张违约金的基础。
+              - paragraph [ref=e111]: 《中华人民共和国民法典》第五百七十七条
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - generic [ref=e115]: 风险提示
+                - generic [ref=e116]: 高
+              - heading "违约金过高可能被调低" [level=3] [ref=e117]
+              - paragraph [ref=e118]: 合同约定的 20% 违约金可能面临被法院调低的风险。最高人民法院关于适用《民法典》合同编通则若干问题的解释第六十五条规定，约定的违约金超过造成的损失的 30% 的，人民法院可以认定为"过分高于造成的损失"。
+            - generic [ref=e119]:
+              - generic [ref=e122]: 合同条款
+              - heading "违约责任条款存在歧义" [level=3] [ref=e123]
+              - paragraph [ref=e124]: 合同第 8.2 条约定的违约金计算方式未明确"以实际损失为基准"，存在被不利于我方的解释空间。
+            - generic [ref=e125]:
+              - generic [ref=e128]: 行为分析
+              - heading "当事人态度软化，倾向于调解" [level=3] [ref=e129]
+              - paragraph [ref=e130]: 当事人在本次会谈中多次使用"可以商量""能不能少点"等措辞，较首次会谈的对抗性明显降低。建议引导进入调解程序。
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: 转写参考
+            - generic [ref=e134]: 12 条
+          - generic [ref=e135]:
+            - generic [ref=e136]:
+              - generic [ref=e137]: 律
+              - paragraph [ref=e138]: 根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任。
+            - generic [ref=e139]:
+              - generic [ref=e140]: 当
+              - paragraph [ref=e141]: 但是对方主张违约金过高，认为我们只延迟了三天。
+            - generic [ref=e142]:
+              - generic [ref=e143]: 律
+              - paragraph [ref=e144]: 这个抗辩是合理的。约定的违约金超过损失的 30%，法院可以认定为过分高于。
+            - generic [ref=e145]:
+              - generic [ref=e146]: 当
+              - paragraph [ref=e147]: 那能不能商量一下，我们确实也有困难...
+            - generic [ref=e148]:
+              - generic [ref=e149]: 律
+              - paragraph [ref=e150]: 如果您愿意接受调解，我们可以尝试与对方协商一个双方都能接受的方案。
+            - generic [ref=e151]:
+              - generic [ref=e152]: 当
+              - paragraph [ref=e153]: 可以的，只要不过分，我们可以谈。
+  - generic [ref=e154]:
+    - generic [ref=e155]:
+      - heading "Live Session v3 — Mobile" [level=2] [ref=e156]
+      - generic [ref=e157]: 390 × 844
+    - generic [ref=e159]:
+      - generic [ref=e160]:
+        - generic [ref=e162]: 实时会谈
+        - button "录音" [ref=e164] [cursor=pointer]:
+          - img [ref=e165]
+          - text: 录音
+      - generic [ref=e168]:
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - generic [ref=e171]: 当事人画像
+            - generic [ref=e172]: ▼
+          - generic [ref=e173]:
+            - generic [ref=e174]:
+              - generic [ref=e175]: 情绪
+              - generic [ref=e179]: 冷静
+            - generic [ref=e180]:
+              - generic [ref=e181]: 案件
+              - text: 合同纠纷
+          - generic [ref=e182]:
+            - generic [ref=e183]: 违约金过高
+            - generic [ref=e184]: 不可抗力
+            - generic [ref=e185]: 已自认违约
+        - generic [ref=e186]:
+          - generic [ref=e189]: 可分析意图
+          - paragraph [ref=e190]: 当事人提到"违约金过高"，可进一步分析裁量标准。
+          - button "生成分析" [ref=e191] [cursor=pointer]
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - generic [ref=e195]: 风险提示
+            - generic [ref=e196]: 高
+          - heading "违约金过高可能被调低" [level=3] [ref=e197]
+          - paragraph [ref=e198]: 合同约定的 20% 违约金可能面临被法院调低的风险。
+        - generic [ref=e199]:
+          - generic [ref=e202]: 行为分析
+          - heading "当事人态度软化" [level=3] [ref=e203]
+          - paragraph [ref=e204]: 多次使用"可以商量"等措辞，建议引导调解。
+      - navigation [ref=e205]:
+        - button "洞察" [ref=e206] [cursor=pointer]:
+          - img [ref=e207]
+          - generic [ref=e209]: 洞察
+        - button "画像" [ref=e210] [cursor=pointer]:
+          - img [ref=e211]
+          - generic [ref=e214]: 画像
+        - button "转写" [ref=e215] [cursor=pointer]:
+          - img [ref=e216]
+          - generic [ref=e218]: 转写
+  - generic [ref=e219]:
+    - generic [ref=e220]:
+      - heading "Entry Page v2" [level=2] [ref=e221]
+      - generic [ref=e222]: 1440 × 900
+    - generic [ref=e224]:
+      - generic [ref=e226]:
+        - generic [ref=e227]: AI-POWERED LEGAL ASSISTANT
+        - heading "法律 AI 辅助会谈" [level=1] [ref=e228]:
+          - text: 法律 AI
+          - text: 辅助会谈
+        - paragraph [ref=e229]:
+          - text: 在专注对话的同时，让系统成为您的第二大脑。
+          - text: 实时转写、法规识别、风险预警，全部自动完成。
+      - generic [ref=e231]:
+        - generic [ref=e232]:
+          - heading "开始新会谈" [level=2] [ref=e233]
+          - paragraph [ref=e234]: 创建加密会话，所有数据本地存储
+        - button "开始新会谈" [ref=e235] [cursor=pointer]
+        - link "首次使用？注册您的声纹" [ref=e237] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e238]
+          - text: 首次使用？注册您的声纹

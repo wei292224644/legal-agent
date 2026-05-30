@@ -1,0 +1,5 @@
+- generic [ref=e3]:
+  - heading "法律 AI 辅助会谈" [level=1] [ref=e4]
+  - paragraph [ref=e5]: 点击开始新会谈
+  - button "开始新会谈" [ref=e6]
+  - button "声纹注册" [ref=e7]

@@ -5,31 +5,6 @@
 """
 
 
-def build_relevance_prompt(speaker: str, text: str) -> str:
-    """二分类相关性提示:判断这句话是否值得唤醒 HeavyAgent。
-
-    设计契约:输出只是一个布尔。不要标签、不要 severity、不要 intent_type。
-    标注者只看"法律/需求相关",产品策略变了不用重训。
-    """
-    return f"""你正在旁听律师与客户的劳动法律咨询。
-
-判断当前这句话是否需要 AI 法律助手参与(法律问题、案件需求、需要法条/计算/策略)。
-
-## 规则
-- 寒暄、应答("好的""嗯""谢谢")→ false
-- 律师的科普、引用法条、安慰客户、事实询问 → false(律师是专业人士,默认不打扰)
-- 律师以第一人称显式求助("系统帮我…""AI 查一下…")→ true
-- 客户陈述事实(月薪、工龄、入职日期等)→ false(交给画像提取,无需唤醒)
-- 客户的法律提问("赔多少""能赢吗""怎么算")→ true
-- 客户的转述("公司说我不胜任")→ false
-
-只输出一个词:true 或 false。不要解释。
-
-speaker: {speaker}
-text: {text}
-"""
-
-
 def build_profile_prompt(
     speaker: str,
     text: str,
@@ -114,25 +89,37 @@ def build_profile_prompt(
 
 def get_child_system_prompt() -> str:
     """HeavyAgent child 的系统提示:自决深浅 + 自决是否先问律师。"""
-    return """你是一名专业的劳动仲裁法律顾问,正在旁听律师与客户的咨询。
+    return """你是律师的专属 AI 法律助手,正在旁听律师与客户的劳动法律咨询。
 
-你拥有以下工具,**自行判断要不要用**:
+## 角色与受众
+- 你的**唯一受众是律师**。所有输出都是给律师看的分析、建议或备忘。
+- 你**不是客户的法律顾问**,严禁用第二人称("您")直接对客户说话。
+- 严禁代替律师指导客户如何回答问题。你的职责是辅助律师,不是替代律师。
+
+## 工具使用（优先级最高）
+你拥有以下工具:
 - `fetch_more_transcript(start_idx, end_idx)`: 当默认窗口看不到的早期内容
-  对回答**确实必要**时,主动拉。窗口够用就不要拉,省 token。
-- `deep_analysis(topic, rationale)`: 当问题需要全画像+多步推理才能答好
-  (谈判策略、胜率评估、复杂法条交叉分析)时,调用此工具——它会**暂停你的运行**
-  等律师确认。律师确认后你才会被唤醒继续推理。
+  对回答确实必要时,主动拉取。窗口够用就不要拉,省 token。
+- `deep_analysis(topic, rationale)`: 当你判断这个问题需要多步推理、交叉法条
+  或调动大量上下文才能答好时,调用此工具。它会暂停你的运行,等律师确认后
+  你再被唤醒继续产出完整答案。
 
-对**简单查询**(法条直问、单步金额计算、模板推荐):直接 1-3 句话答完,
-不要调 deep_analysis。
+**绝对禁止**: 如果你判断问题需要深度分析（多步推理、交叉法条、复杂计算、
+策略推演等），你必须调用 `deep_analysis` 工具来暂停，**严禁在回复中直接写出
+深度分析内容**。只有在凭已有信息 1-3 句话就能给律师清晰结论的情况下，
+才允许直接回答，不调用工具。
 
-对**复杂问题**:先调一次 deep_analysis 暂停,topic 写清楚要分析什么,
-rationale 写为什么不能浅答。律师确认后,你会被续跑继续,这时再产出
-完整的(法律法规 / 计算方式 / 建议行动)三段式答案。
+## 输出风格
+- 直接对律师说话,使用专业但简洁的法律分析口吻。
+- 引用法条时给出具体条款编号和核心要义。
+- 涉及计算时展示公式和结果,方便律师向客户解释。
+- 发现证据缺口或风险点时,直接列出供律师参考。
 """
 
 
-def build_child_user_prompt(trigger_text: str, profile_summary: dict, recent_window: list) -> str:
+def build_child_user_prompt(
+    trigger_text: str, trigger_speaker: str, profile_summary: dict, recent_window: list
+) -> str:
     """构造 child 一次启动用的 user prompt:画像全量 + 最近 N 轮转写。"""
     from models.utterance import Utterance  # noqa: PLC0415
 
@@ -156,7 +143,6 @@ def build_child_user_prompt(trigger_text: str, profile_summary: dict, recent_win
 {history_str}
 
 ## 触发当前响应的句子
-{trigger_text}
+speaker: {trigger_speaker}
+text: {trigger_text}
 """
-
-
