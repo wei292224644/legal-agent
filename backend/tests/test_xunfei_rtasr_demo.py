@@ -86,7 +86,8 @@ def test_parse_transcription_result():
                         "ws": [
                             {"cw": [{"w": "你", "wb": 2340, "we": 2680, "wp": "n", "rl": 1}]},
                             {"cw": [{"w": "好", "wb": 2680, "we": 2950, "wp": "n", "rl": 0}]},
-                            {"cw": [{"w": "。", "wb": 2950, "we": 2950, "wp": "p", "rl": 0}]},
+                            {"cw": [{"w": "嗯", "wb": 2950, "we": 3100, "wp": "s", "rl": 0}]},
+                            {"cw": [{"w": "。", "wb": 3100, "we": 3100, "wp": "p", "rl": 0}]},
                         ]
                     }
                 ],
@@ -95,7 +96,7 @@ def test_parse_transcription_result():
         "seg_id": 0,
     }
     sentence = _parse_transcription_result(raw)
-    assert sentence["text"] == "你好。"
+    assert sentence["text"] == "你好嗯。"
     assert sentence["speaker"] == 1
     assert sentence["start_ms"] == 2340
     assert sentence["end_ms"] == 5120

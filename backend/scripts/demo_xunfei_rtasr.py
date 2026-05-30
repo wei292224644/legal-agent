@@ -80,7 +80,7 @@ def _parse_transcription_result(data: dict) -> dict[str, object]:
             for cw in ws_item.get("cw", []):
                 w = cw.get("w", "")
                 wp = cw.get("wp", "n")
-                if wp == "n":
+                if wp in ("n", "s"):
                     text_parts.append(w)
                 elif wp == "p":
                     text_parts.append(w)
