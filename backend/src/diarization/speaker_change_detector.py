@@ -19,7 +19,7 @@ class VoiceprintState:
 
 
 def _ema_update(current: np.ndarray, new: np.ndarray, weight: float = 0.15) -> np.ndarray:
-    """EMA 更新 client embedding，保持 L2 归一化。"""
+    """EMA 更新 client embedding，保持 L2 归一化。Phase 3 使用。"""
     updated = current * (1 - weight) + new * weight
     norm = float(np.linalg.norm(updated))
     if norm > 0:
@@ -38,6 +38,7 @@ def detect_speaker_changes(
     margin: float = 0.10,
 ) -> list[int]:
     """检测 seg_audio 内的说话人切换点，返回毫秒切分位置列表（相对 seg_audio 起点）。"""
+    # margin: used by Phase 3 dual comparison (implemented in next task)
     window_samples = int(sr * window_ms / 1000)
     step_samples = int(sr * step_ms / 1000)
 
@@ -79,7 +80,7 @@ def detect_speaker_changes(
         if not seeded:
             cur_state = "lawyer" if s_l >= lawyer_threshold else "other"
         else:
-            # Phase 3 placeholder for type consistency; seeded=False here
+            # Phase 3 dual comparison; will be implemented in next task
             cur_state = "other"
 
         if prev_state is not None and prev_state != cur_state and not seeded:
