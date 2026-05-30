@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import datetime
 import hashlib
 import hmac
 import json
+import os
 import random
 import string
 import urllib.parse
+import uuid as uuid_mod
+from pathlib import Path
 
 import numpy as np
 import requests
 import soundfile as sf
+import websockets
 
 TARGET_SR = 16000
+
+WS_URL = "wss://office-api-ast-dx.iflyaisol.com/ast/communicate/v1"
 
 VOICEPRINT_URL = "https://office-api-personal-dx.iflyaisol.com/res/feature/v1/register"
 
@@ -142,3 +149,183 @@ def _register_voiceprint(
     if data.get("status") != 1:
         raise RuntimeError(f"声纹注册状态异常: {data}")
     return data["feature_id"]
+
+
+def _build_ws_url(
+    app_id: str,
+    access_key_id: str,
+    access_key_secret: str,
+    feature_ids: str | None = None,
+    role_type: int = 2,
+    pd: str = "court",
+    lang: str = "autodialect",
+    audio_encode: str = "pcm_s16le",
+    samplerate: int = 16000,
+) -> str:
+    """构建带签名的 WebSocket 握手 URL。"""
+    utc = datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
+    # URL 编码时区偏移中的 + 号
+    utc = utc.replace("+", "%2B")
+    uid = str(uuid_mod.uuid4())
+
+    params: dict[str, str] = {
+        "accessKeyId": access_key_id,
+        "appId": app_id,
+        "audio_encode": audio_encode,
+        "lang": lang,
+        "role_type": str(role_type),
+        "samplerate": str(samplerate),
+        "utc": utc,
+        "uuid": uid,
+    }
+    if feature_ids:
+        params["feature_ids"] = feature_ids
+    if pd:
+        params["pd"] = pd
+
+    signature = _generate_signature(params, access_key_secret)
+    params["signature"] = signature
+
+    encoded = []
+    for k, v in sorted(params.items(), key=lambda x: x[0]):
+        encoded.append(f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(str(v), safe='')}")
+    return f"{WS_URL}?{'&'.join(encoded)}"
+
+
+async def _transcribe(
+    pcm_bytes: bytes,
+    app_id: str,
+    access_key_id: str,
+    access_key_secret: str,
+    feature_ids: str | None = None,
+    role_type: int = 2,
+    pd: str = "court",
+) -> list[dict[str, object]]:
+    """通过 WebSocket 发送音频并收集转写结果。
+
+    按 40ms / 1280 字节分块发送。
+    """
+    url = _build_ws_url(app_id, access_key_id, access_key_secret, feature_ids, role_type, pd)
+    sentences: list[dict[str, object]] = []
+    sid = ""
+
+    async with websockets.connect(url) as ws:
+        # 等待握手响应
+        handshake = await ws.recv()
+        hs_data = json.loads(handshake)
+        if hs_data.get("action") == "started":
+            sid = hs_data.get("sid", "")
+            print(f"[握手成功] sid={sid}")
+        else:
+            print(f"[握手异常] {handshake}")
+            return sentences
+
+        # 分块发送音频：40ms = 16000 * 0.04 * 2 bytes = 1280 bytes
+        chunk_size = 1280
+        for i in range(0, len(pcm_bytes), chunk_size):
+            chunk = pcm_bytes[i : i + chunk_size]
+            await ws.send(chunk)
+            await asyncio.sleep(0.04)  # 模拟实时流
+
+        # 发送结束标识
+        await ws.send(json.dumps({"end": True, "sessionId": sid}))
+
+        # 持续接收结果直到连接关闭
+        try:
+            async for message in ws:
+                if isinstance(message, bytes):
+                    continue
+                data = json.loads(message)
+                action = data.get("action")
+                if action == "result":
+                    sentence = _parse_transcription_result(data.get("data", {}))
+                    if sentence["text"]:
+                        sentences.append(sentence)
+                        _print_sentence(sentence)
+                elif action == "error":
+                    print(f"[错误] code={data.get('code')} desc={data.get('desc')}")
+                    break
+        except websockets.exceptions.ConnectionClosed:
+            pass
+
+    return sentences
+
+
+def _format_time(ms: int) -> str:
+    """毫秒转为 MM:SS.mmm 格式。"""
+    total_seconds = ms // 1000
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    millis = ms % 1000
+    return f"{minutes:02d}:{seconds:02d}.{millis:03d}"
+
+
+def _print_sentence(sentence: dict[str, object]) -> None:
+    """打印单句转写结果。"""
+    speaker = sentence["speaker"]
+    start = _format_time(sentence["start_ms"])
+    end = _format_time(sentence["end_ms"])
+    text = sentence["text"]
+    print(f"[说话人{speaker}] {start} - {end}")
+    print(f"  {text}")
+
+
+def main() -> None:
+    """Demo 入口。"""
+    import dotenv
+    dotenv.load_dotenv(Path(__file__).parent.parent / ".env")
+
+    app_id = os.getenv("XUNFEI_APPID", "").strip()
+    access_key_id = os.getenv("XUNFEI_APIKEY", "").strip()
+    access_key_secret = os.getenv("XUNFEI_APISECRET", "").strip()
+
+    if not all([app_id, access_key_id, access_key_secret]):
+        print("错误：请设置环境变量 XUNFEI_APPID、XUNFEI_APIKEY、XUNFEI_APISECRET")
+        print("或在 backend/.env 文件中配置：")
+        print("  XUNFEI_APPID=xxx")
+        print("  XUNFEI_APIKEY=xxx")
+        print("  XUNFEI_APISECRET=xxx")
+        raise SystemExit(1)
+
+    fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "律师声纹注册.wav"
+    if not fixture_path.exists():
+        print(f"错误：找不到测试音频 {fixture_path}")
+        raise SystemExit(1)
+
+    print(f"[加载音频] {fixture_path.name}")
+    pcm_bytes, duration_ms = _load_audio_as_pcm16(str(fixture_path))
+    print(f"[音频信息] 时长 {duration_ms / 1000:.1f}s, PCM 大小 {len(pcm_bytes)} bytes")
+
+    if duration_ms < 10_000:
+        print("警告：音频时长不足 10s，声纹注册可能失败。请使用更长的音频。")
+
+    # 声纹注册
+    print("[声纹注册] 正在上传...")
+    audio_base64 = base64.b64encode(pcm_bytes).decode("utf-8")
+    feature_id = _register_voiceprint(
+        audio_base64=audio_base64,
+        audio_type="raw",
+        app_id=app_id,
+        access_key_id=access_key_id,
+        access_key_secret=access_key_secret,
+    )
+    print(f"[声纹注册] 成功，feature_id={feature_id}")
+
+    # 实时转写
+    print("[实时转写] 开始发送音频...")
+    sentences = asyncio.run(
+        _transcribe(
+            pcm_bytes=pcm_bytes,
+            app_id=app_id,
+            access_key_id=access_key_id,
+            access_key_secret=access_key_secret,
+            feature_ids=feature_id,
+            role_type=2,
+            pd="court",
+        )
+    )
+    print(f"[完成] 共 {len(sentences)} 句")
+
+
+if __name__ == "__main__":
+    main()
