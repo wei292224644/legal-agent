@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import hashlib
 import hmac
+import json
+import random
+import string
 import urllib.parse
 
 import numpy as np
+import requests
 import soundfile as sf
 
 TARGET_SR = 16000
+
+VOICEPRINT_URL = "https://office-api-personal-dx.iflyaisol.com/res/feature/v1/register"
 
 
 def _load_audio_as_pcm16(path: str) -> tuple[bytes, float]:
@@ -54,3 +61,49 @@ def _generate_signature(params: dict[str, str], secret: str) -> str:
     base_string = "&".join(encoded_pairs)
     mac = hmac.new(secret.encode("utf-8"), base_string.encode("utf-8"), hashlib.sha1)
     return base64.b64encode(mac.digest()).decode("utf-8")
+
+
+def _register_voiceprint(
+    audio_base64: str,
+    audio_type: str,
+    app_id: str,
+    access_key_id: str,
+    access_key_secret: str,
+    uid: str | None = None,
+) -> str:
+    """注册声纹，返回 feature_id。
+
+    音频要求：10s ~ 60s，base64 编码。
+    """
+    date_time = datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
+    signature_random = "".join(random.choices(string.ascii_letters + string.digits, k=16))
+
+    query_params = {
+        "appId": app_id,
+        "accessKeyId": access_key_id,
+        "dateTime": date_time,
+        "signatureRandom": signature_random,
+    }
+    signature = _generate_signature(query_params, access_key_secret)
+
+    headers = {
+        "Content-Type": "application/json",
+        "signature": signature,
+    }
+
+    body: dict[str, str] = {
+        "audio_data": audio_base64,
+        "audio_type": audio_type,
+    }
+    if uid:
+        body["uid"] = uid
+
+    resp = requests.post(VOICEPRINT_URL, params=query_params, headers=headers, json=body)
+    resp.raise_for_status()
+    result = resp.json()
+    if result.get("code") != "000000":
+        raise RuntimeError(f"声纹注册失败: {result.get('code')} - {result.get('desc')}")
+    data = json.loads(result["data"]) if isinstance(result.get("data"), str) else result.get("data", {})
+    if data.get("status") != 1:
+        raise RuntimeError(f"声纹注册状态异常: {data}")
+    return data["feature_id"]
