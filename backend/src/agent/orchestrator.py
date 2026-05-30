@@ -64,7 +64,7 @@ class PendingRequest:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "PendingRequest":
+    def from_dict(cls, d: dict) -> PendingRequest:
         # run_output 永远为 None(不可序列化),恢复出来的 pending 没有可
         # confirm 的 requirements,只能等 TTL sweep 自然过期或主动 dismiss。
         # Orchestrator.from_dict 会决定要不要把它带回来,见下方注释。
@@ -202,7 +202,7 @@ class Orchestrator:
     async def _run_child(self, utt: Utterance, generation: int) -> None:
         try:
             run = await asyncio.wait_for(self._ha.arun(utt), timeout=RUN_TIMEOUT)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("child run timeout (>%ss) for utt %s", RUN_TIMEOUT, utt.id)
             return
         except Exception:

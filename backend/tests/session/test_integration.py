@@ -1,6 +1,6 @@
 """Session 集成测试：验证 WebSocket 重连与状态恢复。"""
 
-import time
+import asyncio
 from unittest.mock import AsyncMock
 
 import numpy as np
@@ -29,8 +29,10 @@ async def session_manager_fixture(monkeypatch):
     monkeypatch.setattr(main, "_lawyer_enrollment", _stub_enrollment())
 
     # mock stream_stt 避免加载真实 STT 模型
-    def _mock_stream_stt(audio_iter, *, enrollment):
-        return (x async for x in [])  # 空 async generator，不产出任何 utterance
+    async def _mock_stream_stt(audio_iter, *, enrollment):
+        # 空 async generator:不产出任何 utterance,但有合法 __aiter__
+        return
+        yield  # pragma: no cover  # 让 Python 识别此函数为 async generator
 
     monkeypatch.setattr(main, "stream_stt", _mock_stream_stt)
 
@@ -116,11 +118,13 @@ class TestReconnect:
 
         with client.websocket_connect("/ws/close-test-1") as ws:
             ws.send_json({"type": "close"})
-            # 给服务器一点时间处理 close 消息（生成 summary + close_session）
-            time.sleep(0.2)
+
+        # 等待后台异步 task 生成 summary
+        await asyncio.sleep(0.2)
 
         sm = session_manager_fixture
         state = await sm.get_state("close-test-1")
         assert state is not None
         assert state.status == "closed"
         assert state.summary == "test summary"
+

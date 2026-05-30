@@ -6,14 +6,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from agno.db.base import BaseDb
 from agno.db.postgres import PostgresDb
 
 from config import AGNO_DB_URL
 
-_db: Optional[BaseDb] = None
+_db: BaseDb | None = None
 
 
 def get_agno_db() -> BaseDb:
@@ -24,7 +22,7 @@ def get_agno_db() -> BaseDb:
     return _db
 
 
-def reset_agno_db_for_tests(replacement: Optional[BaseDb] = None) -> None:
+def reset_agno_db_for_tests(replacement: BaseDb | None = None) -> None:
     """清空模块级单例;可选注入替身(测试常用 InMemoryDb)。
 
     Args:

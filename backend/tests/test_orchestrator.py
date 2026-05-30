@@ -15,6 +15,7 @@ from models.utterance import Utterance
 def _mock_env(monkeypatch, tmp_path):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     from agno.db.in_memory import InMemoryDb  # noqa: PLC0415
+
     from agent.db import reset_agno_db_for_tests  # noqa: PLC0415
     reset_agno_db_for_tests(replacement=InMemoryDb())
 

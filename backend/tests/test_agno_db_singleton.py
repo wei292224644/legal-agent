@@ -6,7 +6,6 @@
 """
 
 import pytest
-
 from agno.db.in_memory import InMemoryDb
 
 from agent.db import get_agno_db, reset_agno_db_for_tests

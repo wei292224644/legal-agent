@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-
 from agno.run.base import RunStatus
 
 from agent.context_store import ContextStore
@@ -26,6 +25,7 @@ def _mock_env(monkeypatch, tmp_path):
     _cfg.PENDING_TTL = 0.2
 
     from agno.db.in_memory import InMemoryDb  # noqa: PLC0415
+
     from agent.db import reset_agno_db_for_tests  # noqa: PLC0415
     reset_agno_db_for_tests(replacement=InMemoryDb())
 
