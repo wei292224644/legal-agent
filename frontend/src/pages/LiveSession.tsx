@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { fetchHistory } from "@/api/sessions";
 import { useWebSocket, type SuggestionData } from "@/hooks/useWebSocket";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -273,6 +274,56 @@ const SuggestionCard = memo(function SuggestionCard({
 
 export default function LiveSession() {
   const { id: sessionId } = useParams<{ id: string }>();
+  const [hydrated, setHydrated] = useState(false);
+
+  // 页面加载时先从后端拉历史数据，再连 WS
+  useEffect(() => {
+    if (!sessionId) {
+      setHydrated(true);
+      return;
+    }
+    let cancelled = false;
+    fetchHistory(sessionId)
+      .then((h) => {
+        if (cancelled || !h) {
+          setHydrated(true);
+          return;
+        }
+        // 回填 transcript
+        setTranscript(
+          h.utterances.map((u) => ({
+            speaker: u.speaker ?? "uncertain",
+            text: u.text,
+          }))
+        );
+        // 回填 suggestions
+        setSuggestions(
+          h.suggestions.map((s): Suggestion => {
+            if (s.kind === "pending") {
+              return {
+                kind: "pending",
+                requestId: s.request_id,
+                topic: s.preview_topic ?? "",
+                rationale: s.preview_rationale ?? "",
+              };
+            }
+            return {
+              kind: "ready",
+              id: s.id,
+              requestId: s.request_id,
+              text: s.text ?? "",
+              topic: s.preview_topic ?? "",
+            };
+          })
+        );
+        setHydrated(true);
+      })
+      .catch(() => setHydrated(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -318,7 +369,7 @@ export default function LiveSession() {
           if ((s.kind !== "pending" && s.kind !== "running") || s.requestId !== rid) return s;
           const ready: Suggestion = {
             kind: "ready",
-            id: crypto.randomUUID(),
+            id: `ready-${rid}`,
             requestId: rid,
             text: data.text ?? "",
             topic: s.topic,
@@ -328,7 +379,7 @@ export default function LiveSession() {
       }
       const ready: Suggestion = {
         kind: "ready",
-        id: crypto.randomUUID(),
+        id: `ready-${Date.now()}`,
         text: data.text ?? "",
         topic: "",
       };
@@ -337,7 +388,7 @@ export default function LiveSession() {
   }, []);
 
   const { isConnected, error: wsError, sendAudioChunk, confirmIntent, dismissIntent, notifyAudioEnd } =
-    useWebSocket(sessionId ?? "", {
+    useWebSocket(hydrated ? (sessionId ?? "") : "", {
       onTranscript,
       onAnalysis,
       onSuggestion,

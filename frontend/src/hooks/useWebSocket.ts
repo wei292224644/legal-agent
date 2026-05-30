@@ -62,6 +62,7 @@ export function useWebSocket(sessionId: string, callbacks: Callbacks = {}) {
   }, [])
 
   const connect = useCallback(() => {
+    if (!sessionId) return
     cleanup()
     const ws = new WebSocket(wsUrl)
 
