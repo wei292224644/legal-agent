@@ -2,14 +2,26 @@
   "hooks": {
     "PostToolUse": [
       {
-        "if": "tool == 'Edit' && endsWith(file_path, '.py')",
-        "run": "Bash(uv run ruff format {{file_path}} && uv run ruff check --fix {{file_path}})"
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "endsWith(file_path, '.py')",
+            "command": "uv run ruff format {{file_path}} && uv run ruff check --fix {{file_path}}"
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
-        "if": "tool == 'Edit' && matches(file_path, '\\.env(\\.example)?$')",
-        "prompt": "此文件可能包含密钥，确认要继续编辑吗？"
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "prompt",
+            "if": "matches(file_path, '\\.env(\\.example)?$')",
+            "prompt": "此文件可能包含密钥，确认要继续编辑吗？"
+          }
+        ]
       }
     ]
   }
