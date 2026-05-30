@@ -52,21 +52,22 @@ class TestOrchestratorRoundtrip:
 
     @pytest.mark.asyncio
     async def test_with_pending(self):
+        """to_dict 把 pending 写进 snapshot 供审计;from_dict 故意不恢复——
+        RunOutput 含不可序列化的运行期对象,跨进程恢复无法 confirm。
+        见 PendingRequest / Orchestrator.from_dict docstring。"""
         ctx = ContextStore()
         orch = Orchestrator(ctx)
-        utt = Utterance(id="u1", text="test", t_start=0.0, t_end=1.0, speaker="client")
         orch._pending["req_1"] = PendingRequest(
             request_id="req_1",
-            utt=utt,
-            intent_type="ask",
+            run_id="run_abc",
+            utt_id="u1",
             generation=1,
-            meta={"severity": "simple"},
+            preview={"topic": "胜率评估", "rationale": "全画像"},
         )
         d = orch.to_dict()
+        assert any(p["request_id"] == "req_1" for p in d["pending"]), "snapshot 应记录 pending(审计用)"
         orch2 = Orchestrator.from_dict(d, ctx=ctx)
-        assert len(orch2._pending) == 1
-        assert orch2._pending["req_1"].intent_type == "ask"
-        assert orch2._pending["req_1"].utt.text == "test"
+        assert orch2._pending == {}, "恢复后必须为空,避免对失效 RunOutput 调 confirm"
 
 
 class TestEnrollmentRoundtrip:
