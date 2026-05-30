@@ -50,7 +50,7 @@ def detect_speaker_changes(
     for start in range(0, len(seg_audio) - window_samples + 1, step_samples):
         w = seg_audio[start : start + window_samples]
         energy = float(np.sqrt(np.mean(w.astype(np.float64) ** 2)))
-        if energy < 0.0:
+        if energy < 0.001:
             embeddings.append(None)
         else:
             embeddings.append(extract_embedding(w, sr))

@@ -42,7 +42,7 @@ def test_phase1_detects_lawyer_to_nonlawyer(monkeypatch, lawyer_emb):
     fake = _make_fake_extractor([lawyer_emb, lawyer_emb, nonlawyer, nonlawyer])
     monkeypatch.setattr(scd, "extract_embedding", fake)
 
-    seg = np.zeros(16000 * 4, dtype=np.float32)
+    seg = np.full(16000 * 4, 0.01, dtype=np.float32)
     vp = VoiceprintState(lawyer=lawyer_emb)
     changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
 
@@ -57,7 +57,7 @@ def test_phase1_no_false_positive(monkeypatch, lawyer_emb):
     fake = _make_fake_extractor([lawyer_emb, lawyer_emb, lawyer_emb])
     monkeypatch.setattr(scd, "extract_embedding", fake)
 
-    seg = np.zeros(16000 * 3, dtype=np.float32)
+    seg = np.full(16000 * 3, 0.01, dtype=np.float32)
     vp = VoiceprintState(lawyer=lawyer_emb)
     changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1000, step_ms=1000)
     assert changes == []
@@ -70,7 +70,7 @@ def test_short_segment_returns_empty(monkeypatch, lawyer_emb):
     fake = _make_fake_extractor([lawyer_emb])
     monkeypatch.setattr(scd, "extract_embedding", fake)
 
-    seg = np.zeros(16000 * 1, dtype=np.float32)
+    seg = np.full(16000 * 1, 0.01, dtype=np.float32)
     vp = VoiceprintState(lawyer=lawyer_emb)
     changes = detect_speaker_changes(seg, vp, sr=16000, window_ms=1500, step_ms=500)
     assert changes == []
