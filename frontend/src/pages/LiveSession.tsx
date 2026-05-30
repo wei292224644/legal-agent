@@ -323,7 +323,7 @@ export default function LiveSession() {
               text: s.text ?? "",
               topic: s.preview_topic ?? "",
             };
-          }))
+          })
         );
         setHydrated(true);
       })

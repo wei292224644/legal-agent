@@ -177,9 +177,7 @@ async def _handle_text_message(
     if msg_type == "confirm":
         request_id = msg.get("request_id")
         if request_id:
-            async with _maker() as s:
-                from repositories.suggestions import SuggestionRepository
-                await SuggestionRepository(s).mark_running(session_id, request_id)
+            # running 不存 DB（中间状态），只调 orchestrator
             ok = await orch.confirm_analysis(request_id)
             await _safe_send_json(ws, {"type": "confirm_ack", "request_id": request_id, "ok": ok})
         return False
@@ -187,9 +185,7 @@ async def _handle_text_message(
     if msg_type == "dismiss":
         request_id = msg.get("request_id")
         if request_id:
-            async with _maker() as s:
-                from repositories.suggestions import SuggestionRepository
-                await SuggestionRepository(s).mark_dismissed(session_id, request_id)
+            # dismissed 不存 DB（中间状态），只调 orchestrator
             await orch.dismiss_pending(request_id)
         return False
 
@@ -262,18 +258,7 @@ async def legal_session(ws: WebSocket, session_id: str):
             request_id = meta.get("request_id")
             try:
                 if meta.get("kind") == "pending":
-                    # gated deep_analysis：挂起等待用户确认
-                    if utt_id and request_id:
-                        preview = meta.get("preview", {})
-                        async with _maker() as s:
-                            from repositories.suggestions import SuggestionRepository
-                            await SuggestionRepository(s).upsert_pending(
-                                sid_uuid,
-                                utt_id=utt_id,
-                                request_id=request_id,
-                                preview_topic=preview.get("topic"),
-                                preview_rationale=preview.get("rationale"),
-                            )
+                    # pending 只推 WS，不存 DB（中间状态，刷新后不恢复）
                     await ws.send_json({
                         "type": "suggestion.pending",
                         "text": None,
@@ -319,14 +304,6 @@ async def legal_session(ws: WebSocket, session_id: str):
                 logger.warning("Suggestion callback failed: %s", exc)
 
         orch.set_suggestion_callback(on_suggestion)
-
-        async def on_expired(request_ids: list[str]) -> None:
-            async with _maker() as s:
-                from repositories.suggestions import SuggestionRepository
-                for rid in request_ids:
-                    await SuggestionRepository(s).mark_expired(sid_uuid, rid)
-
-        orch.set_expiry_callback(on_expired)
         await orch.start()
 
         # --- 音频管道 ---
