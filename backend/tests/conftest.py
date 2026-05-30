@@ -119,3 +119,36 @@ def mock_llm_client():
         return mock_client
 
     return _make
+
+
+# ---------------------------------------------------------------------------
+# 共享 fixture：db_session 提供一个干净的事务化 AsyncSession。
+#
+# 每个测试用新的 engine + 建表 + 拆表，避免污染。生产用 alembic 管理 schema；
+# 测试用 Base.metadata.create_all 跳过迁移以加速。
+# ---------------------------------------------------------------------------
+import os  # noqa: E402
+
+import pytest_asyncio  # noqa: E402
+
+from db.base import Base  # noqa: E402
+from db.engine import create_engine_from_env, get_sessionmaker  # noqa: E402
+import db.models  # noqa: F401, E402
+
+
+@pytest_asyncio.fixture
+async def db_session():
+    os.environ.setdefault(
+        "DATABASE_URL",
+        "postgresql+psycopg://legal:legal@localhost:5432/legal_agent",
+    )
+    engine = create_engine_from_env()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    SessionLocal = get_sessionmaker(engine)
+    async with SessionLocal() as session:
+        yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
