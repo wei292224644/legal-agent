@@ -254,3 +254,58 @@ async def test_bus_consumer_survives_handler_exception(store):
     ready = [m for _, m in suggestions if m["kind"] == "ready"]
     assert len(ready) == 1, "第二句应正常处理"
     assert ready[0]["utt_id"] == "u_2"
+
+
+from agent.child_tools import make_fetch_more_transcript_tool  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_child_fetched_transcript_reaches_user(store, mock_relevance_gate):
+    """契约:child 调 fetch_more_transcript(start, end) 拿到的实际文本,
+    必须能进入 child 最终产出的 content,并被 Orchestrator 透传给 callback。
+
+    实现方式:stub HA.arun 不写死返回内容,而是**真的调用** fetch_more_transcript
+    工具(同一个 ctx),把工具返回字符串拼进 RunOutput.content 里。这样:
+    - 改 fetch_more_transcript 的实现(比如改了 clamping 规则或格式)→ 测试会挂
+    - 改 store 的 get_full_history 索引语义 → 测试会挂
+    - 给历史多塞几句无关内容 → 测试仍能通过(只要 fetched 字符串包含目标索引)
+    """
+    gate = mock_relevance_gate(is_relevant=True)
+    pa = MagicMock()
+    pa.extract = AsyncMock(return_value=[])
+
+    # 用唯一可辨识的句子填充历史,后续断言要找它
+    sentinel = "客户在 2019 年 3 月入职"
+    await store.append_utterance(
+        Utterance(id="u_0", text=sentinel, speaker="client", t_start=0.0, t_end=1.0)
+    )
+    for i in range(1, 15):
+        await store.append_utterance(
+            Utterance(id=f"u_{i}", text=f"中段{i}", speaker="client", t_start=float(i), t_end=float(i + 1))
+        )
+
+    # stub HA:真的调工具,把工具返回拼进 content
+    fetch_tool = make_fetch_more_transcript_tool(store)
+
+    class RealFetchHA:
+        _db = MagicMock(spec=["update_approval_run_status"])
+
+        async def arun(self, utt):
+            fetched = fetch_tool.entrypoint(start_idx=0, end_idx=1)
+            return _completed_run(f"基于早期发言「{fetched}」给出建议")
+
+    orch = Orchestrator(store, gate=gate, pa=pa, ha=RealFetchHA())
+    suggestions = []
+    orch.set_suggestion_callback(lambda t, m: suggestions.append((t, m)))
+
+    await orch.handle_utterance(
+        Utterance(id="u_q", text="结合一开始那次入职回答", speaker="client", t_start=20.0, t_end=21.0)
+    )
+    await asyncio.sleep(0.1)
+
+    ready = [(t, m) for t, m in suggestions if m["kind"] == "ready"]
+    assert len(ready) == 1, "child completed → 必须 emit ready"
+    answer = ready[0][0]
+    # 真正的契约:fetch_more_transcript 拉到的 sentinel 必须出现在最终回答里。
+    # 改了 fetch 的格式 / 索引语义 / clamping → 这里会挂。
+    assert sentinel in answer, f"sentinel '{sentinel}' 没有透传到回答: {answer!r}"
