@@ -14,7 +14,7 @@ def create_engine_from_env() -> AsyncEngine:
     url = os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL not set")
-    return create_async_engine(url, pool_pre_ping=True, future=True)
+    return create_async_engine(url, pool_pre_ping=True)
 
 
 def get_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
