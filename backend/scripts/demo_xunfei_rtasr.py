@@ -164,8 +164,7 @@ def _build_ws_url(
 ) -> str:
     """构建带签名的 WebSocket 握手 URL。"""
     utc = datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
-    # URL 编码时区偏移中的 + 号
-    utc = utc.replace("+", "%2B")
+    # 签名基于不含 signature 的参数集生成
     uid = str(uuid_mod.uuid4())
 
     params: dict[str, str] = {
@@ -180,8 +179,7 @@ def _build_ws_url(
     }
     if feature_ids:
         params["feature_ids"] = feature_ids
-    if pd:
-        params["pd"] = pd
+    params["pd"] = pd
 
     signature = _generate_signature(params, access_key_secret)
     params["signature"] = signature
@@ -217,11 +215,10 @@ async def _transcribe(
             sid = hs_data.get("sid", "")
             print(f"[握手成功] sid={sid}")
         else:
-            print(f"[握手异常] {handshake}")
-            return sentences
+            raise RuntimeError(f"WebSocket 握手失败: {handshake}")
 
         # 分块发送音频：40ms = 16000 * 0.04 * 2 bytes = 1280 bytes
-        chunk_size = 1280
+        chunk_size = int(TARGET_SR * 0.04 * 2)
         for i in range(0, len(pcm_bytes), chunk_size):
             chunk = pcm_bytes[i : i + chunk_size]
             await ws.send(chunk)
@@ -299,32 +296,42 @@ def main() -> None:
     if duration_ms < 10_000:
         print("警告：音频时长不足 10s，声纹注册可能失败。请使用更长的音频。")
 
-    # 声纹注册
-    print("[声纹注册] 正在上传...")
-    audio_base64 = base64.b64encode(pcm_bytes).decode("utf-8")
-    feature_id = _register_voiceprint(
-        audio_base64=audio_base64,
-        audio_type="raw",
-        app_id=app_id,
-        access_key_id=access_key_id,
-        access_key_secret=access_key_secret,
-    )
-    print(f"[声纹注册] 成功，feature_id={feature_id}")
+    # 声纹注册：音频截断到 60s
+    register_pcm = pcm_bytes
+    if duration_ms > 60_000:
+        print("警告：音频时长超过 60s，声纹注册将只取前 60s")
+        register_pcm = pcm_bytes[: int(60_000 / 1000 * TARGET_SR * 2)]
 
-    # 实时转写
-    print("[实时转写] 开始发送音频...")
-    sentences = asyncio.run(
-        _transcribe(
-            pcm_bytes=pcm_bytes,
+    print("[声纹注册] 正在上传...")
+    audio_base64 = base64.b64encode(register_pcm).decode("utf-8")
+
+    try:
+        feature_id = _register_voiceprint(
+            audio_base64=audio_base64,
+            audio_type="raw",
             app_id=app_id,
             access_key_id=access_key_id,
             access_key_secret=access_key_secret,
-            feature_ids=feature_id,
-            role_type=2,
-            pd="court",
         )
-    )
-    print(f"[完成] 共 {len(sentences)} 句")
+        print(f"[声纹注册] 成功，feature_id={feature_id}")
+
+        # 实时转写
+        print("[实时转写] 开始发送音频...")
+        sentences = asyncio.run(
+            _transcribe(
+                pcm_bytes=pcm_bytes,
+                app_id=app_id,
+                access_key_id=access_key_id,
+                access_key_secret=access_key_secret,
+                feature_ids=feature_id,
+                role_type=2,
+                pd="court",
+            )
+        )
+        print(f"[完成] 共 {len(sentences)} 句")
+    except Exception as e:
+        print(f"[错误] {e}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
