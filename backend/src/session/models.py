@@ -1,36 +1,20 @@
-"""Session 状态模型。
+"""Session 运行时状态——只保留进程内需要的字段。
 
-Session 生命周期：active → disconnected → closed
+持久化数据全在 Postgres 里。WS 连接状态、live ContextStore/Orchestrator 仅活在内存。
 """
-
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass
 from typing import Literal
-
-from diarization.enrollment import Enrollment
 
 SessionStatus = Literal["active", "disconnected", "closed"]
 
 
 @dataclass
-class SessionState:
-    """Session 运行时状态（纯数据，可序列化）。"""
-
-    session_id: str
-    created_at: float = field(default_factory=time.monotonic)
-    last_active_at: float = field(default_factory=time.monotonic)
-    # Agent 状态 — 由 ContextStore / Orchestrator 的 to_dict() 产出
-    context_store: dict = field(default_factory=dict)
-    orchestrator: dict = field(default_factory=dict)
-    # 声纹注册数据
-    enrollment: dict = field(default_factory=dict)
-    # 生命周期状态
+class SessionRuntime:
+    """单个 session 的进程内 runtime 状态。"""
+    session_id: uuid.UUID
     status: SessionStatus = "active"
-    # AI 摘要（关闭后填充）
-    summary: str | None = None
-
-    def touch(self) -> None:
-        """更新最后活跃时间。"""
-        self.last_active_at = time.monotonic()
+    ctx: object | None = None       # ContextStore 实例
+    orchestrator: object | None = None

@@ -5,12 +5,14 @@ import json
 import logging
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from agent.bus import UtteranceBus  # noqa: E402
@@ -18,14 +20,12 @@ from agent.context_store import ContextStore  # noqa: E402
 from agent.relevance_gate import load_relevance_model  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
 from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
+from db.engine import create_engine_from_env, get_sessionmaker  # noqa: E402
 from session.manager import SessionManager  # noqa: E402
-from session.persistence import SQLiteBackend  # noqa: E402
-from session.serializer import SessionSerializer  # noqa: E402
 from session.summary import generate_summary  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
 
 ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册.wav"
-SESSION_DB = Path(__file__).parent / "data" / "sessions.db"
 
 # uvicorn 默认只给 uvicorn.* 系列 logger 加 handler,不给应用 logger。
 # 不调 basicConfig 的话,main.py 与 src/* 里的 logger.info 全静默,
@@ -49,6 +49,7 @@ app.add_middleware(
 
 _lawyer_enrollment: Enrollment | None = None
 session_manager: SessionManager | None = None
+_maker: async_sessionmaker | None = None
 
 
 def _get_lawyer_enrollment() -> Enrollment:
@@ -77,8 +78,7 @@ def _session_enrollment() -> Enrollment:
 @app.post("/api/sessions")
 async def create_session():
     """创建新会话并返回 session_id。前端拿到 id 后通过 WS 连接。"""
-    enrollment = await asyncio.to_thread(_session_enrollment)
-    session_id = await session_manager.create_session(enrollment)
+    session_id = await session_manager.create_session()
     return {"session_id": session_id}
 
 
@@ -87,10 +87,10 @@ async def _startup() -> None:
     # 预加载 BERT 模型。硬依赖：失败即阻止服务启动。
     load_relevance_model()
 
-    global session_manager
-    SESSION_DB.parent.mkdir(parents=True, exist_ok=True)
-    backend = SQLiteBackend(SESSION_DB)
-    session_manager = SessionManager(backend, snapshot_interval=60.0, ttl=600.0)
+    global session_manager, _maker
+    engine = create_engine_from_env()
+    _maker = get_sessionmaker(engine)
+    session_manager = SessionManager(_maker, ttl=600.0)
     await session_manager.start()
 
 
@@ -116,7 +116,7 @@ async def _safe_ws_close(ws: WebSocket, code: int = 1000, reason: str = "") -> N
         await ws.close(code=code, reason=reason)
 
 
-async def _generate_summary_and_save(session_id: str, ctx: ContextStore) -> None:
+async def _generate_summary_and_save(session_id: uuid.UUID, ctx: ContextStore) -> None:
     summary = await generate_summary(ctx)
     await session_manager.set_summary(session_id, summary)
 
@@ -125,7 +125,7 @@ async def _handle_text_message(
     ws: WebSocket,
     msg: dict,
     orch: Orchestrator,
-    session_id: str,
+    session_id: uuid.UUID,
     ctx: ContextStore,
     audio_q: asyncio.Queue | None,
 ) -> bool:
@@ -169,19 +169,26 @@ async def legal_session(ws: WebSocket, session_id: str):
     print(f"[WS] accepted sid={session_id}")
 
     # --- Session 验证 ---
-    state = await session_manager.get_state(session_id) or await session_manager.restore_session(session_id)
-    if state is None:
+    try:
+        sid_uuid = uuid.UUID(session_id)
+    except ValueError:
+        print(f"[WS] invalid session_id sid={session_id} (4002)")
+        await _safe_ws_close(ws, code=4002, reason="会话不存在")
+        return
+
+    runtime = await session_manager.get_runtime(sid_uuid) or await session_manager.restore_session(sid_uuid)
+    if runtime is None:
         print(f"[WS] session not found sid={session_id} (4002)")
         await _safe_ws_close(ws, code=4002, reason="会话不存在")
         return
-    if state.status == "closed":
+    if runtime.status == "closed":
         print(f"[WS] session closed sid={session_id} (4001)")
         await _safe_ws_close(ws, code=4001, reason="会话已结束")
         return
-    print(f"[WS] session loaded sid={session_id} status={state.status}")
+    print(f"[WS] session loaded sid={session_id} status={runtime.status}")
 
     # 后来者接管：关掉旧 WS（若存在），本连接接管
-    old_ws = await session_manager.attach_ws(session_id, ws)
+    old_ws = await session_manager.attach_ws(sid_uuid, ws)
     if old_ws is not None:
         print(f"[WS] replacing old ws sid={session_id}")
         await _safe_ws_close(old_ws, code=4000, reason="已被新连接接管")
@@ -195,14 +202,13 @@ async def legal_session(ws: WebSocket, session_id: str):
     stt_task: asyncio.Task | None = None
     try:
         # --- 恢复或新建 Agent 状态 ---
-        if state.context_store and state.orchestrator:
-            ctx = ContextStore.from_dict(state.context_store)
-            orch = Orchestrator.from_dict(
-                state.orchestrator, ctx=ctx, session_id=session_id, user_id="lawyer-default"
-            )
+        if runtime.ctx is not None and runtime.orchestrator is not None:
+            ctx = runtime.ctx
+            orch = runtime.orchestrator
         else:
-            ctx = ContextStore()
+            ctx = ContextStore(session_id=sid_uuid, sessionmaker=_maker)
             orch = Orchestrator(ctx, session_id=session_id, user_id="lawyer-default")
+            await session_manager.bind_runtime(sid_uuid, ctx=ctx, orchestrator=orch)
 
         bus = UtteranceBus(maxsize=10)
         orch.attach_bus(bus)
@@ -238,7 +244,7 @@ async def legal_session(ws: WebSocket, session_id: str):
         await orch.start()
 
         # --- 音频管道 ---
-        enrollment = SessionSerializer.enrollment_from_dict(state.enrollment)
+        enrollment = await asyncio.to_thread(_session_enrollment)
         audio_q = asyncio.Queue()
         t0 = time.monotonic()
 
@@ -302,7 +308,7 @@ async def legal_session(ws: WebSocket, session_id: str):
                 except json.JSONDecodeError:
                     await _safe_send_json(ws, {"type": "error", "message": "Invalid JSON"})
                     continue
-                should_close = await _handle_text_message(ws, msg, orch, session_id, ctx, audio_q)
+                should_close = await _handle_text_message(ws, msg, orch, sid_uuid, ctx, audio_q)
                 if should_close:
                     break
 
@@ -322,10 +328,10 @@ async def legal_session(ws: WebSocket, session_id: str):
             with contextlib.suppress(Exception):
                 await orch.shutdown()
         if ctx is not None and orch is not None:
-            cur_state = await session_manager.get_state(session_id)
-            if cur_state is not None and cur_state.status != "closed":
+            cur = await session_manager.get_runtime(sid_uuid)
+            if cur is not None and cur.status != "closed":
                 with contextlib.suppress(Exception):
-                    await session_manager.update_agent_state(session_id, ctx, orch)
+                    await session_manager.bind_runtime(sid_uuid, ctx=ctx, orchestrator=orch)
         # detach_ws 必须执行，传入 ws 防止竞态。
         with contextlib.suppress(Exception):
-            await session_manager.detach_ws(session_id, ws)
+            await session_manager.detach_ws(sid_uuid, ws)
