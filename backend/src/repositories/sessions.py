@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,9 +31,9 @@ class SessionRepository:
         if row is None:
             return
         row.status = status
-        row.last_active_at = datetime.now(timezone.utc)
+        row.last_active_at = datetime.now(UTC)
         if status == "closed":
-            row.closed_at = datetime.now(timezone.utc)
+            row.closed_at = datetime.now(UTC)
         await self._s.commit()
 
     async def set_summary(self, session_id: uuid.UUID, summary: str | None) -> None:
@@ -47,18 +47,18 @@ class SessionRepository:
         row = await self._s.get(Session, session_id)
         if row is None:
             return
-        row.last_active_at = datetime.now(timezone.utc)
+        row.last_active_at = datetime.now(UTC)
         await self._s.commit()
 
     async def list_expired_disconnected(self, ttl_seconds: float) -> list[uuid.UUID]:
         """返回 disconnected 且超过 TTL 的 session_id；供清理任务使用。"""
         from sqlalchemy import and_
 
-        cutoff = datetime.now(timezone.utc).timestamp() - ttl_seconds
+        cutoff = datetime.now(UTC).timestamp() - ttl_seconds
         stmt = select(Session.id).where(
             and_(
                 Session.status == "disconnected",
-                Session.last_active_at < datetime.fromtimestamp(cutoff, tz=timezone.utc),
+                Session.last_active_at < datetime.fromtimestamp(cutoff, tz=UTC),
             )
         )
         return list((await self._s.execute(stmt)).scalars().all())

@@ -4,9 +4,9 @@ import os
 import pytest
 import pytest_asyncio
 
+import db.models  # noqa: F401  # 触发 ORM 注册到 metadata
 from db.base import Base
 from db.engine import create_engine_from_env, get_sessionmaker
-import db.models  # noqa: F401  # 触发 ORM 注册到 metadata
 
 
 @pytest.fixture(autouse=True)
@@ -24,8 +24,8 @@ async def db_session():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    SessionLocal = get_sessionmaker(engine)
-    async with SessionLocal() as session:
+    session_local = get_sessionmaker(engine)
+    async with session_local() as session:
         yield session
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

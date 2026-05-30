@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +34,7 @@ class SuggestionRepository:
             row.kind = "pending"
             row.preview_topic = preview_topic
             row.preview_rationale = preview_rationale
-            row.updated_at = datetime.now(timezone.utc)
+            row.updated_at = datetime.now(UTC)
         await self._s.commit()
 
     async def upsert_ready(
@@ -56,7 +56,7 @@ class SuggestionRepository:
         else:
             row.kind = "ready"
             row.text = text
-            row.updated_at = datetime.now(timezone.utc)
+            row.updated_at = datetime.now(UTC)
         await self._s.commit()
 
     async def _find(self, session_id: uuid.UUID, request_id: str) -> Suggestion | None:

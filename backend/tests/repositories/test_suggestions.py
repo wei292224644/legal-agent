@@ -1,5 +1,4 @@
 """验证 suggestion 仓储：upsert 幂等、按 request_id 更新到 ready。"""
-import uuid
 
 import pytest
 

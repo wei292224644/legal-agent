@@ -5,7 +5,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from db.engine import create_engine_from_env, get_sessionmaker
 from db.models import ProfileEntry, Session, Suggestion, Utterance
 
 
@@ -89,7 +88,7 @@ async def test_profile_entry_source_utt_set_null(db_session):
     )
     db_session.add(entry)
     await db_session.commit()
-    await db_session.delete((await db_session.get(Utterance, "utt-x")))
+    await db_session.delete(await db_session.get(Utterance, "utt-x"))
     await db_session.commit()
     await db_session.refresh(entry)
     assert entry.source_utt_id is None

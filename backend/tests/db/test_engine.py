@@ -19,8 +19,8 @@ async def test_engine_connects_to_postgres():
 async def test_sessionmaker_yields_async_session():
     """session 工厂能产出可用的 AsyncSession——避免 maker 配置写错。"""
     engine = create_engine_from_env()
-    SessionLocal = get_sessionmaker(engine)
-    async with SessionLocal() as session:
+    session_local = get_sessionmaker(engine)
+    async with session_local() as session:
         result = await session.execute(text("SELECT 2"))
         assert result.scalar_one() == 2
     await engine.dispose()
