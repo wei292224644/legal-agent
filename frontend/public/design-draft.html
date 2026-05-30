@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>创意草案 — 3 个方向</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{background:#050506;color:#e8e8ec;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.page-frame{border:1px solid #222;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,0.03),0 20px 60px rgba(0,0,0,0.5);}
+.label-tag{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.02em;}
+</style>
+</head>
+<body class="min-h-screen py-12 px-6">
+<div class="max-w-6xl mx-auto space-y-20">
+
+<div class="text-center mb-16">
+<h1 class="text-3xl font-semibold tracking-tight text-[#e8e8ec] mb-3">三个发散方向</h1>
+<p class="text-sm text-[#555a62]">每个方向只画 LiveSession 核心布局，选一个推进</p>
+</div>
+
+<!-- ===== 方向 A: 沉浸 HUD ===== -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-semibold text-[#e8e8ec]">方向 A：沉浸 HUD</h2>
+<span class="text-xs text-[#555a62] font-mono">像 AR 眼镜的抬头显示</span>
+</div>
+<p class="text-sm text-[#8a8f98] mb-4 max-w-2xl">
+屏幕中央完全留白给律师看对方。所有信息以"浮现层"形式出现在边缘。转写是一条底部的字幕流。洞察从右侧边缘滑入。用户画像常驻左下角，像一个迷你档案夹。
+</p>
+<div class="page-frame" style="aspect-ratio:16/9;max-height:520px;">
+<div class="relative w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center" style="background-image:radial-gradient(circle at 50% 50%,rgba(124,156,191,0.03) 0%,transparent 60%);">
+<!-- 中央留白区 -->
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="text-center opacity-10">
+<div class="w-24 h-24 rounded-full border border-[#7c9cbf] flex items-center justify-center mb-4 mx-auto">
+<div class="w-16 h-16 rounded-full border border-[#7c9cbf]"></div>
+</div>
+<p class="text-xs text-[#7c9cbf] font-mono">FOCAL AREA</p>
+</div>
+</div>
+<!-- 顶部状态栏 -->
+<div class="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-6" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+<span class="text-xs font-medium text-[#e8e8ec]">实时会谈</span>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<span class="w-1 h-1 rounded-full bg-[#6b9e8e]"></span>
+<span class="text-xs text-[#6b9e8e] font-mono">已连接</span>
+</div>
+<button class="h-7 px-3 rounded text-xs font-medium bg-[#7c9cbf] text-[#0a0a0c]">开始录音</button>
+</div>
+</div>
+<!-- 左下：用户画像卡片 -->
+<div class="absolute bottom-16 left-6 w-56 p-4 rounded-lg" style="background:rgba(19,19,23,0.9);border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(8px);">
+<div class="flex items-center gap-2 mb-3">
+<div class="w-8 h-8 rounded-full bg-[#1b1b20] flex items-center justify-center text-xs font-mono text-[#7c9cbf]">当</div>
+<div>
+<div class="text-sm font-medium text-[#e8e8ec]">当事人</div>
+<div class="text-xs text-[#555a62]">合同纠纷 · 被告</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mb-2">
+<div class="flex-1 h-1 rounded-full bg-[#1b1b20]"><div class="h-full rounded-full bg-[#6b9e8e]" style="width:35%"></div></div>
+<span class="text-xs text-[#6b9e8e]">冷静</span>
+</div>
+<div class="flex gap-1.5 flex-wrap">
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(124,156,191,0.12)] text-[#7c9cbf]">违约金</span>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(124,156,191,0.12)] text-[#7c9cbf]">不可抗力</span>
+</div>
+</div>
+<!-- 右下：洞察浮现卡片 -->
+<div class="absolute bottom-16 right-6 w-72 space-y-3">
+<div class="p-3 rounded-lg" style="background:rgba(124,156,191,0.08);border:1px solid rgba(124,156,191,0.15);">
+<div class="flex items-center gap-2 mb-1.5">
+<span class="w-1 h-1 rounded-full bg-[#b86b6b]"></span>
+<span class="text-xs font-medium text-[#b86b6b]">风险提示</span>
+<span class="label-tag text-[#b86b6b]">高</span>
+</div>
+<p class="text-xs text-[#8a8f98] leading-relaxed">当事人自认违约事实，建议引导进入调解程序</p>
+</div>
+<div class="p-3 rounded-lg" style="background:rgba(19,19,23,0.85);border:1px solid rgba(255,255,255,0.06);">
+<div class="flex items-center gap-2 mb-1">
+<span class="w-1 h-1 rounded-full bg-[#7c9cbf]"></span>
+<span class="text-xs font-medium text-[#7c9cbf]">法规引用</span>
+</div>
+<p class="text-xs text-[#8a8f98] leading-relaxed">民法典第 577 条 · 违约责任</p>
+</div>
+</div>
+<!-- 底部字幕流 -->
+<div class="absolute bottom-0 left-0 right-0 h-12 flex items-center px-6" style="background:linear-gradient(to top,rgba(10,10,12,0.95),transparent);border-top:1px solid rgba(255,255,255,0.04);">
+<span class="text-xs font-mono text-[#7c9cbf] mr-2">律师</span>
+<span class="text-sm text-[#e8e8ec]/80">根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任...</span>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ===== 方向 B: 浮动卡片宇宙 ===== -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-semibold text-[#e8e8ec]">方向 B：浮动卡片宇宙</h2>
+<span class="text-xs text-[#555a62] font-mono">无固定分栏，卡片自由浮动</span>
+</div>
+<p class="text-sm text-[#8a8f98] mb-4 max-w-2xl">
+没有左右分栏的概念。转写是一条底部字幕条。洞察以大小不一的浮动卡片散布在屏幕中上部，重要卡片更大、更靠近中心。用户画像是一张左侧的大卡片。背景有极淡的动态声纹纹理。
+</p>
+<div class="page-frame" style="aspect-ratio:16/9;max-height:520px;">
+<div class="relative w-full h-full bg-[#0a0a0c] overflow-hidden">
+<!-- 背景纹理 -->
+<div class="absolute inset-0 opacity-[0.03]" style="background-image:repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(124,156,191,0.5) 40px,rgba(124,156,191,0.5) 41px);background-size:100% 100%;"></div>
+<!-- 顶部工具栏 -->
+<div class="relative z-10 flex items-center justify-between px-6 h-10" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+<span class="text-xs font-medium text-[#e8e8ec]">实时会谈</span>
+<button class="h-7 px-3 rounded text-xs font-medium bg-[#7c9cbf] text-[#0a0a0c]">开始录音</button>
+</div>
+<!-- 左侧用户画像大卡片 -->
+<div class="absolute left-6 top-16 w-64 p-5 rounded-xl" style="background:#131317;border:1px solid rgba(255,255,255,0.08);">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-full bg-[#1b1b20] flex items-center justify-center text-sm font-mono text-[#7c9cbf]">当</div>
+<div>
+<div class="text-sm font-semibold text-[#e8e8ec]">当事人画像</div>
+<div class="text-xs text-[#555a62]">合同纠纷 · 第 2 次会谈</div>
+</div>
+</div>
+<div class="space-y-3">
+<div>
+<div class="text-xs text-[#555a62] mb-1">情绪状态</div>
+<div class="flex items-center gap-2">
+<div class="flex-1 h-1.5 rounded-full bg-[#1b1b20]"><div class="h-full rounded-full bg-[#6b9e8e]" style="width:35%"></div></div>
+<span class="text-xs text-[#6b9e8e]">冷静</span>
+</div>
+</div>
+<div>
+<div class="text-xs text-[#555a62] mb-1">关键主张</div>
+<div class="space-y-1">
+<div class="flex items-start gap-1.5"><span class="w-1 h-1 rounded-full mt-1.5 bg-[#7c9cbf]"></span><span class="text-xs text-[#8a8f98]">违约金过高</span></div>
+<div class="flex items-start gap-1.5"><span class="w-1 h-1 rounded-full mt-1.5 bg-[#b86b6b]"></span><span class="text-xs text-[#8a8f98]">已自认违约</span></div>
+</div>
+</div>
+<div class="p-2 rounded" style="background:rgba(184,107,107,0.06);border:1px solid rgba(184,107,107,0.1);">
+<div class="text-xs text-[#b86b6b] font-medium mb-0.5">高风险</div>
+<div class="text-xs text-[#8a8f98]">自认"延迟三天"，构成违约事实自认</div>
+</div>
+</div>
+</div>
+<!-- 浮动洞察卡片 -->
+<div class="absolute" style="left:300px;top:80px;">
+<div class="w-80 p-5 rounded-xl" style="background:#131317;border:1px solid rgba(124,156,191,0.15);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+<div class="flex items-center gap-2 mb-2">
+<span class="w-2 h-2 rounded-full bg-[#b86b6b]"></span>
+<span class="text-xs font-medium text-[#b86b6b]">风险提示 · 高</span>
+</div>
+<h3 class="text-base font-semibold text-[#e8e8ec] mb-2">违约金过高可能被调低</h3>
+<p class="text-sm text-[#8a8f98] leading-relaxed">合同约定的 20% 违约金可能面临被法院调低的风险。建议准备实际损失的证据材料。</p>
+</div>
+</div>
+<div class="absolute" style="left:340px;top:260px;">
+<div class="w-64 p-4 rounded-xl" style="background:#131317;border:1px solid rgba(124,156,191,0.1);">
+<div class="flex items-center gap-2 mb-2">
+<span class="w-1.5 h-1.5 rounded-full bg-[#7c9cbf]"></span>
+<span class="text-xs font-medium text-[#7c9cbf]">法规引用</span>
+</div>
+<h3 class="text-sm font-semibold text-[#e8e8ec] mb-1">民法典第 577 条</h3>
+<p class="text-xs text-[#8a8f98] leading-relaxed">确立了违约责任的一般条款</p>
+</div>
+</div>
+<div class="absolute" style="left:640px;top:100px;">
+<div class="w-56 p-4 rounded-xl" style="background:#131317;border:1px solid rgba(107,158,142,0.15);">
+<div class="flex items-center gap-2 mb-2">
+<span class="w-1.5 h-1.5 rounded-full bg-[#6b9e8e]"></span>
+<span class="text-xs font-medium text-[#6b9e8e]">行为分析</span>
+</div>
+<h3 class="text-sm font-semibold text-[#e8e8ec] mb-1">态度软化，倾向调解</h3>
+<p class="text-xs text-[#8a8f98] leading-relaxed">多次使用"可以商量"</p>
+</div>
+</div>
+<div class="absolute" style="left:680px;top:240px;">
+<div class="w-48 p-3 rounded-lg" style="background:rgba(124,156,191,0.08);border:1px solid rgba(124,156,191,0.2);">
+<div class="flex items-center gap-2 mb-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#7c9cbf]"></span>
+<span class="text-xs font-medium text-[#7c9cbf]">可分析意图</span>
+</div>
+<p class="text-xs text-[#8a8f98] mb-2">违约金调整裁量标准</p>
+<button class="h-7 px-3 rounded text-xs font-medium bg-[#7c9cbf] text-[#0a0a0c]">生成分析</button>
+</div>
+</div>
+<!-- 底部字幕条 -->
+<div class="absolute bottom-0 left-0 right-0 h-12 flex items-center px-6 gap-3" style="background:rgba(10,10,12,0.9);border-top:1px solid rgba(255,255,255,0.06);">
+<span class="text-xs font-mono text-[#7c9cbf]">律师</span>
+<span class="text-sm text-[#e8e8ec]/70">根据《民法典》第五百七十七条，当事人一方不履行合同义务的...</span>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ===== 方向 C: 法律笔录 ===== -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-semibold text-[#e8e8ec]">方向 C：法律笔录</h2>
+<span class="text-xs text-[#555a62] font-mono">整个屏幕就是一份自动书写的笔录</span>
+</div>
+<p class="text-sm text-[#8a8f98] mb-4 max-w-2xl">
+整个界面像一张正在自动书写的法律笔录纸。转写是文档主体，占满屏幕中央。洞察以红色/蓝色行内高亮 + 右侧批注栏的形式出现（像 Google Docs 评论）。用户画像是一个可折叠的档案侧栏。字体偏大，行高舒适，像阅读真正的法律文件。
+</p>
+<div class="page-frame" style="aspect-ratio:16/9;max-height:520px;">
+<div class="w-full h-full bg-[#0a0a0c] flex">
+<!-- 左侧：档案侧栏（可折叠） -->
+<div class="w-14 shrink-0 flex flex-col items-center py-4 gap-4" style="border-right:1px solid rgba(255,255,255,0.06);background:#0d0d10;">
+<div class="w-8 h-8 rounded bg-[#131317] flex items-center justify-center text-xs font-mono text-[#7c9cbf]">当</div>
+<div class="w-8 h-8 rounded flex items-center justify-center text-[#555a62]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+</div>
+<!-- 中央：笔录主体 -->
+<div class="flex-1 flex justify-center overflow-auto">
+<div class="w-full max-w-2xl py-10 px-12">
+<!-- 文档头部 -->
+<div class="mb-10 pb-6" style="border-bottom:1px solid rgba(255,255,255,0.08);">
+<div class="flex items-center justify-between mb-4">
+<div>
+<h1 class="text-xl font-semibold text-[#e8e8ec] tracking-tight mb-1">会谈笔录</h1>
+<p class="text-xs text-[#555a62] font-mono">CASE-2025-0547 · 第 2 次会谈</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#6b9e8e]"></span>
+<span class="text-xs text-[#6b9e8e] font-mono">录音中</span>
+</div>
+</div>
+<div class="flex gap-6 text-xs text-[#555a62]">
+<span>当事人：张某（被告）</span>
+<span>律师：李律师</span>
+<span>时间：2025-05-30 14:30</span>
+</div>
+</div>
+<!-- 笔录内容 -->
+<div class="space-y-6">
+<div class="flex gap-4 group">
+<div class="shrink-0 pt-1">
+<span class="text-xs font-mono text-[#7c9cbf]">律师</span>
+</div>
+<p class="text-[15px] leading-[1.9] text-[#e8e8ec]/90">
+根据<span class="px-1 rounded" style="background:rgba(124,156,191,0.12);color:#95b0d4;">《中华人民共和国民法典》第五百七十七条</span>，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。
+</p>
+</div>
+<div class="flex gap-4 group">
+<div class="shrink-0 pt-1">
+<span class="text-xs font-mono text-[#555a62]">当事人</span>
+</div>
+<div class="text-[15px] leading-[1.9] text-[#e8e8ec]/90">
+<p>但是对方主张违约金过高，认为我们只延迟了三天，不应该按合同约定的百分之二十计算。</p>
+<!-- 行内批注 -->
+<div class="mt-2 pl-3 border-l-2 border-[#b86b6b]/50">
+<p class="text-xs text-[#b86b6b] leading-relaxed">⚠ 当事人自认"延迟三天"，构成违约事实自认。建议立即引导确认是否接受调解。</p>
+</div>
+</div>
+</div>
+<div class="flex gap-4 group">
+<div class="shrink-0 pt-1">
+<span class="text-xs font-mono text-[#7c9cbf]">律师</span>
+</div>
+<p class="text-[15px] leading-[1.9] text-[#e8e8ec]/90">
+这个抗辩是合理的。最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释第六十五条规定，<span class="px-1 rounded" style="background:rgba(124,156,191,0.12);color:#95b0d4;">约定的违约金超过造成的损失的百分之三十的，人民法院可以认定为"过分高于造成的损失"</span>。
+</p>
+</div>
+<div class="flex gap-4 group">
+<div class="shrink-0 pt-1">
+<span class="text-xs font-mono text-[#555a62]">当事人</span>
+</div>
+<p class="text-[15px] leading-[1.9] text-[#e8e8ec]/90">
+那能不能商量一下？我们确实也有困难，只要不过分，我们可以谈。
+</p>
+</div>
+<div class="flex gap-4 group">
+<div class="shrink-0 pt-1">
+<span class="text-xs font-mono text-[#7c9cbf]">律师</span>
+</div>
+<p class="text-[15px] leading-[1.9] text-[#e8e8ec]/90">
+如果您愿意接受调解，我们可以尝试与对方协商一个双方都能接受的方案。
+</p>
+</div>
+</div>
+</div>
+</div>
+<!-- 右侧：批注栏 -->
+<div class="w-72 shrink-0 py-8 px-5 overflow-auto" style="background:#0d0d10;border-left:1px solid rgba(255,255,255,0.06);">
+<div class="mb-6">
+<h3 class="text-xs font-semibold text-[#e8e8ec] mb-4">批注与洞察</h3>
+<div class="space-y-4">
+<div class="p-3 rounded-lg" style="background:rgba(184,107,107,0.06);border:1px solid rgba(184,107,107,0.12);">
+<div class="flex items-center gap-2 mb-1.5">
+<span class="w-1 h-1 rounded-full bg-[#b86b6b]"></span>
+<span class="text-xs font-medium text-[#b86b6b]">风险提示 · 高</span>
+</div>
+<p class="text-xs text-[#8a8f98] leading-relaxed">违约金过高可能被调低。建议准备实际损失的证据材料。</p>
+</div>
+<div class="p-3 rounded-lg" style="background:rgba(107,158,142,0.06);border:1px solid rgba(107,158,142,0.12);">
+<div class="flex items-center gap-2 mb-1.5">
+<span class="w-1 h-1 rounded-full bg-[#6b9e8e]"></span>
+<span class="text-xs font-medium text-[#6b9e8e]">行为分析</span>
+</div>
+<p class="text-xs text-[#8a8f98] leading-relaxed">当事人态度软化，多次使用"可以商量"，建议引导调解。</p>
+</div>
+<div class="p-3 rounded-lg" style="background:rgba(124,156,191,0.06);border:1px solid rgba(124,156,191,0.12);">
+<div class="flex items-center gap-2 mb-1.5">
+<span class="w-1 h-1 rounded-full bg-[#7c9cbf]"></span>
+<span class="text-xs font-medium text-[#7c9cbf]">法规引用</span>
+</div>
+<p class="text-xs text-[#8a8f98] leading-relaxed">民法典第 577 条已引用，后续可衔接第 585 条。</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- 底部说明 -->
+<div class="text-center pt-8 pb-16">
+<p class="text-sm text-[#555a62]">选一个方向，我推进完整实现</p>
+</div>
+
+</div>
+</body>
+</html>

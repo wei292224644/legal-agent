@@ -1,0 +1,135 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "三个发散方向" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 每个方向只画 LiveSession 核心布局，选一个推进
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "方向 A：沉浸 HUD" [level=2] [ref=e8]
+      - generic [ref=e9]: 像 AR 眼镜的抬头显示
+    - paragraph [ref=e10]: 屏幕中央完全留白给律师看对方。所有信息以"浮现层"形式出现在边缘。转写是一条底部的字幕流。洞察从右侧边缘滑入。用户画像常驻左下角，像一个迷你档案夹。
+    - generic [ref=e12]:
+      - paragraph [ref=e17]: FOCAL AREA
+      - generic [ref=e18]:
+        - generic [ref=e19]: 实时会谈
+        - generic [ref=e20]:
+          - generic [ref=e23]: 已连接
+          - button "开始录音" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: 当
+          - generic [ref=e28]:
+            - generic [ref=e29]: 当事人
+            - generic [ref=e30]: 合同纠纷 · 被告
+        - generic [ref=e34]: 冷静
+        - generic [ref=e35]:
+          - generic [ref=e36]: 违约金
+          - generic [ref=e37]: 不可抗力
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e42]: 风险提示
+            - generic [ref=e43]: 高
+          - paragraph [ref=e44]: 当事人自认违约事实，建议引导进入调解程序
+        - generic [ref=e45]:
+          - generic [ref=e48]: 法规引用
+          - paragraph [ref=e49]: 民法典第 577 条 · 违约责任
+      - generic [ref=e50]:
+        - generic [ref=e51]: 律师
+        - generic [ref=e52]: 根据《民法典》第五百七十七条，当事人一方不履行合同义务的，应当承担违约责任...
+  - generic [ref=e53]:
+    - generic [ref=e54]:
+      - heading "方向 B：浮动卡片宇宙" [level=2] [ref=e55]
+      - generic [ref=e56]: 无固定分栏，卡片自由浮动
+    - paragraph [ref=e57]: 没有左右分栏的概念。转写是一条底部字幕条。洞察以大小不一的浮动卡片散布在屏幕中上部，重要卡片更大、更靠近中心。用户画像是一张左侧的大卡片。背景有极淡的动态声纹纹理。
+    - generic [ref=e59]:
+      - generic [ref=e61]:
+        - generic [ref=e62]: 实时会谈
+        - button "开始录音" [ref=e63] [cursor=pointer]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: 当
+          - generic [ref=e67]:
+            - generic [ref=e68]: 当事人画像
+            - generic [ref=e69]: 合同纠纷 · 第 2 次会谈
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: 情绪状态
+            - generic [ref=e76]: 冷静
+          - generic [ref=e77]:
+            - generic [ref=e78]: 关键主张
+            - generic [ref=e79]:
+              - generic [ref=e82]: 违约金过高
+              - generic [ref=e85]: 已自认违约
+          - generic [ref=e86]:
+            - generic [ref=e87]: 高风险
+            - generic [ref=e88]: 自认"延迟三天"，构成违约事实自认
+      - generic [ref=e90]:
+        - generic [ref=e93]: 风险提示 · 高
+        - heading "违约金过高可能被调低" [level=3] [ref=e94]
+        - paragraph [ref=e95]: 合同约定的 20% 违约金可能面临被法院调低的风险。建议准备实际损失的证据材料。
+      - generic [ref=e97]:
+        - generic [ref=e100]: 法规引用
+        - heading "民法典第 577 条" [level=3] [ref=e101]
+        - paragraph [ref=e102]: 确立了违约责任的一般条款
+      - generic [ref=e104]:
+        - generic [ref=e107]: 行为分析
+        - heading "态度软化，倾向调解" [level=3] [ref=e108]
+        - paragraph [ref=e109]: 多次使用"可以商量"
+      - generic [ref=e111]:
+        - generic [ref=e114]: 可分析意图
+        - paragraph [ref=e115]: 违约金调整裁量标准
+        - button "生成分析" [ref=e116] [cursor=pointer]
+      - generic [ref=e117]:
+        - generic [ref=e118]: 律师
+        - generic [ref=e119]: 根据《民法典》第五百七十七条，当事人一方不履行合同义务的...
+  - generic [ref=e120]:
+    - generic [ref=e121]:
+      - heading "方向 C：法律笔录" [level=2] [ref=e122]
+      - generic [ref=e123]: 整个屏幕就是一份自动书写的笔录
+    - paragraph [ref=e124]: 整个界面像一张正在自动书写的法律笔录纸。转写是文档主体，占满屏幕中央。洞察以红色/蓝色行内高亮 + 右侧批注栏的形式出现（像 Google Docs 评论）。用户画像是一个可折叠的档案侧栏。字体偏大，行高舒适，像阅读真正的法律文件。
+    - generic [ref=e126]:
+      - generic [ref=e127]:
+        - generic [ref=e128]: 当
+        - img [ref=e130]
+      - generic [ref=e134]:
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - heading "会谈笔录" [level=1] [ref=e138]
+              - paragraph [ref=e139]: CASE-2025-0547 · 第 2 次会谈
+            - generic [ref=e142]: 录音中
+          - generic [ref=e143]:
+            - generic [ref=e144]: 当事人：张某（被告）
+            - generic [ref=e145]: 律师：李律师
+            - generic [ref=e146]: 时间：2025-05-30 14:30
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - generic [ref=e149]: 律师
+            - paragraph [ref=e150]: 根据《中华人民共和国民法典》第五百七十七条，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。
+          - generic [ref=e151]:
+            - generic [ref=e152]: 当事人
+            - generic [ref=e153]:
+              - paragraph [ref=e154]: 但是对方主张违约金过高，认为我们只延迟了三天，不应该按合同约定的百分之二十计算。
+              - paragraph [ref=e156]: ⚠ 当事人自认"延迟三天"，构成违约事实自认。建议立即引导确认是否接受调解。
+          - generic [ref=e157]:
+            - generic [ref=e158]: 律师
+            - paragraph [ref=e159]: 这个抗辩是合理的。最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释第六十五条规定，约定的违约金超过造成的损失的百分之三十的，人民法院可以认定为"过分高于造成的损失"。
+          - generic [ref=e160]:
+            - generic [ref=e161]: 当事人
+            - paragraph [ref=e162]: 那能不能商量一下？我们确实也有困难，只要不过分，我们可以谈。
+          - generic [ref=e163]:
+            - generic [ref=e164]: 律师
+            - paragraph [ref=e165]: 如果您愿意接受调解，我们可以尝试与对方协商一个双方都能接受的方案。
+      - generic [ref=e167]:
+        - heading "批注与洞察" [level=3] [ref=e168]
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - generic [ref=e173]: 风险提示 · 高
+            - paragraph [ref=e174]: 违约金过高可能被调低。建议准备实际损失的证据材料。
+          - generic [ref=e175]:
+            - generic [ref=e178]: 行为分析
+            - paragraph [ref=e179]: 当事人态度软化，多次使用"可以商量"，建议引导调解。
+          - generic [ref=e180]:
+            - generic [ref=e183]: 法规引用
+            - paragraph [ref=e184]: 民法典第 577 条已引用，后续可衔接第 585 条。
+  - paragraph [ref=e186]: 选一个方向，我推进完整实现
