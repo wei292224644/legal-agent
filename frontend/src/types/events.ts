@@ -17,6 +17,7 @@ export type InsightReady = {
   id: string
   utt_id: string
   text: string
+  created_at: string
 }
 
 export type AnalysisProposed = {
@@ -25,6 +26,7 @@ export type AnalysisProposed = {
   utt_id: string
   topic: string
   rationale: string
+  created_at: string
 }
 
 export type AnalysisReady = {

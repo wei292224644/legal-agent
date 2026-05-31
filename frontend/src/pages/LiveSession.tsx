@@ -51,6 +51,7 @@ function LiveSessionInner() {
   const {
     state,
     recvEvent,
+    addInsight,
     addSuggestion,
     addTranscript,
     setConnectionStatus,
@@ -153,18 +154,30 @@ function LiveSessionInner() {
         newTranscripts.forEach((t) => addTranscript(t))
 
         const existingSuggestionIds = new Set(latest.suggestions.map((s) => s.id))
-        const newSuggestions = h.suggestions
+        const newHistoryItems = h.suggestions
           .filter((s) => s.status !== 'expired' && s.status !== 'dismissed' && !existingSuggestionIds.has(s.id))
-          .map((s) => ({
-            id: s.id,
-            requestId: s.request_id ?? `req-${s.id}`,
-            status: s.status as 'pending' | 'running' | 'ready',
-            topic: s.preview_topic ?? '',
-            rationale: s.preview_rationale ?? '',
-            text: s.text ?? null,
-            createdAt: s.created_at,
-          }))
-        newSuggestions.forEach((s) => addSuggestion(s))
+
+        newHistoryItems.forEach((s) => {
+          if (s.source === 'direct') {
+            addInsight({
+              id: s.id,
+              uttId: s.utt_id,
+              text: s.text ?? '',
+              createdAt: s.created_at,
+            })
+          } else {
+            addSuggestion({
+              id: s.id,
+              requestId: s.request_id ?? `req-${s.id}`,
+              status: s.status as 'pending' | 'running' | 'ready',
+              topic: s.preview_topic ?? '',
+              rationale: s.preview_rationale ?? '',
+              text: s.text ?? null,
+              source: s.source as 'direct' | 'gated',
+              createdAt: s.created_at,
+            })
+          }
+        })
 
         const profileEntries: ProfileEntryItem[] = (h.profile_entries ?? []).map(
           (e) => ({
@@ -183,7 +196,7 @@ function LiveSessionInner() {
         setSyncing(false)
       }
     },
-    [addTranscript, addSuggestion, setProfile]
+    [addTranscript, addInsight, addSuggestion, setProfile]
   )
 
   const {

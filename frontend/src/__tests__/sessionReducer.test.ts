@@ -16,22 +16,22 @@ describe('sessionReducer.RECV_EVENT', () => {
     expect(s.transcripts[0]).toMatchObject({ id: 'u1', text: 'hi', speaker: 'lawyer' })
   })
 
-  it('insight.ready → 加到 insights 头部', () => {
-    const s = recv({ type: 'insight.ready', id: 'ins_1', utt_id: 'u1', text: '洞察' })
+  it('insight.ready → 加到 insights 头部并携带 createdAt', () => {
+    const s = recv({ type: 'insight.ready', id: 'ins_1', utt_id: 'u1', text: '洞察', created_at: '2026-05-31T10:00:00Z' })
     expect(s.insights).toHaveLength(1)
-    expect(s.insights[0]).toMatchObject({ id: 'ins_1', uttId: 'u1', text: '洞察' })
+    expect(s.insights[0]).toMatchObject({ id: 'ins_1', uttId: 'u1', text: '洞察', createdAt: '2026-05-31T10:00:00Z' })
   })
 
   it('analysis.proposed → 新建 pending suggestion (幂等)', () => {
     const evt: ServerEvent = {
       type: 'analysis.proposed', request_id: 'req_1', utt_id: 'u1',
-      topic: 'T', rationale: 'R',
+      topic: 'T', rationale: 'R', created_at: '2026-05-31T10:00:00Z',
     }
     const s1 = sessionReducer(initialState, { type: 'RECV_EVENT', payload: evt })
     const s2 = sessionReducer(s1, { type: 'RECV_EVENT', payload: evt })
     expect(s1.suggestions).toHaveLength(1)
     expect(s2.suggestions).toHaveLength(1)  // 幂等
-    expect(s1.suggestions[0]).toMatchObject({ status: 'pending', topic: 'T' })
+    expect(s1.suggestions[0]).toMatchObject({ status: 'pending', topic: 'T', createdAt: '2026-05-31T10:00:00Z' })
   })
 
   it('analysis.ready → 把同 request_id 的 suggestion 改 ready', () => {

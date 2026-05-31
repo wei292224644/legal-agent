@@ -11,20 +11,38 @@ export type InsightStreamProps = {
   onDismiss: (requestId: string) => void
 }
 
+type StreamItem =
+  | { kind: 'insight'; data: Insight }
+  | { kind: 'suggestion'; data: Suggestion }
+
+function getTimestamp(item: StreamItem): number {
+  const t = new Date(item.data.createdAt).getTime()
+  return isNaN(t) ? 0 : t
+}
+
+function mergeItems(insights: Insight[], suggestions: Suggestion[]): StreamItem[] {
+  const items: StreamItem[] = [
+    ...insights.map((i) => ({ kind: 'insight' as const, data: i })),
+    ...suggestions.map((s) => ({ kind: 'suggestion' as const, data: s })),
+  ]
+  return items.sort((a, b) => getTimestamp(b) - getTimestamp(a))
+}
+
 export default function InsightStream({
   insights,
   suggestions,
   onConfirm,
   onDismiss,
 }: InsightStreamProps) {
-  const hasContent = insights.length > 0 || suggestions.length > 0
+  const items = mergeItems(insights, suggestions)
+  const hasContent = items.length > 0
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
       <div className="px-6 h-10 shrink-0 flex items-center justify-between border-b border-border-color">
         <span className="text-xs font-semibold text-ink-primary">实时洞察</span>
         <span className="text-xs font-mono text-ink-muted">
-          {suggestions.length + insights.length} 条
+          {items.length} 条
         </span>
       </div>
       <ScrollArea className="flex-1 px-6 py-5">
@@ -36,17 +54,18 @@ export default function InsightStream({
           </div>
         ) : (
           <div>
-            {suggestions.map((s) => (
-              <SuggestionCard
-                key={s.requestId}
-                suggestion={s}
-                onConfirm={onConfirm}
-                onDismiss={onDismiss}
-              />
-            ))}
-            {insights.map((insight) => (
-              <InsightCard key={insight.id} insight={insight} />
-            ))}
+            {items.map((item) =>
+              item.kind === 'suggestion' ? (
+                <SuggestionCard
+                  key={item.data.requestId}
+                  suggestion={item.data}
+                  onConfirm={onConfirm}
+                  onDismiss={onDismiss}
+                />
+              ) : (
+                <InsightCard key={item.data.id} insight={item.data} />
+              )
+            )}
           </div>
         )}
       </ScrollArea>

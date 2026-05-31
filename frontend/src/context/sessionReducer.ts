@@ -21,7 +21,7 @@ function recvEvent(state: SessionState, evt: ServerEvent): SessionState {
         id: evt.id,
         uttId: evt.utt_id,
         text: evt.text,
-        createdAt: '',
+        createdAt: evt.created_at,
       }
       return { ...state, insights: [insight, ...state.insights] }
     }
@@ -35,7 +35,7 @@ function recvEvent(state: SessionState, evt: ServerEvent): SessionState {
         topic: evt.topic,
         rationale: evt.rationale,
         text: null,
-        createdAt: '',
+        createdAt: evt.created_at,
       }
       return { ...state, suggestions: [sug, ...state.suggestions] }
     }

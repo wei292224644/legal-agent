@@ -15,6 +15,7 @@ export type Suggestion = {
   rationale: string;
   text: string | null;
   progress?: number;
+  source?: 'direct' | 'gated';
   createdAt: string;
 };
 
