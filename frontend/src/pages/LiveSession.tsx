@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { SessionProvider } from '@/context/SessionContext'
 import { useSession } from '@/hooks/useSession'
 import { fetchHistory } from '@/api/sessions'
@@ -48,11 +49,13 @@ function DisconnectBanner({ onRetry }: { onRetry: () => void }) {
 
 function LiveSessionInner() {
   const { id: sessionId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const {
     state,
     recvEvent,
     addInsight,
     addSuggestion,
+    updateSuggestion,
     addTranscript,
     setConnectionStatus,
     setSessionId,
@@ -127,6 +130,8 @@ function LiveSessionInner() {
             value: e.value,
             subject: e.subject,
             category: (e.category || 'fact') as ProfileEntryItem['category'],
+            timestamp: e.timestamp,
+            sourceUttId: e.source_utt_id,
           })
         )
 
@@ -196,6 +201,8 @@ function LiveSessionInner() {
             value: e.value,
             subject: e.subject,
             category: (e.category || 'fact') as ProfileEntryItem['category'],
+            timestamp: e.timestamp,
+            sourceUttId: e.source_utt_id,
           })
         )
         if (profileEntries.length > 0) {
@@ -242,10 +249,10 @@ function LiveSessionInner() {
 
   const handleConfirm = useCallback(
     (requestId: string) => {
+      updateSuggestion(requestId, { status: 'running' })
       confirmIntent(requestId)
-      // ready 状态等服务端 analysis.ready 事件回来,这里不再本地预改
     },
-    [confirmIntent]
+    [confirmIntent, updateSuggestion]
   )
 
   const handleDismiss = useCallback(
@@ -281,6 +288,20 @@ function LiveSessionInner() {
 
   const connectionIndicatorNode = useMemo(() => <ConnectionIndicator />, [])
 
+  const backButtonNode = useMemo(
+    () => (
+      <button
+        onClick={() => navigate('/')}
+        className="flex items-center gap-1.5 px-2 h-8 text-sm text-ink-primary rounded-md border border-border-color bg-transparent hover:bg-bg-tertiary transition-colors"
+        aria-label="返回首页"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="hidden sm:inline">首页</span>
+      </button>
+    ),
+    [navigate],
+  )
+
   return (
     <>
       <PortraitLock />
@@ -298,6 +319,7 @@ function LiveSessionInner() {
       {/* Desktop Header */}
       <header className="hidden md:flex items-center justify-between px-6 h-12 border-b border-border-color bg-bg-primary shrink-0">
         <div className="flex items-center gap-4">
+          {backButtonNode}
           <h1 className="text-base font-semibold text-ink-primary tracking-tight">实时会谈</h1>
           {connectionIndicatorNode}
         </div>
@@ -318,6 +340,7 @@ function LiveSessionInner() {
         transcriptPanel={transcriptPanelNode}
         connectionStatus={connectionIndicatorNode}
         audioControls={<AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />}
+        backButton={backButtonNode}
       />
     </div>
     </>

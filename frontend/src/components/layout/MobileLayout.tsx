@@ -10,6 +10,7 @@ export type MobileLayoutProps = {
   transcriptPanel: ReactNode
   connectionStatus: ReactNode
   audioControls: ReactNode
+  backButton?: ReactNode
 }
 
 export default function MobileLayout({
@@ -18,6 +19,7 @@ export default function MobileLayout({
   transcriptPanel,
   connectionStatus,
   audioControls,
+  backButton,
 }: MobileLayoutProps) {
   const [activeTab, setActiveTab] = useState<'insights' | 'profile' | 'transcript'>('insights')
 
@@ -26,6 +28,7 @@ export default function MobileLayout({
       {/* Header */}
       <div className="px-4 h-12 shrink-0 flex items-center justify-between border-b border-border-color bg-bg-primary">
         <div className="flex items-center gap-3">
+          {backButton}
           <div className="text-base font-semibold text-ink-primary tracking-tight">实时会谈</div>
           {connectionStatus}
         </div>
