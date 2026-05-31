@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import copy
 import io
 import json
 import logging
@@ -34,8 +33,6 @@ from session.manager import SessionManager  # noqa: E402
 from session.summary import generate_summary  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
 
-ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册_30s.wav"
-
 # uvicorn 默认只给 uvicorn.* 系列 logger 加 handler,不给应用 logger。
 # 不调 basicConfig 的话,main.py 与 src/* 里的 logger.info 全静默,
 # 排查问题时会误以为代码没跑到。force=True 覆盖任何已有 root handler。
@@ -56,32 +53,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_lawyer_enrollment: Enrollment | None = None
 session_manager: SessionManager | None = None
 _maker: async_sessionmaker | None = None
 
 
-def _get_lawyer_enrollment() -> Enrollment:
-    """模块级单例:律师 enrollment 全进程加载一次。
-
-    Sprint 3 会把这换成 WS 协议里前端上传 / 用户绑定的 enrollment。
-    """
-    global _lawyer_enrollment
-    if _lawyer_enrollment is None:
-        audio, sr = sf.read(str(ENROLLMENT_WAV), dtype="float32", always_2d=False)
-        if audio.ndim == 2:
-            audio = audio.mean(axis=1)
-        _lawyer_enrollment = enroll_speaker(audio, sr)
-    return _lawyer_enrollment
-
-
-def _session_enrollment() -> Enrollment:
-    """每个会话拿到独立的 enrollment 副本。
-
-    matcher 的双声纹自举会写回 client_embedding;若所有会话共享全局单例,
-    会话 A 的客户声纹种子会泄漏污染会话 B 的说话人判定。
-    """
-    return copy.deepcopy(_get_lawyer_enrollment())
+async def _load_session_enrollment(sid: uuid.UUID) -> Enrollment | None:
+    """从 SessionManager 加载 session 绑定的 enrollment。"""
+    if session_manager is None:
+        return None
+    return await session_manager.get_enrollment(sid)
 
 
 @app.post("/api/sessions")
@@ -387,7 +367,11 @@ async def legal_session(ws: WebSocket, session_id: str):
         await orch.start()
 
         # --- 音频管道 ---
-        enrollment = await asyncio.to_thread(_session_enrollment)
+        enrollment = await _load_session_enrollment(sid_uuid)
+        if enrollment is None:
+            logger.warning("[WS] no enrollment for sid=%s (4003)", session_id)
+            await _safe_ws_close(ws, code=4003, reason="请先录制声纹")
+            return
         audio_q = asyncio.Queue()
         t0 = time.monotonic()
 
