@@ -108,15 +108,24 @@ function RunningCard({ suggestion }: { suggestion: Suggestion }) {
 function ReadyCard({ suggestion }: { suggestion: Suggestion }) {
   const [expanded, setExpanded] = useState(false)
 
+  const preview = suggestion.text
+    ? suggestion.text.slice(0, 120) + (suggestion.text.length > 120 ? '...' : '')
+    : ''
+
   return (
     <div className="mb-5 p-4 rounded-lg bg-bg-secondary border border-border-color">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-3 h-3 text-success" />
-            <span className="text-xs font-medium text-success">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
+            <span className="text-xs font-medium text-success shrink-0">
               {suggestion.topic || '深度分析'}
             </span>
+            {!expanded && preview && (
+              <span className="text-xs text-ink-muted truncate">
+                · {preview}
+              </span>
+            )}
           </div>
           <Button
             variant="ghost"
