@@ -18,6 +18,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from agent.events import (
@@ -247,6 +248,7 @@ class Orchestrator:
                     logger.warning("insert_direct failed utt=%s", utt.id, exc_info=True)
             await self._emit_event(InsightReady(
                 id=insight_id, utt_id=utt.id, text=text,
+                created_at=datetime.now(UTC).isoformat(),
             ))
             return
 
@@ -279,6 +281,7 @@ class Orchestrator:
                 logger.warning("upsert_pending failed req=%s", request_id, exc_info=True)
         await self._emit_event(AnalysisProposed(
             request_id=request_id, utt_id=utt.id, topic=topic, rationale=rationale,
+            created_at=datetime.now(UTC).isoformat(),
         ))
 
     # ------------------------------------------------------------------

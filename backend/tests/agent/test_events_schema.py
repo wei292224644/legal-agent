@@ -20,9 +20,9 @@ ADAPTER: TypeAdapter[OutboundEvent] = TypeAdapter(OutboundEvent)
 @pytest.mark.parametrize("evt", [
     TranscriptDelta(utt_id="u1", speaker="lawyer", text="hi",
                     t_start=0.0, t_end=1.0, closed_by=None),
-    InsightReady(id="ins_1", utt_id="u1", text="结论"),
+    InsightReady(id="ins_1", utt_id="u1", text="结论", created_at="2026-05-31T12:00:00+00:00"),
     AnalysisProposed(request_id="req_1", utt_id="u1",
-                     topic="X 是否构成 Y", rationale="因为 Z"),
+                     topic="X 是否构成 Y", rationale="因为 Z", created_at="2026-05-31T12:00:00+00:00"),
     AnalysisReady(request_id="req_1", utt_id="u1", text="深度结论"),
     AnalysisDismissed(request_id="req_1", reason="expired"),
     ProfileUpdated(entries=[ProfileEntryPayload(key="姓名", value="张三", subject="client",
