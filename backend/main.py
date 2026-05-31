@@ -84,7 +84,8 @@ async def create_session():
 
 @app.get("/api/sessions/{session_id}/history")
 async def get_history(session_id: str):
-    """返回 session 的完整历史（utterances + suggestions），供前端刷新回放。"""
+    """返回 session 的完整历史（utterances + suggestions + profile），供前端刷新回放。"""
+    from repositories.profile_entries import ProfileEntryRepository
     from repositories.sessions import SessionRepository
     from repositories.suggestions import SuggestionRepository
     from repositories.utterances import UtteranceRepository
@@ -100,6 +101,7 @@ async def get_history(session_id: str):
             raise HTTPException(status_code=404, detail="会话不存在")
         utts = await UtteranceRepository(s).list_by_session(sid)
         sugs = await SuggestionRepository(s).list_by_session(sid)
+        profile_entries = await ProfileEntryRepository(s).list_by_session(sid)
 
     return {
         "session_id": str(sid),
@@ -111,6 +113,14 @@ async def get_history(session_id: str):
             } for u in utts
         ],
         "suggestions": sugs,
+        "profile_entries": [
+            {
+                "key": e.key,
+                "value": e.value,
+                "subject": e.subject,
+            }
+            for e in profile_entries
+        ],
     }
 
 
@@ -304,6 +314,21 @@ async def legal_session(ws: WebSocket, session_id: str):
                 logger.warning("Suggestion callback failed: %s", exc)
 
         orch.set_suggestion_callback(on_suggestion)
+
+        async def on_profile_update(entries):
+            await _safe_send_json(ws, {
+                "type": "profile_update",
+                "entries": [
+                    {
+                        "key": e.key,
+                        "value": e.value,
+                        "subject": e.subject,
+                    }
+                    for e in entries
+                ],
+            })
+
+        orch.set_profile_callback(on_profile_update)
         await orch.start()
 
         # --- 音频管道 ---

@@ -75,6 +75,7 @@ class Orchestrator:
         self._bus = None
         self._bus_task = None
         self._ttl_task = None
+        self._profile_callback = None
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -88,6 +89,9 @@ class Orchestrator:
 
     def set_expiry_callback(self, callback) -> None:
         self._expiry_callback = callback
+
+    def set_profile_callback(self, callback) -> None:
+        self._profile_callback = callback
 
     async def start(self) -> None:
         await self._ctx.start_profile_worker()
@@ -145,8 +149,14 @@ class Orchestrator:
                     for entry in entries:
                         entry.timestamp = utt.t_start
                     await self._ctx.enqueue_profile_update(utt.id, entries)
+                    if self._profile_callback is not None:
+                        try:
+                            result = self._profile_callback(entries)
+                            if asyncio.iscoroutine(result):
+                                await result
+                        except Exception:
+                            logger.warning("profile callback failed", exc_info=True)
             except Exception as e:
-                # 画像兜底失败要大声说,不能静默:CLAUDE.md 第 12 条
                 logger.warning("ProfileAgent.extract failed for utt %s: %s", utt.id, e)
 
         should_spawn = await gate_task
