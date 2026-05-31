@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Mic, Shield, Brain, ArrowRight } from 'lucide-react'
 
@@ -18,7 +19,7 @@ export default function EntryPage() {
       const { session_id } = await resp.json()
       navigate(`/session/${session_id}`)
     } catch (e) {
-      alert('创建会话失败: ' + (e as Error).message)
+      toast.error('创建会话失败', { description: (e as Error).message })
       setLoading(false)
     }
   }

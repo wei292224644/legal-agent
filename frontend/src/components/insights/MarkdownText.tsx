@@ -1,9 +1,9 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-const ALLOWED = new Set([
+const ALLOWED = [
   'p', 'strong', 'em', 'code', 'ul', 'ol', 'li', 'blockquote', 'a', 'br', 'pre',
-])
+]
 
 const COMPONENTS = {
   p: ({ children }: { children?: React.ReactNode }) => <p className="text-sm text-ink-secondary leading-relaxed whitespace-pre-wrap mb-1">{children}</p>,
