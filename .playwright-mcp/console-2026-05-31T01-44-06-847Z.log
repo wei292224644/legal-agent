@@ -1,0 +1,63 @@
+[      75ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:14336
+[    3994ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[    4017ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  101848ms] [ERROR] React has detected a change in the order of Hooks called by %s. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
+
+   Previous render            Next render
+   ------------------------------------------------------
+%s   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ LiveSessionInner 1. useContext                 useContext
+2. useContext                 useContext
+3. useState                   useState
+4. useRef                     useRef
+5. useEffect                  useEffect
+6. useEffect                  useEffect
+7. useCallback                useCallback
+8. useCallback                useCallback
+9. useCallback                useCallback
+10. useCallback               useCallback
+11. useState                  useState
+12. useState                  useState
+13. useRef                    useRef
+14. useRef                    useRef
+15. useRef                    useRef
+16. useRef                    useRef
+17. useRef                    useRef
+18. useRef                    useRef
+19. useCallback               useCallback
+20. useCallback               useCallback
+21. useEffect                 useEffect
+22. useEffect                 useEffect
+23. useCallback               useCallback
+24. useCallback               useCallback
+25. useCallback               useCallback
+26. useCallback               useCallback
+27. useEffect                 useCallback
+ @ http://localhost:5199/@vite/client:524
+[  101861ms] Error: Rendered more hooks than during the previous render.
+    at updateWorkInProgressHook (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4326:12)
+    at updateCallback (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4920:15)
+    at Object.useCallback (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:13242:12)
+    at exports.useCallback (http://localhost:5199/node_modules/.vite/deps/react-Dyb9tW5G.js?v=b71b64c4:732:31)
+    at LiveSessionInner (http://localhost:5199/src/pages/LiveSession.tsx?t=1780191948517:250:24)
+    at Object.react_stack_bottom_frame (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:12867:12)
+    at renderWithHooks (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4212:19)
+    at updateFunctionComponent (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:5568:16)
+    at beginWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:6139:20)
+    at runWithFiberInDEV (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:850:66)
+[  101855ms] [WARNING] %s
+
+%s
+ An error occurred in the <LiveSessionInner> component. Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries. @ http://localhost:5199/@vite/client:524
+[  114618ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5199/src/pages/LiveSession.tsx?t=1780191961415:0
+[  114618ms] [ERROR] [vite] Failed to reload /src/pages/LiveSession.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5199/@vite/client:524
+[  120460ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5199/src/pages/LiveSession.tsx?t=1780191967303:0
+[  120460ms] [ERROR] [vite] Failed to reload /src/pages/LiveSession.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5199/@vite/client:524
+[  141595ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  141601ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  147943ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  152102ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  157031ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  161115ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  169014ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0

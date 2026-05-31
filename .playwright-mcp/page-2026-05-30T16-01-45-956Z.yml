@@ -1,0 +1,55 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - img [ref=e4]
+    - heading "请旋转设备" [level=2] [ref=e6]
+    - paragraph [ref=e7]: 为获得最佳体验，请将手机旋转至竖屏模式
+  - generic [ref=e8]:
+    - banner [ref=e9]:
+      - generic [ref=e10]:
+        - heading "实时会谈" [level=1] [ref=e11]
+        - generic [ref=e14]: 连接中…
+      - generic [ref=e15]:
+        - button "开始录音" [ref=e16]:
+          - img
+          - text: 开始录音
+        - button "上传音频" [ref=e17]:
+          - img
+          - text: 上传音频
+    - generic [ref=e18]:
+      - generic [ref=e20]:
+        - generic [ref=e22]: 当事人画像
+        - generic [ref=e23]:
+          - generic [ref=e25]:
+            - img [ref=e26]
+            - generic [ref=e29]: 基本信息
+          - generic [ref=e32]:
+            - img [ref=e33]
+            - generic [ref=e35]: 情绪状态
+          - generic [ref=e38]:
+            - img [ref=e39]
+            - generic [ref=e42]: 关键主张
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - generic [ref=e48]: 风险暴露
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - generic [ref=e55]: 已确认事实
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - generic [ref=e59]: 实时洞察
+          - generic [ref=e60]: 0 条
+        - generic [ref=e62]:
+          - img [ref=e63]
+          - paragraph [ref=e65]: 系统正在监听并分析对话内容…
+          - paragraph [ref=e66]: 分析结果将随对话自动呈现
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e69]: 转写参考
+          - generic [ref=e70]:
+            - generic [ref=e71]: 0 条
+            - button [ref=e72]:
+              - img
+        - generic [ref=e74]:
+          - img [ref=e75]
+          - paragraph [ref=e77]: 开始说话，转写文本将实时显示…
+          - paragraph [ref=e78]: 录音开始后，对话内容将出现在此处

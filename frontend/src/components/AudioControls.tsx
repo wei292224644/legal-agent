@@ -42,6 +42,8 @@ export default function AudioControls({ onChunk, onAudioEnd }: AudioControlsProp
             accept="audio/*"
             className="hidden"
             onChange={handleFileChange}
+            aria-hidden="true"
+            tabIndex={-1}
           />
         </>
       ) : null}
@@ -92,6 +94,7 @@ export default function AudioControls({ onChunk, onAudioEnd }: AudioControlsProp
             variant="ghost"
             size="icon"
             onClick={clearError}
+            title="关闭错误提示"
             aria-label="关闭错误提示"
           >
             <X className="w-3 h-3" />

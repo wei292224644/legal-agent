@@ -32,6 +32,19 @@ function ConnectionIndicator() {
     </div>
   )
 }
+function DisconnectBanner({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2 bg-danger/10 border-b border-danger/20 text-sm">
+      <span className="text-danger">连接已断开，实时转写和分析已暂停</span>
+      <button
+        onClick={onRetry}
+        className="px-3 py-1 text-xs font-medium rounded bg-danger text-white hover:bg-danger/90 transition-colors"
+      >
+        重新连接
+      </button>
+    </div>
+  )
+}
 
 function LiveSessionInner() {
   const { id: sessionId } = useParams<{ id: string }>()
@@ -50,6 +63,7 @@ function LiveSessionInner() {
   } = useSession()
 
   const [hydrated, setHydrated] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const disconnectTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -117,6 +131,7 @@ function LiveSessionInner() {
   // Backfill history after reconnect
   const backfillHistory = useCallback(
     async (sid: string) => {
+      setSyncing(true)
       try {
         const h = await fetchHistory(sid)
         if (!h) return
@@ -157,6 +172,8 @@ function LiveSessionInner() {
         }
       } catch {
         // ignore backfill errors
+      } finally {
+        setSyncing(false)
       }
     },
     [state.transcripts, state.suggestions, addTranscript, addSuggestion, setProfile]
@@ -224,6 +241,7 @@ function LiveSessionInner() {
     confirmIntent,
     dismissIntent,
     notifyAudioEnd,
+    reconnect,
   } = useWebSocket(hydrated ? (sessionId ?? '') : '', {
     onTranscript,
     onAnalysis,
@@ -295,6 +313,16 @@ function LiveSessionInner() {
     <>
       <PortraitLock />
       <div className="flex flex-col h-screen bg-background text-foreground">
+      {/* Disconnect Banner */}
+      {state.connectionStatus === 'disconnected' && <DisconnectBanner onRetry={reconnect} />}
+
+      {/* Syncing Banner */}
+      {syncing && (
+        <div className="flex items-center justify-center px-4 py-1.5 bg-accent-muted border-b border-accent/15 text-xs text-accent">
+          正在同步离线期间的对话记录…
+        </div>
+      )}
+
       {/* Desktop Header */}
       <header className="hidden md:flex items-center justify-between px-6 h-12 border-b border-border-color bg-bg-primary shrink-0">
         <div className="flex items-center gap-4">

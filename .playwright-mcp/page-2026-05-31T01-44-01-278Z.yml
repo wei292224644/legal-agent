@@ -1,0 +1,8 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - heading "声纹注册" [level=1] [ref=e6]
+    - paragraph [ref=e7]: 首次使用前，请朗读以下文本以注册您的声纹
+  - paragraph [ref=e9]: "\"今天天气很好，我们在这里进行法律咨询。根据中华人民共和国相关法律法规，我将为您提供专业的法律服务和建议。\""
+  - button "开始录音 (15秒)" [ref=e10]:
+    - img
+    - text: 开始录音 (15秒)

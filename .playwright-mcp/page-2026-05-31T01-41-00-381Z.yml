@@ -1,0 +1,26 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - generic [ref=e16]: 法律 AI 辅助会谈 v3
+    - heading "实时转写、智能分析、 风险识别" [level=1] [ref=e17]:
+      - text: 实时转写、智能分析、
+      - text: 风险识别
+    - paragraph [ref=e18]: 做您会谈中的第二大脑。基于大语言模型的实时法律分析， 帮助律师在会谈中快速识别风险、引用法规、把握当事人心理。
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - img [ref=e22]
+        - generic [ref=e25]: 实时语音转写，自动区分律师与当事人
+      - generic [ref=e26]:
+        - img [ref=e28]
+        - generic [ref=e36]: 智能洞察生成，法规引用与风险提示
+      - generic [ref=e37]:
+        - img [ref=e39]
+        - generic [ref=e41]: 当事人画像构建，情绪与主张追踪
+  - generic [ref=e43]:
+    - heading "开始会谈" [level=2] [ref=e44]
+    - paragraph [ref=e45]: 创建加密会话，所有数据仅保存在本地与您的服务器中。
+    - button "开始新会谈" [ref=e46]:
+      - text: 开始新会谈
+      - img
+    - button "声纹注册" [ref=e47]

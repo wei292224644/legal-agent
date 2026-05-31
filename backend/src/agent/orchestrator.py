@@ -189,13 +189,25 @@ class Orchestrator:
             return False
 
     async def _run_child(self, utt: Utterance, generation: int) -> None:
+        task = asyncio.create_task(self._ha.arun(utt))
         try:
-            run = await asyncio.wait_for(self._ha.arun(utt), timeout=RUN_TIMEOUT)
+            run = await asyncio.wait_for(task, timeout=RUN_TIMEOUT)
         except TimeoutError:
             logger.warning("child run timeout (>%ss) for utt %s", RUN_TIMEOUT, utt.id)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
             return
         except Exception:
             logger.exception("child run failed for utt %s", utt.id)
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             return
 
         # 两个分支都要查 generation:paused 也可能因新 utterance 而 stale,

@@ -1,0 +1,40 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - heading "实时会谈" [level=1] [ref=e7]
+      - generic [ref=e10]: 离线
+    - generic [ref=e11]:
+      - button "开始录音" [ref=e12]:
+        - img
+        - text: 开始录音
+      - button "上传音频" [ref=e13]:
+        - img
+        - text: 上传音频
+  - generic [ref=e39]:
+    - generic [ref=e41]: 当事人画像
+    - generic [ref=e42]:
+      - generic [ref=e44]:
+        - img [ref=e45]
+        - generic [ref=e48]: 基本信息
+      - generic [ref=e51]:
+        - img [ref=e52]
+        - generic [ref=e54]: 情绪状态
+      - generic [ref=e57]:
+        - img [ref=e58]
+        - generic [ref=e61]: 关键主张
+      - generic [ref=e64]:
+        - img [ref=e65]
+        - generic [ref=e67]: 风险暴露
+      - generic [ref=e70]:
+        - img [ref=e71]
+        - generic [ref=e74]: 已确认事实
+  - navigation [ref=e27]:
+    - button "洞察" [ref=e28]:
+      - img [ref=e29]
+      - text: 洞察
+    - button "画像" [active] [ref=e31]:
+      - img [ref=e32]
+      - text: 画像
+    - button "转写" [ref=e35]:
+      - img [ref=e36]
+      - text: 转写

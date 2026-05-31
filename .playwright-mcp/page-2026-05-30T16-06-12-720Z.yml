@@ -1,0 +1,30 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - heading "实时会谈" [level=1] [ref=e7]
+      - generic [ref=e10]: 离线
+    - generic [ref=e11]:
+      - button "开始录音" [ref=e12]:
+        - img
+        - text: 开始录音
+      - button "上传音频" [ref=e13]:
+        - img
+        - text: 上传音频
+  - generic [ref=e17]:
+    - generic [ref=e18]:
+      - generic [ref=e19]: 实时洞察
+      - generic [ref=e20]: 0 条
+    - generic [ref=e22]:
+      - img [ref=e23]
+      - paragraph [ref=e25]: 系统正在监听并分析对话内容…
+      - paragraph [ref=e26]: 分析结果将随对话自动呈现
+  - navigation [ref=e27]:
+    - button "洞察" [ref=e28]:
+      - img [ref=e29]
+      - text: 洞察
+    - button "画像" [ref=e31]:
+      - img [ref=e32]
+      - text: 画像
+    - button "转写" [ref=e35]:
+      - img [ref=e36]
+      - text: 转写

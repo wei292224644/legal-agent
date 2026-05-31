@@ -175,5 +175,11 @@ export function useWebSocket(sessionId: string, callbacks: Callbacks = {}) {
     }
   }, [])
 
-  return { isConnected, error, sendAudioChunk, confirmIntent, dismissIntent, notifyAudioEnd }
+  const reconnect = useCallback(() => {
+    reconnectAttemptsRef.current = 0
+    setError(null)
+    connect()
+  }, [connect])
+
+  return { isConnected, error, sendAudioChunk, confirmIntent, dismissIntent, notifyAudioEnd, reconnect }
 }
