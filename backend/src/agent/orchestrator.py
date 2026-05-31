@@ -22,6 +22,7 @@ from typing import Any, Protocol
 
 from agent.events import (
     OutboundEvent, ProfileUpdated, ProfileEntryPayload, InsightReady,
+    AnalysisProposed,
 )
 
 from agno.run.base import RunStatus
@@ -268,9 +269,13 @@ class Orchestrator:
 
         # paused: 取首个 requirement 的预览给律师
         req = run.active_requirements[0] if run.active_requirements else None
-        preview = {}
-        if req is not None and req.tool_execution is not None:
-            preview = dict(req.tool_execution.tool_args or {})
+        tool_args = (
+            dict(req.tool_execution.tool_args or {})
+            if req is not None and req.tool_execution is not None
+            else {}
+        )
+        topic = str(tool_args.get("topic", ""))
+        rationale = str(tool_args.get("rationale", ""))
 
         request_id = f"req_{uuid.uuid4().hex[:8]}"
         self._pending[request_id] = PendingRequest(
@@ -278,18 +283,20 @@ class Orchestrator:
             run_id=run.run_id,
             utt_id=utt.id,
             generation=generation,
-            preview=preview,
-            run_output=run,  # 保留引用,confirm/reject 时用
+            preview={"topic": topic, "rationale": rationale},
+            run_output=run,
         )
-        await self._emit(
-            {
-                "kind": "pending",
-                "utt_id": utt.id,
-                "request_id": request_id,
-                "preview": preview,
-            },
-            text=None,
-        )
+        if self._repo is not None:
+            try:
+                await self._repo.upsert_pending(
+                    utt_id=utt.id, request_id=request_id,
+                    preview_topic=topic, preview_rationale=rationale,
+                )
+            except Exception:
+                logger.warning("upsert_pending failed req=%s", request_id, exc_info=True)
+        await self._emit_event(AnalysisProposed(
+            request_id=request_id, utt_id=utt.id, topic=topic, rationale=rationale,
+        ))
 
     # ------------------------------------------------------------------
     # confirm / dismiss / cleanup

@@ -220,3 +220,50 @@ async def test_run_child_skips_empty_insight(orch):
 
     assert [e for e in fake_emitter.received if isinstance(e, InsightReady)] == []
     assert fake_repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_run_child_emits_analysis_proposed_and_persists(orch):
+    """gated 路径:HeavyAgent paused 等确认 → AnalysisProposed + upsert_pending。"""
+    from unittest.mock import AsyncMock
+    from agent.events import AnalysisProposed
+    from models.utterance import Utterance
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeReq:
+        class tool_execution:
+            tool_args = {"topic": "本案是否构成违约", "rationale": "对方未履行交付义务"}
+        def confirm(self): pass
+        def reject(self, _): pass
+
+    class _FakeRun:
+        is_paused = True
+        run_id = "agno_run_xyz"
+        active_requirements = [_FakeReq()]
+        requirements = active_requirements
+        content = None
+
+    orch._ha.arun = AsyncMock(return_value=_FakeRun())
+    utt = Utterance(id="u1", text="x", speaker="client", t_start=0.0, t_end=1.0)
+    generation = await orch._ctx.append_utterance(utt)
+    await orch._run_child(utt, generation)
+
+    proposed = [e for e in fake_emitter.received if isinstance(e, AnalysisProposed)]
+    assert len(proposed) == 1
+    evt = proposed[0]
+    assert evt.utt_id == "u1"
+    assert evt.topic == "本案是否构成违约"
+    assert evt.rationale == "对方未履行交付义务"
+    assert evt.request_id.startswith("req_")
+
+    pending_calls = [c for c in fake_repo.calls if c[0] == "upsert_pending"]
+    assert len(pending_calls) == 1
+    assert pending_calls[0][1]["utt_id"] == "u1"
+    assert pending_calls[0][1]["request_id"] == evt.request_id
+
+    # PendingRequest 必须仍在内存以便后续 confirm
+    assert evt.request_id in orch._pending
