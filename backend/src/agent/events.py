@@ -23,6 +23,7 @@ class InsightReady(BaseModel):
     id: str
     utt_id: str
     text: str
+    created_at: str
 
 
 class AnalysisProposed(BaseModel):
@@ -31,6 +32,7 @@ class AnalysisProposed(BaseModel):
     utt_id: str
     topic: str
     rationale: str
+    created_at: str
 
 
 class AnalysisReady(BaseModel):
