@@ -3,6 +3,7 @@ import { Activity, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import type { Suggestion } from '@/types'
+import MarkdownText from './MarkdownText'
 
 const PENDING_TIMEOUT_SECONDS = 30
 
@@ -135,8 +136,8 @@ function ReadyCard({ suggestion }: { suggestion: Suggestion }) {
           </Button>
         </div>
         <CollapsibleContent>
-          <div className="text-sm text-ink-secondary leading-relaxed mt-3 whitespace-pre-wrap">
-            {suggestion.text ?? '分析结果为空'}
+          <div className="mt-3">
+            <MarkdownText>{suggestion.text ?? '分析结果为空'}</MarkdownText>
           </div>
         </CollapsibleContent>
       </Collapsible>
