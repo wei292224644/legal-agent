@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { SessionProvider } from '@/context/SessionContext'
 import { useSession } from '@/hooks/useSession'
-import { fetchHistory } from '@/api/sessions'
+import { fetchHistory, getSession } from '@/api/sessions'
+import VoiceprintModal from '@/components/VoiceprintModal'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import DesktopLayout from '@/components/layout/DesktopLayout'
 import MobileLayout from '@/components/layout/MobileLayout'
@@ -66,6 +67,7 @@ function LiveSessionInner() {
 
   const [hydrated, setHydrated] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [enrollmentPhase, setEnrollmentPhase] = useState<'checking' | 'needed' | 'ready'>('checking')
   const disconnectTimeRef = useRef<number | null>(null)
 
   // ref 保存最新 state，供 backfillHistory 读取而不用依赖 state 数组
@@ -77,6 +79,30 @@ function LiveSessionInner() {
   useEffect(() => {
     if (sessionId) setSessionId(sessionId)
   }, [sessionId, setSessionId])
+
+  // 查询 enrollment 状态
+  useEffect(() => {
+    if (!sessionId) {
+      setEnrollmentPhase('ready')
+      return
+    }
+    let cancelled = false
+    getSession(sessionId)
+      .then((info) => {
+        if (cancelled) return
+        if (info && info.has_enrollment) {
+          setEnrollmentPhase('ready')
+        } else {
+          setEnrollmentPhase('needed')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEnrollmentPhase('needed')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId])
 
   // Hydrate from history on mount
   useEffect(() => {
@@ -226,7 +252,7 @@ function LiveSessionInner() {
     notifyAudioEnd,
     reconnect,
   } = useWebSocket(
-    hydrated ? (sessionId ?? '') : '',
+    hydrated && enrollmentPhase === 'ready' ? (sessionId ?? '') : '',
     recvEvent,
   )
 
@@ -304,6 +330,13 @@ function LiveSessionInner() {
 
   return (
     <>
+      {enrollmentPhase === 'needed' && sessionId && (
+        <VoiceprintModal
+          sessionId={sessionId}
+          onComplete={() => setEnrollmentPhase('ready')}
+          onError={() => setEnrollmentPhase('needed')}
+        />
+      )}
       <PortraitLock />
       <div className="flex flex-col h-screen bg-background text-foreground">
       {/* Disconnect Banner */}
@@ -323,7 +356,9 @@ function LiveSessionInner() {
           <h1 className="text-base font-semibold text-ink-primary tracking-tight">实时会谈</h1>
           {connectionIndicatorNode}
         </div>
-        <AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />
+        {enrollmentPhase === 'ready' && (
+          <AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />
+        )}
       </header>
 
       {/* Desktop Layout */}
@@ -339,7 +374,11 @@ function LiveSessionInner() {
         insightStream={insightStreamNode}
         transcriptPanel={transcriptPanelNode}
         connectionStatus={connectionIndicatorNode}
-        audioControls={<AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />}
+        audioControls={
+          enrollmentPhase === 'ready' ? (
+            <AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />
+          ) : null
+        }
         backButton={backButtonNode}
       />
     </div>
