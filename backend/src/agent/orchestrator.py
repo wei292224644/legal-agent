@@ -21,7 +21,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from agent.events import (
-    OutboundEvent, ProfileUpdated, ProfileEntryPayload,
+    OutboundEvent, ProfileUpdated, ProfileEntryPayload, InsightReady,
 )
 
 from agno.run.base import RunStatus
@@ -252,7 +252,18 @@ class Orchestrator:
             return
 
         if not run.is_paused:
-            await self._emit({"kind": "ready", "utt_id": utt.id}, text=getattr(run, "content", None))
+            text = (getattr(run, "content", None) or "").strip()
+            if not text:
+                return
+            insight_id = f"ins_{uuid.uuid4().hex[:8]}"
+            if self._repo is not None:
+                try:
+                    await self._repo.insert_direct(utt_id=utt.id, text=text)
+                except Exception:
+                    logger.warning("insert_direct failed utt=%s", utt.id, exc_info=True)
+            await self._emit_event(InsightReady(
+                id=insight_id, utt_id=utt.id, text=text,
+            ))
             return
 
         # paused: 取首个 requirement 的预览给律师

@@ -159,3 +159,64 @@ async def test_handle_utterance_lawyer_skips_profile_event(orch):
 
     profile_evts = [e for e in fake_emitter.received if isinstance(e, ProfileUpdated)]
     assert profile_evts == []
+
+
+@pytest.mark.asyncio
+async def test_run_child_emits_insight_ready_and_persists(orch):
+    """非 gated 路径:HeavyAgent 直出文本 → InsightReady 事件 + repo.insert_direct。
+    业务意图:大多数 utterance 走这条路径,事件丢失等于"实时洞察"一直空白。"""
+    from unittest.mock import AsyncMock
+    from agent.events import InsightReady
+    from models.utterance import Utterance
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeRun:
+        is_paused = False
+        content = "这是直接洞察"
+
+    orch._ha.arun = AsyncMock(return_value=_FakeRun())
+
+    utt = Utterance(id="u1", text="某客户陈述", speaker="client",
+                    t_start=0.0, t_end=1.0)
+    generation = await orch._ctx.append_utterance(utt)
+    await orch._run_child(utt, generation)
+
+    insight_evts = [e for e in fake_emitter.received if isinstance(e, InsightReady)]
+    assert len(insight_evts) == 1
+    evt = insight_evts[0]
+    assert evt.utt_id == "u1"
+    assert evt.text == "这是直接洞察"
+    assert evt.id.startswith("ins_")
+
+    direct_calls = [c for c in fake_repo.calls if c[0] == "insert_direct"]
+    assert len(direct_calls) == 1
+    assert direct_calls[0][1] == {"utt_id": "u1", "text": "这是直接洞察"}
+
+
+@pytest.mark.asyncio
+async def test_run_child_skips_empty_insight(orch):
+    """空 content 不应入 DB 也不应发事件——避免占位卡片污染 UI。"""
+    from unittest.mock import AsyncMock
+    from agent.events import InsightReady
+    from models.utterance import Utterance
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeRun:
+        is_paused = False
+        content = "   "
+
+    orch._ha.arun = AsyncMock(return_value=_FakeRun())
+    utt = Utterance(id="u1", text="x", speaker="client", t_start=0.0, t_end=1.0)
+    generation = await orch._ctx.append_utterance(utt)
+    await orch._run_child(utt, generation)
+
+    assert [e for e in fake_emitter.received if isinstance(e, InsightReady)] == []
+    assert fake_repo.calls == []
