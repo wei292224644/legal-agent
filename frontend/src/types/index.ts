@@ -1,18 +1,9 @@
-export type InsightCategory =
-  | 'law_citation'
-  | 'risk_warning'
-  | 'contract_clause'
-  | 'behavior_analysis';
-
 export type Insight = {
-  id: string;
-  category: InsightCategory;
-  title: string;
-  content: string;
-  citation?: string;
-  riskLevel?: 'high' | 'medium' | 'low';
-  createdAt: string;
-};
+  id: string
+  uttId: string
+  text: string
+  createdAt: string
+}
 
 export type SuggestionStatus = 'pending' | 'running' | 'ready' | 'expired' | 'dismissed';
 
@@ -36,10 +27,13 @@ export type TranscriptLine = {
   timestamp: number;
 };
 
+export type ProfileCategory = 'basic_info' | 'emotion' | 'risk' | 'claim' | 'fact';
+
 export type ProfileEntryItem = {
   key: string;
   value: string;
   subject: string;
+  category: ProfileCategory;
 };
 
 export type Profile = {
@@ -82,16 +76,28 @@ export type Session = {
 };
 
 export function entriesToProfile(entries: ProfileEntryItem[]): Profile {
+  const basicEntries = entries.filter((e) => e.category === 'basic_info');
+  const emotionEntries = entries.filter((e) => e.category === 'emotion');
+
   return {
     entries,
-    role: '',
+    role: basicEntries.length > 0 ? '已建档' : '',
     caseType: '',
     sessionRound: '',
-    emotion: null,
+    emotion: emotionEntries.length > 0
+      ? { label: emotionEntries[emotionEntries.length - 1].value, score: 50, description: '' }
+      : null,
     claims: entries
-      .filter((e) => e.subject === '当事人')
+      .filter((e) => e.category === 'claim')
       .map((e) => ({ text: `${e.key}: ${e.value}`, variant: 'default' as const })),
-    risks: [],
-    facts: entries.map((e) => ({ text: `${e.key}: ${e.value}`, confirmed: true })),
+    risks: entries
+      .filter((e) => e.category === 'risk')
+      .map((e) => ({
+        level: ('medium' as const),
+        description: `${e.key}: ${e.value}`,
+      })),
+    facts: entries
+      .filter((e) => e.category === 'fact')
+      .map((e) => ({ text: `${e.key}: ${e.value}`, confirmed: true })),
   };
 }
