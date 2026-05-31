@@ -89,7 +89,6 @@ class Orchestrator:
         self._pa = pa or ProfileAgent()
         self._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
         self._suggestion_callback = None
-        self._expiry_callback = None
         self._pending: dict[str, PendingRequest] = {}
         self._inflight: set[asyncio.Task] = set()  # 在飞 child task,防 GC + 收集异常
         self._bus = None
@@ -108,9 +107,6 @@ class Orchestrator:
 
     def set_suggestion_callback(self, callback) -> None:
         self._suggestion_callback = callback
-
-    def set_expiry_callback(self, callback) -> None:
-        self._expiry_callback = callback
 
     def set_profile_callback(self, callback) -> None:
         self._profile_callback = callback
@@ -364,6 +360,14 @@ class Orchestrator:
         if pending is None:
             return
         await self._abandon_run(pending)
+        if self._repo is not None:
+            try:
+                await self._repo.mark_dismissed(request_id)
+            except Exception:
+                logger.warning("mark_dismissed failed req=%s", request_id, exc_info=True)
+        await self._emit_event(AnalysisDismissed(
+            request_id=request_id, reason="dismissed",
+        ))
 
     async def _abandon_run(self, pending: PendingRequest) -> None:
         """放弃挂起 run:reject 内存中的 requirements + 把 Agno db 的 run 状态标 CANCELLED。
@@ -402,17 +406,19 @@ class Orchestrator:
                 break
             now = time.time()
             stale = [rid for rid, p in self._pending.items() if now - p.created_at > ttl]
-            if stale and self._expiry_callback is not None:
-                try:
-                    result = self._expiry_callback(stale)
-                    if asyncio.iscoroutine(result):
-                        await result
-                except Exception:
-                    logger.warning("expiry callback failed", exc_info=True)
             for rid in stale:
                 pending = self._pending.pop(rid, None)
-                if pending:
-                    await self._abandon_run(pending)
+                if pending is None:
+                    continue
+                await self._abandon_run(pending)
+                if self._repo is not None:
+                    try:
+                        await self._repo.mark_expired(rid)
+                    except Exception:
+                        logger.warning("mark_expired failed req=%s", rid, exc_info=True)
+                await self._emit_event(AnalysisDismissed(
+                    request_id=rid, reason="expired",
+                ))
 
     # ------------------------------------------------------------------
     # plumbing

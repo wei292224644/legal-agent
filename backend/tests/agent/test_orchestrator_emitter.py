@@ -312,3 +312,71 @@ async def test_confirm_analysis_emits_ready_and_persists(orch):
     op_names = [c[0] for c in fake_repo.calls]
     assert "mark_running" in op_names
     assert "upsert_ready" in op_names
+
+
+@pytest.mark.asyncio
+async def test_dismiss_pending_emits_dismissed(orch):
+    from agent.events import AnalysisDismissed
+    from agent.orchestrator import PendingRequest
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeReq:
+        def reject(self, _): pass
+
+    class _FakeRun:
+        active_requirements = [_FakeReq()]
+
+    orch._pending["req_x"] = PendingRequest(
+        request_id="req_x", run_id="r", utt_id="u", generation=0,
+        preview={}, run_output=_FakeRun(),
+    )
+    orch._ha._db = type("D", (), {"update_approval_run_status": lambda *a, **kw: None})()
+
+    await orch.dismiss_pending("req_x")
+
+    dismissed = [e for e in fake_emitter.received if isinstance(e, AnalysisDismissed)]
+    assert len(dismissed) == 1
+    assert dismissed[0].request_id == "req_x"
+    assert dismissed[0].reason == "dismissed"
+    assert ("mark_dismissed", {"request_id": "req_x"}) in fake_repo.calls
+
+
+@pytest.mark.asyncio
+async def test_ttl_expiry_emits_expired(orch, monkeypatch):
+    """TTL 过期 → AnalysisDismissed(reason='expired') + mark_expired。"""
+    import config
+    monkeypatch.setattr(config, "PENDING_TTL", 0.1)
+
+    from agent.events import AnalysisDismissed
+    from agent.orchestrator import PendingRequest
+    import time as _time
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeReq:
+        def reject(self, _): pass
+    class _FakeRun:
+        active_requirements = [_FakeReq()]
+
+    orch._pending["req_y"] = PendingRequest(
+        request_id="req_y", run_id="r", utt_id="u", generation=0,
+        preview={}, run_output=_FakeRun(),
+        created_at=_time.time() - 10,
+    )
+    orch._ha._db = type("D", (), {"update_approval_run_status": lambda *a, **kw: None})()
+
+    await orch.start()
+    await asyncio.sleep(0.3)
+    await orch.shutdown()
+
+    expired = [e for e in fake_emitter.received
+               if isinstance(e, AnalysisDismissed) and e.reason == "expired"]
+    assert len(expired) >= 1
+    assert any(c[0] == "mark_expired" for c in fake_repo.calls)
