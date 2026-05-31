@@ -3,14 +3,14 @@ import { useParams } from 'react-router-dom'
 import { SessionProvider } from '@/context/SessionContext'
 import { useSession } from '@/hooks/useSession'
 import { fetchHistory } from '@/api/sessions'
-import { useWebSocket, type SuggestionData } from '@/hooks/useWebSocket'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import DesktopLayout from '@/components/layout/DesktopLayout'
 import MobileLayout from '@/components/layout/MobileLayout'
 import PortraitLock from '@/components/layout/PortraitLock'
 import InsightStream from '@/components/insights/InsightStream'
 import TranscriptPanel from '@/components/transcript/TranscriptPanel'
 import AudioControls from '@/components/AudioControls'
-import { entriesToProfile, type Insight, type ProfileEntryItem, type TranscriptLine } from '@/types'
+import { entriesToProfile, type ProfileEntryItem, type TranscriptLine } from '@/types'
 
 function ConnectionIndicator() {
   const { state } = useSession()
@@ -50,10 +50,8 @@ function LiveSessionInner() {
   const { id: sessionId } = useParams<{ id: string }>()
   const {
     state,
-    addInsight,
+    recvEvent,
     addSuggestion,
-    updateSuggestion,
-    dismissSuggestion,
     addTranscript,
     setConnectionStatus,
     setSessionId,
@@ -111,6 +109,7 @@ function LiveSessionInner() {
             key: e.key,
             value: e.value,
             subject: e.subject,
+            category: (e.category || 'fact') as ProfileEntryItem['category'],
           })
         )
 
@@ -165,6 +164,7 @@ function LiveSessionInner() {
             key: e.key,
             value: e.value,
             subject: e.subject,
+            category: (e.category || 'fact') as ProfileEntryItem['category'],
           })
         )
         if (profileEntries.length > 0) {
@@ -179,61 +179,6 @@ function LiveSessionInner() {
     [state.transcripts, state.suggestions, addTranscript, addSuggestion, setProfile]
   )
 
-  const onTranscript = useCallback(
-    (data: { text: string; speaker: string }) => {
-      addTranscript({
-        id: crypto.randomUUID(),
-        speaker: (data.speaker as TranscriptLine['speaker']) ?? 'uncertain',
-        text: data.text,
-        timestamp: Date.now(),
-      })
-    },
-    [addTranscript]
-  )
-
-  const onAnalysis = useCallback(
-    (data: { category: string; title: string; content: string; citation?: string }) => {
-      const insight: Insight = {
-        id: crypto.randomUUID(),
-        category: data.category as Insight['category'],
-        title: data.title,
-        content: data.content,
-        citation: data.citation,
-        createdAt: new Date().toISOString(),
-      }
-      addInsight(insight)
-    },
-    [addInsight]
-  )
-
-  const onSuggestion = useCallback(
-    (data: SuggestionData) => {
-      if (data.type === 'suggestion.pending') {
-        addSuggestion({
-          id: crypto.randomUUID(),
-          requestId: data.meta.request_id ?? `req-${Date.now()}`,
-          status: 'pending',
-          topic: data.meta.preview?.topic ?? '',
-          rationale: data.meta.preview?.rationale ?? '',
-          text: null,
-          createdAt: new Date().toISOString(),
-        })
-        return
-      }
-      if (data.type === 'suggestion.ready') {
-        const rid = data.meta.request_id
-        if (rid) {
-          updateSuggestion(rid, {
-            status: 'ready',
-            text: data.text,
-            topic: data.meta.preview?.topic ?? '',
-          })
-        }
-      }
-    },
-    [addSuggestion, updateSuggestion]
-  )
-
   const {
     isConnected,
     error: wsError,
@@ -242,20 +187,10 @@ function LiveSessionInner() {
     dismissIntent,
     notifyAudioEnd,
     reconnect,
-  } = useWebSocket(hydrated ? (sessionId ?? '') : '', {
-    onTranscript,
-    onAnalysis,
-    onSuggestion,
-    onConfirmAck: ({ ok, request_id }) => {
-      if (!ok) {
-        dismissSuggestion(request_id)
-      }
-    },
-    onProfileUpdate: (entries: ProfileEntryItem[]) => {
-      const merged = [...(state.profile?.entries ?? []), ...entries]
-      setProfile(entriesToProfile(merged))
-    },
-  })
+  } = useWebSocket(
+    hydrated ? (sessionId ?? '') : '',
+    recvEvent,
+  )
 
   useEffect(() => {
     if (wsError) {
@@ -277,17 +212,17 @@ function LiveSessionInner() {
   const handleConfirm = useCallback(
     (requestId: string) => {
       confirmIntent(requestId)
-      updateSuggestion(requestId, { status: 'running', progress: 0 })
+      // ready 状态等服务端 analysis.ready 事件回来,这里不再本地预改
     },
-    [confirmIntent, updateSuggestion]
+    [confirmIntent]
   )
 
   const handleDismiss = useCallback(
     (requestId: string) => {
       dismissIntent(requestId)
-      dismissSuggestion(requestId)
+      // 卡片消失等 analysis.dismissed 事件
     },
-    [dismissIntent, dismissSuggestion]
+    [dismissIntent]
   )
 
   const insightStreamNode = (
