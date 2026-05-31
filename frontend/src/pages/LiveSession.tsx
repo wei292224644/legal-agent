@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { SessionProvider } from '@/context/SessionContext'
 import { useSession } from '@/hooks/useSession'
@@ -63,6 +63,12 @@ function LiveSessionInner() {
   const [hydrated, setHydrated] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const disconnectTimeRef = useRef<number | null>(null)
+
+  // ref 保存最新 state，供 backfillHistory 读取而不用依赖 state 数组
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  })
 
   useEffect(() => {
     if (sessionId) setSessionId(sessionId)
@@ -134,7 +140,8 @@ function LiveSessionInner() {
       try {
         const h = await fetchHistory(sid)
         if (!h) return
-        const existingIds = new Set(state.transcripts.map((t) => t.id))
+        const latest = stateRef.current
+        const existingIds = new Set(latest.transcripts.map((t) => t.id))
         const newTranscripts: TranscriptLine[] = h.utterances
           .filter((u) => !existingIds.has(u.id))
           .map((u) => ({
@@ -145,7 +152,7 @@ function LiveSessionInner() {
           }))
         newTranscripts.forEach((t) => addTranscript(t))
 
-        const existingSuggestionIds = new Set(state.suggestions.map((s) => s.id))
+        const existingSuggestionIds = new Set(latest.suggestions.map((s) => s.id))
         const newSuggestions = h.suggestions
           .filter((s) => s.status !== 'expired' && s.status !== 'dismissed' && !existingSuggestionIds.has(s.id))
           .map((s) => ({
@@ -176,7 +183,7 @@ function LiveSessionInner() {
         setSyncing(false)
       }
     },
-    [state.transcripts, state.suggestions, addTranscript, addSuggestion, setProfile]
+    [addTranscript, addSuggestion, setProfile]
   )
 
   const {
@@ -225,24 +232,30 @@ function LiveSessionInner() {
     [dismissIntent]
   )
 
-  const insightStreamNode = (
-    <InsightStream
-      insights={state.insights}
-      suggestions={state.suggestions}
-      onConfirm={handleConfirm}
-      onDismiss={handleDismiss}
-    />
+  const insightStreamNode = useMemo(
+    () => (
+      <InsightStream
+        insights={state.insights}
+        suggestions={state.suggestions}
+        onConfirm={handleConfirm}
+        onDismiss={handleDismiss}
+      />
+    ),
+    [state.insights, state.suggestions, handleConfirm, handleDismiss],
   )
 
-  const transcriptPanelNode = (
-    <TranscriptPanel
-      transcripts={state.transcripts}
-      isOpen={state.isTranscriptPanelOpen}
-      onToggle={toggleTranscriptPanel}
-    />
+  const transcriptPanelNode = useMemo(
+    () => (
+      <TranscriptPanel
+        transcripts={state.transcripts}
+        isOpen={state.isTranscriptPanelOpen}
+        onToggle={toggleTranscriptPanel}
+      />
+    ),
+    [state.transcripts, state.isTranscriptPanelOpen, toggleTranscriptPanel],
   )
 
-  const connectionIndicatorNode = <ConnectionIndicator />
+  const connectionIndicatorNode = useMemo(() => <ConnectionIndicator />, [])
 
   return (
     <>

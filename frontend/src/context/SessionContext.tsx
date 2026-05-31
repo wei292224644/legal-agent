@@ -1,4 +1,4 @@
-import { useReducer, useCallback, type ReactNode } from 'react'
+import { useReducer, useCallback, useMemo, type ReactNode } from 'react'
 import {
   SessionContext,
   initialState,
@@ -34,26 +34,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setActiveMobileTab = useCallback((tab: 'insights' | 'profile' | 'transcript') => dispatch({ type: 'SET_ACTIVE_MOBILE_TAB', payload: tab }), [])
   const hydrate = useCallback((payload: Partial<SessionState>) => dispatch({ type: 'HYDRATE', payload }), [])
 
+  const value = useMemo(() => ({
+    state,
+    dispatch,
+    recvEvent,
+    setSessionId,
+    setProfile,
+    addInsight,
+    addSuggestion,
+    updateSuggestion,
+    dismissSuggestion,
+    addTranscript,
+    setConnectionStatus,
+    setRecordingStatus,
+    toggleTranscriptPanel,
+    setActiveMobileTab,
+    hydrate,
+  }), [state, recvEvent, setSessionId, setProfile, addInsight, addSuggestion, updateSuggestion, dismissSuggestion, addTranscript, setConnectionStatus, setRecordingStatus, toggleTranscriptPanel, setActiveMobileTab, hydrate])
+
   return (
-    <SessionContext.Provider
-      value={{
-        state,
-        dispatch,
-        recvEvent,
-        setSessionId,
-        setProfile,
-        addInsight,
-        addSuggestion,
-        updateSuggestion,
-        dismissSuggestion,
-        addTranscript,
-        setConnectionStatus,
-        setRecordingStatus,
-        toggleTranscriptPanel,
-        setActiveMobileTab,
-        hydrate,
-      }}
-    >
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   )

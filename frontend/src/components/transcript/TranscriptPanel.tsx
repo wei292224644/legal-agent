@@ -38,7 +38,7 @@ export default function TranscriptPanel({ transcripts, isOpen, onToggle }: Trans
     if (isAtBottomRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [transcripts])
+  }, [transcripts.length])
   if (!isOpen) {
     return (
       <div className="w-10 shrink-0 flex flex-col items-center py-4 border-l border-border-color bg-bg-secondary">

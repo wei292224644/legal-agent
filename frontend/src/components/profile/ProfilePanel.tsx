@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { User, Heart, FileText, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Profile, ProfileCategory, ProfileEntryItem } from '@/types'
@@ -127,8 +128,15 @@ export default function ProfilePanel({ profile, compact }: ProfilePanelProps) {
     );
   }
 
-  const categoryEntries = (cat: ProfileCategory) =>
-    profile.entries.filter((e) => e.category === cat).reverse()
+  const entriesByCategory = useMemo(() => {
+    const map = new Map<ProfileCategory, ProfileEntryItem[]>()
+    for (const cat of ['basic_info', 'emotion', 'risk', 'claim', 'fact'] as ProfileCategory[]) {
+      map.set(cat, profile.entries.filter((e) => e.category === cat).reverse())
+    }
+    return map
+  }, [profile.entries])
+
+  const categoryEntries = (cat: ProfileCategory) => entriesByCategory.get(cat) ?? []
 
   if (compact) {
     const emotionEntries = categoryEntries('emotion')
