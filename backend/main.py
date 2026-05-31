@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import copy
+import io
 import json
 import logging
 import sys
@@ -10,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -132,6 +133,69 @@ async def get_history(session_id: str):
             }
             for e in profile_entries
         ],
+    }
+
+
+@app.post("/api/sessions/{session_id}/enrollment")
+async def upload_enrollment(session_id: str, audio: UploadFile):
+    """上传律师声纹音频并绑定到 session。"""
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的 session_id 格式") from None
+
+    from repositories.sessions import SessionRepository
+
+    async with _maker() as s:
+        row = await SessionRepository(s).get(sid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        if row.status == "closed":
+            raise HTTPException(status_code=400, detail="会话已结束")
+
+    contents = await audio.read()
+    try:
+        with io.BytesIO(contents) as bio:
+            pcm, sr = sf.read(bio, dtype="float32", always_2d=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="音频文件无法解析") from None
+
+    if pcm.ndim == 2:
+        pcm = pcm.mean(axis=1)
+
+    if len(pcm) / sr < 1.0:
+        raise HTTPException(status_code=400, detail="音频过短")
+
+    try:
+        enrollment = await asyncio.to_thread(enroll_speaker, pcm, sr)
+    except Exception:
+        logger.exception("enroll_speaker failed")
+        raise HTTPException(status_code=500, detail="声纹处理失败") from None
+
+    await session_manager.set_enrollment(sid, enrollment)
+    await audio.close()
+    return {"ok": True}
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session(session_id: str):
+    """获取 session 基本信息。"""
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的 session_id 格式") from None
+
+    from repositories.sessions import SessionRepository
+
+    async with _maker() as s:
+        row = await SessionRepository(s).get(sid)
+        if row is None:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+    return {
+        "session_id": str(row.id),
+        "status": row.status,
+        "has_enrollment": row.lawyer_embedding is not None,
     }
 
 
