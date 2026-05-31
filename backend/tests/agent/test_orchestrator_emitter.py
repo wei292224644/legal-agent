@@ -61,9 +61,13 @@ async def orch(db_session):
     import uuid as _uuid
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from agent.orchestrator import Orchestrator
+    from repositories.sessions import SessionRepository
 
     sm = async_sessionmaker(db_session.bind, expire_on_commit=False)
-    ctx = ContextStore(session_id=_uuid.uuid4(), sessionmaker=sm)
+    sid = _uuid.uuid4()
+    async with sm() as s:
+        await SessionRepository(s).create(session_id=sid)
+    ctx = ContextStore(session_id=sid, sessionmaker=sm)
 
     # 关掉 PA/Gate/HA（这一任务只验 wiring，不验业务）
     class _NoopGate:
@@ -107,3 +111,51 @@ def test_setters_exist(orch):
     """set_event_emitter / set_repo_writer 是新公共接口。"""
     assert callable(getattr(orch, "set_event_emitter"))
     assert callable(getattr(orch, "set_repo_writer"))
+
+
+@pytest.mark.asyncio
+async def test_handle_utterance_emits_profile_updated(orch):
+    """客户句子 → PA 返回 entries → emit ProfileUpdated。
+    业务意图：画像数据每次更新都要让前端实时看到，不能只入 DB。"""
+    from unittest.mock import AsyncMock
+    from agent.events import ProfileUpdated
+    from agent.context_store import ProfileEntry
+    from models.utterance import Utterance
+
+    fake_emitter = FakeEmitter()
+    orch.set_event_emitter(fake_emitter)
+
+    entries = [
+        ProfileEntry(key="姓名", value="张三", subject="client", timestamp=0.0,
+                     source_utt_id="u1"),
+        ProfileEntry(key="年龄", value="30", subject="client", timestamp=0.0,
+                     source_utt_id="u1"),
+    ]
+    orch._pa.extract = AsyncMock(return_value=entries)
+
+    utt = Utterance(id="u1", text="我叫张三今年三十", speaker="client",
+                    t_start=0.0, t_end=1.0)
+    await orch.handle_utterance(utt)
+
+    profile_evts = [e for e in fake_emitter.received if isinstance(e, ProfileUpdated)]
+    assert len(profile_evts) == 1
+    assert {(p.key, p.value, p.subject) for p in profile_evts[0].entries} == {
+        ("姓名", "张三", "client"), ("年龄", "30", "client"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_handle_utterance_lawyer_skips_profile_event(orch):
+    """律师句子不跑 PA,自然不应 emit ProfileUpdated。"""
+    from agent.events import ProfileUpdated
+    from models.utterance import Utterance
+
+    fake_emitter = FakeEmitter()
+    orch.set_event_emitter(fake_emitter)
+
+    utt = Utterance(id="u1", text="您好", speaker="lawyer",
+                    t_start=0.0, t_end=1.0)
+    await orch.handle_utterance(utt)
+
+    profile_evts = [e for e in fake_emitter.received if isinstance(e, ProfileUpdated)]
+    assert profile_evts == []

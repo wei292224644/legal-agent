@@ -20,7 +20,9 @@ from dataclasses import dataclass, field
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
-from agent.events import OutboundEvent
+from agent.events import (
+    OutboundEvent, ProfileUpdated, ProfileEntryPayload,
+)
 
 from agno.run.base import RunStatus
 
@@ -183,6 +185,13 @@ class Orchestrator:
                                 await result
                         except Exception:
                             logger.warning("profile callback failed", exc_info=True)
+                    await self._emit_event(ProfileUpdated(
+                        entries=[
+                            ProfileEntryPayload(
+                                key=e.key, value=e.value, subject=e.subject,
+                            ) for e in entries
+                        ],
+                    ))
             except Exception as e:
                 logger.warning("ProfileAgent.extract failed for utt %s: %s", utt.id, e)
 
