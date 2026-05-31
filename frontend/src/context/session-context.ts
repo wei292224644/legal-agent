@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import type { ServerEvent } from '@/types/events'
 import type {
   ConnectionStatus,
   Insight,
@@ -33,6 +34,7 @@ export const initialState: SessionState = {
 }
 
 export type SessionAction =
+  | { type: 'RECV_EVENT'; payload: ServerEvent }
   | { type: 'SET_SESSION_ID'; payload: string }
   | { type: 'SET_PROFILE'; payload: Profile | null }
   | { type: 'ADD_INSIGHT'; payload: Insight }
@@ -49,6 +51,7 @@ export type SessionAction =
 export type SessionContextValue = {
   state: SessionState
   dispatch: React.Dispatch<SessionAction>
+  recvEvent: (evt: ServerEvent) => void
   setSessionId: (id: string) => void
   setProfile: (profile: Profile | null) => void
   addInsight: (insight: Insight) => void
