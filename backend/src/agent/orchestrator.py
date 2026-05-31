@@ -17,7 +17,10 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol
+
+from agent.events import OutboundEvent
 
 from agno.run.base import RunStatus
 
@@ -31,6 +34,20 @@ from models.utterance import Utterance
 logger = logging.getLogger(__name__)
 
 PROFILE_WINDOW_SIZE = 6
+
+
+class _RepoWriter(Protocol):
+    """Orchestrator 写 DB 用的最小接口。main.py 注入一个绑定 sessionmaker
+    + session_id 的实现；测试注入 FakeRepoWriter。"""
+    async def insert_direct(self, *, utt_id: str, text: str) -> None: ...
+    async def upsert_pending(self, *, utt_id: str, request_id: str,
+                              preview_topic: str | None,
+                              preview_rationale: str | None) -> None: ...
+    async def mark_running(self, request_id: str) -> None: ...
+    async def upsert_ready(self, *, request_id: str, text: str,
+                            utt_id: str | None) -> None: ...
+    async def mark_dismissed(self, request_id: str) -> None: ...
+    async def mark_expired(self, request_id: str) -> None: ...
 
 
 @dataclass
@@ -76,6 +93,8 @@ class Orchestrator:
         self._bus_task = None
         self._ttl_task = None
         self._profile_callback = None
+        self._emitter: Callable[[OutboundEvent], Awaitable[None]] | None = None
+        self._repo: _RepoWriter | None = None
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -92,6 +111,14 @@ class Orchestrator:
 
     def set_profile_callback(self, callback) -> None:
         self._profile_callback = callback
+
+    def set_event_emitter(
+        self, emit: Callable[[OutboundEvent], Awaitable[None]]
+    ) -> None:
+        self._emitter = emit
+
+    def set_repo_writer(self, repo: _RepoWriter) -> None:
+        self._repo = repo
 
     async def start(self) -> None:
         await self._ctx.start_profile_worker()
@@ -361,4 +388,12 @@ class Orchestrator:
         result = self._suggestion_callback(text, meta)
         if asyncio.iscoroutine(result):
             await result
+
+    async def _emit_event(self, evt: OutboundEvent) -> None:
+        if self._emitter is None:
+            return
+        try:
+            await self._emitter(evt)
+        except Exception:
+            logger.warning("emit_event failed for %s", evt.type, exc_info=True)
 
