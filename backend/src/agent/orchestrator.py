@@ -88,13 +88,11 @@ class Orchestrator:
         self._gate = gate or RelevanceGate()
         self._pa = pa or ProfileAgent()
         self._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
-        self._suggestion_callback = None
         self._pending: dict[str, PendingRequest] = {}
         self._inflight: set[asyncio.Task] = set()  # 在飞 child task,防 GC + 收集异常
         self._bus = None
         self._bus_task = None
         self._ttl_task = None
-        self._profile_callback = None
         self._emitter: Callable[[OutboundEvent], Awaitable[None]] | None = None
         self._repo: _RepoWriter | None = None
 
@@ -104,12 +102,6 @@ class Orchestrator:
 
     def attach_bus(self, bus) -> None:
         self._bus = bus
-
-    def set_suggestion_callback(self, callback) -> None:
-        self._suggestion_callback = callback
-
-    def set_profile_callback(self, callback) -> None:
-        self._profile_callback = callback
 
     def set_event_emitter(
         self, emit: Callable[[OutboundEvent], Awaitable[None]]
@@ -175,13 +167,6 @@ class Orchestrator:
                     for entry in entries:
                         entry.timestamp = utt.t_start
                     await self._ctx.enqueue_profile_update(utt.id, entries)
-                    if self._profile_callback is not None:
-                        try:
-                            result = self._profile_callback(entries)
-                            if asyncio.iscoroutine(result):
-                                await result
-                        except Exception:
-                            logger.warning("profile callback failed", exc_info=True)
                     await self._emit_event(ProfileUpdated(
                         entries=[
                             ProfileEntryPayload(
@@ -433,13 +418,6 @@ class Orchestrator:
                 break
             except Exception:
                 logger.exception("handle_utterance failed")
-
-    async def _emit(self, meta: dict, text: str | None) -> None:
-        if self._suggestion_callback is None:
-            return
-        result = self._suggestion_callback(text, meta)
-        if asyncio.iscoroutine(result):
-            await result
 
     async def _emit_event(self, evt: OutboundEvent) -> None:
         if self._emitter is None:
