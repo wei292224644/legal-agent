@@ -25,6 +25,9 @@ export type HistoryProfileEntry = {
   key: string;
   value: string;
   subject: string;
+  category: string;
+  timestamp: number;
+  source_utt_id: string;
 };
 
 export type SessionHistory = {
@@ -44,4 +47,33 @@ export async function fetchHistory(
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`history fetch failed: ${r.status}`);
   return r.json();
+}
+
+export type SessionInfo = {
+  session_id: string;
+  status: string;
+  has_enrollment: boolean;
+};
+
+export async function getSession(sessionId: string): Promise<SessionInfo | null> {
+  const r = await fetch(`${API_BASE}/api/sessions/${sessionId}`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`session fetch failed: ${r.status}`);
+  return r.json();
+}
+
+export async function uploadEnrollment(
+  sessionId: string,
+  audioBlob: Blob
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "enrollment.wav");
+  const r = await fetch(`${API_BASE}/api/sessions/${sessionId}/enrollment`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => "");
+    throw new Error(`上传失败 (${r.status}): ${text}`);
+  }
 }
