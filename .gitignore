@@ -37,3 +37,6 @@ __modles__/
 playwright-report/
 test-results/
 .playwright-mcp/
+
+# Claude Code worktrees (临时 agent 隔离工作空间，不入 git)
+.claude/worktrees/
