@@ -22,19 +22,20 @@ export default function AudioControls({ onChunk, onAudioEnd }: AudioControlsProp
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
       {mode === 'idle' ? (
         <>
-          <Button onClick={startRecording}>
+          <Button onClick={startRecording} className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm">
             <Mic className="w-4 h-4" />
-            开始录音
+            <span className="hidden sm:inline">开始录音</span>
           </Button>
           <Button
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
+            className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
           >
             <Upload className="w-4 h-4" />
-            上传音频
+            <span className="hidden sm:inline">上传音频</span>
           </Button>
           <input
             ref={fileInputRef}

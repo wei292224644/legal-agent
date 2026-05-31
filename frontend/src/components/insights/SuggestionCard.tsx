@@ -47,7 +47,7 @@ function PendingCard({
   const progress = (timeLeft / PENDING_TIMEOUT_SECONDS) * 100
 
   return (
-    <div className="mb-5 p-4 rounded-lg bg-accent-muted border border-accent/18">
+    <div className="p-4 rounded-lg bg-accent-muted border border-accent/18">
       <div className="flex items-center gap-2 mb-2">
         <span className="w-1.5 h-1.5 rounded-full bg-accent" />
         <span className="text-xs font-medium text-accent">可分析意图</span>
@@ -88,7 +88,7 @@ function PendingCard({
 function RunningCard({ suggestion }: { suggestion: Suggestion }) {
   const progress = suggestion.progress ?? 0
   return (
-    <div className="mb-5 p-4 rounded-lg bg-accent-muted/50 border border-accent/10">
+    <div className="p-4 rounded-lg bg-accent-muted/50 border border-accent/10">
       <div className="flex items-center gap-2 mb-3">
         <Activity className="w-3 h-3 text-accent animate-pulse" />
         <span className="text-xs font-medium text-accent motion-safe:animate-pulse">
@@ -105,27 +105,37 @@ function RunningCard({ suggestion }: { suggestion: Suggestion }) {
   )
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    .replace(/`{1,3}(.+?)`{1,3}/gs, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .replace(/---/g, '')
+    .trim()
+}
+
 function ReadyCard({ suggestion }: { suggestion: Suggestion }) {
   const [expanded, setExpanded] = useState(false)
 
   const preview = suggestion.text
-    ? suggestion.text.slice(0, 120) + (suggestion.text.length > 120 ? '...' : '')
+    ? stripMarkdown(suggestion.text).slice(0, 120) + (suggestion.text.length > 120 ? '...' : '')
     : ''
 
   return (
-    <div className="mb-5 p-4 rounded-lg bg-bg-secondary border border-border-color">
+    <div className="p-4 rounded-lg bg-bg-secondary border border-border-color">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
-            <span className="text-xs font-medium text-success shrink-0">
+            <span className="text-xs font-medium text-success truncate">
               {suggestion.topic || '深度分析'}
             </span>
-            {!expanded && preview && (
-              <span className="text-xs text-ink-muted truncate">
-                · {preview}
-              </span>
-            )}
           </div>
           <Button
             variant="ghost"
@@ -144,6 +154,11 @@ function ReadyCard({ suggestion }: { suggestion: Suggestion }) {
             )}
           </Button>
         </div>
+        {!expanded && preview && (
+          <p className="text-xs text-ink-muted line-clamp-2 mt-2">
+            {preview}
+          </p>
+        )}
         <CollapsibleContent>
           <div className="mt-3">
             <MarkdownText>{suggestion.text ?? '分析结果为空'}</MarkdownText>

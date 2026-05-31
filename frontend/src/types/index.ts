@@ -52,14 +52,20 @@ export type Profile = {
   claims: Array<{
     text: string;
     variant: 'default' | 'danger';
+    timestamp?: number;
+    sourceUttId?: string;
   }>;
   risks: Array<{
     level: 'high' | 'medium' | 'low';
     description: string;
+    timestamp?: number;
+    sourceUttId?: string;
   }>;
   facts: Array<{
     text: string;
     confirmed: boolean;
+    timestamp?: number;
+    sourceUttId?: string;
   }>;
 };
 
@@ -79,28 +85,41 @@ export type Session = {
 };
 
 export function entriesToProfile(entries: ProfileEntryItem[]): Profile {
-  const basicEntries = entries.filter((e) => e.category === 'basic_info');
-  const emotionEntries = entries.filter((e) => e.category === 'emotion');
+  const sorted = [...entries].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+  const basicEntries = sorted.filter((e) => e.category === 'basic_info');
+  const emotionEntries = sorted.filter((e) => e.category === 'emotion');
 
   return {
-    entries,
+    entries: sorted,
     role: basicEntries.length > 0 ? '已建档' : '',
     caseType: '',
     sessionRound: '',
     emotion: emotionEntries.length > 0
-      ? { label: emotionEntries[emotionEntries.length - 1].value, score: 50, description: '' }
+      ? { label: emotionEntries[0].value, score: 50, description: '' }
       : null,
-    claims: entries
+    claims: sorted
       .filter((e) => e.category === 'claim')
-      .map((e) => ({ text: `${e.key}: ${e.value}`, variant: 'default' as const })),
-    risks: entries
+      .map((e) => ({
+        text: `${e.key}: ${e.value}`,
+        variant: 'default' as const,
+        timestamp: e.timestamp,
+        sourceUttId: e.sourceUttId,
+      })),
+    risks: sorted
       .filter((e) => e.category === 'risk')
       .map((e) => ({
         level: ('medium' as const),
         description: `${e.key}: ${e.value}`,
+        timestamp: e.timestamp,
+        sourceUttId: e.sourceUttId,
       })),
-    facts: entries
+    facts: sorted
       .filter((e) => e.category === 'fact')
-      .map((e) => ({ text: `${e.key}: ${e.value}`, confirmed: true })),
+      .map((e) => ({
+        text: `${e.key}: ${e.value}`,
+        confirmed: true,
+        timestamp: e.timestamp,
+        sourceUttId: e.sourceUttId,
+      })),
   };
 }

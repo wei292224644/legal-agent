@@ -36,30 +36,30 @@ export default function MobileLayout({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'insights' && (
-          <div className="h-full overflow-auto">
+          <div className="h-full flex flex-col">
             {/* Mobile profile summary */}
             {profile && (
-              <div className="px-4 pt-4">
+              <div className="px-4 pt-4 shrink-0">
                 <ProfilePanel profile={profile} compact />
               </div>
             )}
-            <div className="px-4 py-4">{insightStream}</div>
+            {insightStream}
           </div>
         )}
         {activeTab === 'profile' && (
-          <div className="h-full overflow-auto px-4 py-4">
+          <div className="h-full overflow-hidden">
             <ProfilePanel profile={profile} />
           </div>
         )}
         {activeTab === 'transcript' && (
-          <div className="h-full overflow-auto px-4 py-4">{transcriptPanel}</div>
+          <div className="h-full overflow-hidden">{transcriptPanel}</div>
         )}
       </div>
 
       {/* Bottom Tab Bar */}
-      <nav className="flex border-t border-border-color bg-bg-secondary shrink-0">
+      <nav className="flex border-t border-border-color bg-bg-secondary shrink-0 pb-[env(safe-area-inset-bottom)]">
         <button
           onClick={() => setActiveTab('insights')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${

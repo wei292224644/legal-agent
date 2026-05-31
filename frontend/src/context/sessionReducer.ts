@@ -60,7 +60,9 @@ function recvEvent(state: SessionState, evt: ServerEvent): SessionState {
           key: e.key,
           value: e.value,
           subject: e.subject,
-          category: 'fact' as const,
+          category: (e.category || 'fact') as ProfileEntryItem['category'],
+          timestamp: e.timestamp,
+          sourceUttId: e.source_utt_id,
         })),
       ]
       return { ...state, profile: entriesToProfile(merged) }

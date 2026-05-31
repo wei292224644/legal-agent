@@ -31,6 +31,7 @@ export default function VoiceprintModal({
   const samplesRef = useRef<Float32Array[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -186,24 +187,23 @@ export default function VoiceprintModal({
               <Mic className="w-4 h-4 mr-2" />
               开始录音 (15秒)
             </Button>
-            <div className="relative">
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleFileUpload}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                id="enroll-file-input"
-              />
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full"
-                onClick={() => document.getElementById("enroll-file-input")?.click()}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                上传音频文件
-              </Button>
-            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="enroll-file-input"
+            />
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              上传音频文件
+            </Button>
           </div>
         )}
 

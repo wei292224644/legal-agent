@@ -46,11 +46,15 @@ class ContextStore:
         self._maker = sessionmaker
         self._utterances: list[Utterance] = []
         self._profile: list[ProfileEntry] = []
+        self._recent_suggestions: list[str] = []
         self._profile_queue: asyncio.Queue = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
         self._generation = 0
         self._lock = asyncio.Lock()
         self._shutdown = False
+
+    # 仅供 prompt 上下文使用，防止 child 重复同一话题快答；超过窗口即丢，无需持久化。
+    _RECENT_SUGGESTIONS_CAP = 6
 
     async def hydrate(self) -> None:
         """从 DB 加载 utterances + profile——恢复内存 cache 视图。"""
@@ -107,6 +111,21 @@ class ContextStore:
         """已提取 key 列表，按 timestamp 降序去重。"""
         sorted_p = sorted(self._profile, key=lambda e: e.timestamp, reverse=True)
         return list(dict.fromkeys(e.key for e in sorted_p))
+
+    def record_suggestion(self, text: str) -> None:
+        """记录一条已发出的快答文本，仅保留最近 N 条用于后续 prompt 去重提示。"""
+        text = (text or "").strip()
+        if not text:
+            return
+        self._recent_suggestions.append(text)
+        if len(self._recent_suggestions) > self._RECENT_SUGGESTIONS_CAP:
+            del self._recent_suggestions[: len(self._recent_suggestions) - self._RECENT_SUGGESTIONS_CAP]
+
+    def get_recent_suggestions(self, n: int = 3) -> list[str]:
+        """最近 n 条已发快答，按时间升序（最早在前）。n<=0 返回空。"""
+        if n <= 0:
+            return []
+        return list(self._recent_suggestions[-n:])
 
     def get_profile_summary(self) -> dict[str, dict[str, str]]:
         """已知事实摘要，按 subject 分组，(subject, key) 取最新值。"""

@@ -1,0 +1,26 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - button "返回首页" [ref=e19]:
+        - img [ref=e20]
+      - generic [ref=e22]: 实时会谈
+      - generic [ref=e25]: 连接中…
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: 实时洞察
+        - generic [ref=e32]: 0 条
+      - generic [ref=e34]:
+        - img [ref=e35]
+        - paragraph [ref=e37]: 准备就绪，等待对话开始
+        - paragraph [ref=e38]: 点击上方「开始录音」或「上传音频」开始会谈，AI 分析结果将实时显示在此处
+    - navigation [ref=e39]:
+      - button "洞察" [ref=e40]:
+        - img [ref=e41]
+        - text: 洞察
+      - button "画像" [ref=e43]:
+        - img [ref=e44]
+        - text: 画像
+      - button "转写" [ref=e47]:
+        - img [ref=e48]
+        - text: 转写

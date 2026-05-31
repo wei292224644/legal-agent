@@ -36,7 +36,7 @@ export default function EntryPage() {
       />
 
       {/* Left: Product intro */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center px-8 md:px-16 py-12">
+      <div className="relative z-10 flex-1 flex flex-col justify-center px-6 md:px-16 py-8 md:py-12">
         <div className="max-w-lg">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
@@ -71,7 +71,7 @@ export default function EntryPage() {
       </div>
 
       {/* Right: Action area */}
-      <div className="relative z-10 md:w-[420px] shrink-0 flex flex-col justify-center px-8 md:px-12 py-12 bg-bg-secondary border-t md:border-t-0 md:border-l border-border-color">
+      <div className="relative z-10 md:w-[420px] shrink-0 flex flex-col justify-center px-6 md:px-12 py-8 md:py-12 bg-bg-secondary border-t md:border-t-0 md:border-l border-border-color">
         <div className="max-w-sm mx-auto w-full">
           <h2 className="text-xl font-semibold text-ink-primary mb-2">开始会谈</h2>
           <p className="text-sm text-ink-muted mb-8">

@@ -1,0 +1,40 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e39]:
+    - generic [ref=e40]:
+      - heading "请先录制声纹" [level=2] [ref=e41]
+      - paragraph [ref=e42]: 系统需要您的声纹来区分律师与当事人
+    - paragraph [ref=e44]: “今天天气很好，我们在这里进行法律咨询。根据中华人民共和国相关法律法规，我将为您提供专业的法律服务和建议。”
+    - generic [ref=e45]:
+      - button "开始录音 (15秒)" [ref=e46]:
+        - img
+        - text: 开始录音 (15秒)
+      - generic [ref=e47]:
+        - button "Choose File" [ref=e48] [cursor=pointer]
+        - button "上传音频文件" [ref=e49]:
+          - img
+          - text: 上传音频文件
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - button "返回首页" [ref=e7]:
+        - img [ref=e8]
+      - generic [ref=e10]: 实时会谈
+      - generic [ref=e13]: 连接中…
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: 实时洞察
+        - generic [ref=e20]: 0 条
+      - generic [ref=e22]:
+        - img [ref=e23]
+        - paragraph [ref=e25]: 准备就绪，等待对话开始
+        - paragraph [ref=e26]: 点击上方「开始录音」或「上传音频」开始会谈，AI 分析结果将实时显示在此处
+    - navigation [ref=e27]:
+      - button "洞察" [ref=e28]:
+        - img [ref=e29]
+        - text: 洞察
+      - button "画像" [ref=e31]:
+        - img [ref=e32]
+        - text: 画像
+      - button "转写" [ref=e35]:
+        - img [ref=e36]
+        - text: 转写

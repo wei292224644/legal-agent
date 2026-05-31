@@ -22,8 +22,13 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from agent.events import (
-    OutboundEvent, ProfileUpdated, ProfileEntryPayload, InsightReady,
-    AnalysisProposed, AnalysisReady, AnalysisDismissed,
+    OutboundEvent,
+    ProfileUpdated,
+    ProfileEntryPayload,
+    InsightReady,
+    AnalysisProposed,
+    AnalysisReady,
+    AnalysisDismissed,
 )
 
 from agno.run.base import RunStatus
@@ -43,13 +48,13 @@ PROFILE_WINDOW_SIZE = 6
 class _RepoWriter(Protocol):
     """Orchestrator 写 DB 用的最小接口。main.py 注入一个绑定 sessionmaker
     + session_id 的实现；测试注入 FakeRepoWriter。"""
+
     async def insert_direct(self, *, utt_id: str, text: str) -> None: ...
-    async def upsert_pending(self, *, utt_id: str, request_id: str,
-                              preview_topic: str | None,
-                              preview_rationale: str | None) -> None: ...
+    async def upsert_pending(
+        self, *, utt_id: str, request_id: str, preview_topic: str | None, preview_rationale: str | None
+    ) -> None: ...
     async def mark_running(self, request_id: str) -> None: ...
-    async def upsert_ready(self, *, request_id: str, text: str,
-                            utt_id: str | None) -> None: ...
+    async def upsert_ready(self, *, request_id: str, text: str, utt_id: str | None) -> None: ...
     async def mark_dismissed(self, request_id: str) -> None: ...
     async def mark_expired(self, request_id: str) -> None: ...
 
@@ -91,6 +96,7 @@ class Orchestrator:
         self._ha = ha or HeavyAgent(ctx, session_id=session_id, user_id=user_id)
         self._pending: dict[str, PendingRequest] = {}
         self._inflight: set[asyncio.Task] = set()  # 在飞 child task,防 GC + 收集异常
+        self._confirming: set[str] = set()  # 正在执行 confirm_analysis 的 request_id，防重复点击
         self._bus = None
         self._bus_task = None
         self._ttl_task = None
@@ -104,9 +110,7 @@ class Orchestrator:
     def attach_bus(self, bus) -> None:
         self._bus = bus
 
-    def set_event_emitter(
-        self, emit: Callable[[OutboundEvent], Awaitable[None]]
-    ) -> None:
+    def set_event_emitter(self, emit: Callable[[OutboundEvent], Awaitable[None]]) -> None:
         self._emitter = emit
 
     def set_repo_writer(self, repo: _RepoWriter) -> None:
@@ -170,15 +174,21 @@ class Orchestrator:
                     for entry in entries:
                         entry.timestamp = utt.t_start
                     await self._ctx.enqueue_profile_update(utt.id, entries)
-                    await self._emit_event(ProfileUpdated(
-                        entries=[
-                            ProfileEntryPayload(
-                                key=e.key, value=e.value, subject=e.subject,
-                                timestamp=e.timestamp,
-                                source_utt_id=e.source_utt_id,
-                            ) for e in entries
-                        ],
-                    ))
+                    await self._emit_event(
+                        ProfileUpdated(
+                            entries=[
+                                ProfileEntryPayload(
+                                    key=e.key,
+                                    value=e.value,
+                                    subject=e.subject,
+                                    category=e.category or "fact",
+                                    timestamp=e.timestamp,
+                                    source_utt_id=e.source_utt_id,
+                                )
+                                for e in entries
+                            ],
+                        )
+                    )
             except Exception as e:
                 logger.warning("ProfileAgent.extract failed for utt %s: %s", utt.id, e)
 
@@ -248,18 +258,21 @@ class Orchestrator:
                     await self._repo.insert_direct(utt_id=utt.id, text=text)
                 except Exception:
                     logger.warning("insert_direct failed utt=%s", utt.id, exc_info=True)
-            await self._emit_event(InsightReady(
-                id=insight_id, utt_id=utt.id, text=text,
-                created_at=datetime.now(UTC).isoformat(),
-            ))
+            self._ctx.record_suggestion(text)
+            await self._emit_event(
+                InsightReady(
+                    id=insight_id,
+                    utt_id=utt.id,
+                    text=text,
+                    created_at=datetime.now(UTC).isoformat(),
+                )
+            )
             return
 
         # paused: 取首个 requirement 的预览给律师
         req = run.active_requirements[0] if run.active_requirements else None
         tool_args = (
-            dict(req.tool_execution.tool_args or {})
-            if req is not None and req.tool_execution is not None
-            else {}
+            dict(req.tool_execution.tool_args or {}) if req is not None and req.tool_execution is not None else {}
         )
         topic = str(tool_args.get("topic", ""))
         rationale = str(tool_args.get("rationale", ""))
@@ -276,76 +289,98 @@ class Orchestrator:
         if self._repo is not None:
             try:
                 await self._repo.upsert_pending(
-                    utt_id=utt.id, request_id=request_id,
-                    preview_topic=topic, preview_rationale=rationale,
+                    utt_id=utt.id,
+                    request_id=request_id,
+                    preview_topic=topic,
+                    preview_rationale=rationale,
                 )
             except Exception:
                 logger.warning("upsert_pending failed req=%s", request_id, exc_info=True)
-        await self._emit_event(AnalysisProposed(
-            request_id=request_id, utt_id=utt.id, topic=topic, rationale=rationale,
-            created_at=datetime.now(UTC).isoformat(),
-        ))
+        await self._emit_event(
+            AnalysisProposed(
+                request_id=request_id,
+                utt_id=utt.id,
+                topic=topic,
+                rationale=rationale,
+                created_at=datetime.now(UTC).isoformat(),
+            )
+        )
 
     # ------------------------------------------------------------------
     # confirm / dismiss / cleanup
     # ------------------------------------------------------------------
 
     async def confirm_analysis(self, request_id: str) -> bool:
+        if request_id in self._confirming:
+            return True
         pending = self._pending.pop(request_id, None)
         if pending is None:
             return False
-        if pending.run_output is None:
-            # 从 db 恢复出来的 pending 没有 RunOutput 引用 → 无法 confirm,
-            # 直接 abandon。前端应当避免对恢复后的 pending 发 confirm。
-            await self._abandon_run(pending)
-            return False
-
-        # 不再校验 generation:卡片已经展示给用户,paused run 的上下文在 pause 时
-        # 就冻结了,之后新 utterance 不会污染续跑结果。再校验只会让"用户读卡片
-        # 期间又说话"这一常见路径无差别失败。
-        # 在内存里 confirm 所有 active_requirement,再调 acontinue_run。
-        # Agno 文档约定:requirements 直接从 run_output.requirements 传入。
-        for req in pending.run_output.active_requirements or []:
-            try:
-                req.confirm()
-            except Exception:
-                logger.warning("requirement.confirm() failed", exc_info=True)
-
-        # 先标 running(让 DB 反映"已点确认"状态),续跑完成后再 ready
-        if self._repo is not None:
-            try:
-                await self._repo.mark_running(pending.request_id)
-            except Exception:
-                logger.warning("mark_running failed req=%s", pending.request_id, exc_info=True)
-
+        self._confirming.add(request_id)
         try:
-            run = await asyncio.wait_for(
-                self._ha.acontinue_run(
-                    run_id=pending.run_id,
-                    requirements=pending.run_output.requirements,
-                ),
-                timeout=RUN_TIMEOUT,
-            )
-        except Exception:
-            logger.exception("continue_run failed for run_id=%s", pending.run_id)
-            await self._abandon_run(pending)
-            await self._emit_event(AnalysisDismissed(
-                request_id=pending.request_id, reason="abandoned",
-            ))
-            return False
+            if pending.run_output is None:
+                # 从 db 恢复出来的 pending 没有 RunOutput 引用 → 无法 confirm,
+                # 直接 abandon。前端应当避免对恢复后的 pending 发 confirm。
+                await self._abandon_run(pending)
+                return False
 
-        text = (getattr(run, "content", None) or "").strip()
-        if self._repo is not None:
+            # 不再校验 generation:卡片已经展示给用户,paused run 的上下文在 pause 时
+            # 就冻结了,之后新 utterance 不会污染续跑结果。再校验只会让"用户读卡片
+            # 期间又说话"这一常见路径无差别失败。
+            # 在内存里 confirm 所有 active_requirement,再调 acontinue_run。
+            # Agno 文档约定:requirements 直接从 run_output.requirements 传入。
+            for req in pending.run_output.active_requirements or []:
+                try:
+                    req.confirm()
+                except Exception:
+                    logger.warning("requirement.confirm() failed", exc_info=True)
+
+            # 先标 running(让 DB 反映"已点确认"状态),续跑完成后再 ready
+            if self._repo is not None:
+                try:
+                    await self._repo.mark_running(pending.request_id)
+                except Exception:
+                    logger.warning("mark_running failed req=%s", pending.request_id, exc_info=True)
+
             try:
-                await self._repo.upsert_ready(
-                    request_id=pending.request_id, text=text, utt_id=pending.utt_id,
+                run = await asyncio.wait_for(
+                    self._ha.acontinue_run(
+                        run_id=pending.run_id,
+                        requirements=pending.run_output.requirements,
+                    ),
+                    timeout=RUN_TIMEOUT,
                 )
             except Exception:
-                logger.warning("upsert_ready failed req=%s", pending.request_id, exc_info=True)
-        await self._emit_event(AnalysisReady(
-            request_id=pending.request_id, utt_id=pending.utt_id, text=text,
-        ))
-        return True
+                logger.exception("continue_run failed for run_id=%s", pending.run_id)
+                await self._abandon_run(pending)
+                await self._emit_event(
+                    AnalysisDismissed(
+                        request_id=pending.request_id,
+                        reason="abandoned",
+                    )
+                )
+                return False
+
+            text = (getattr(run, "content", None) or "").strip()
+            if self._repo is not None:
+                try:
+                    await self._repo.upsert_ready(
+                        request_id=pending.request_id,
+                        text=text,
+                        utt_id=pending.utt_id,
+                    )
+                except Exception:
+                    logger.warning("upsert_ready failed req=%s", pending.request_id, exc_info=True)
+            await self._emit_event(
+                AnalysisReady(
+                    request_id=pending.request_id,
+                    utt_id=pending.utt_id,
+                    text=text,
+                )
+            )
+            return True
+        finally:
+            self._confirming.discard(request_id)
 
     async def dismiss_pending(self, request_id: str) -> None:
         pending = self._pending.pop(request_id, None)
@@ -357,9 +392,12 @@ class Orchestrator:
                 await self._repo.mark_dismissed(request_id)
             except Exception:
                 logger.warning("mark_dismissed failed req=%s", request_id, exc_info=True)
-        await self._emit_event(AnalysisDismissed(
-            request_id=request_id, reason="dismissed",
-        ))
+        await self._emit_event(
+            AnalysisDismissed(
+                request_id=request_id,
+                reason="dismissed",
+            )
+        )
 
     async def _abandon_run(self, pending: PendingRequest) -> None:
         """放弃挂起 run:reject 内存中的 requirements + 把 Agno db 的 run 状态标 CANCELLED。
@@ -382,9 +420,7 @@ class Orchestrator:
             if hasattr(db, "update_approval_run_status"):
                 db.update_approval_run_status(run_id=pending.run_id, run_status=RunStatus.cancelled)
         except Exception:
-            logger.warning(
-                "update_approval_run_status failed for run_id=%s", pending.run_id, exc_info=True
-            )
+            logger.warning("update_approval_run_status failed for run_id=%s", pending.run_id, exc_info=True)
 
     async def _sweep_pending_ttl(self) -> None:
         """后台扫描:挂起 run 超过 PENDING_TTL 自动 abandon。
@@ -392,6 +428,7 @@ class Orchestrator:
         while True:
             try:
                 import config as _cfg  # noqa: PLC0415
+
                 ttl = _cfg.PENDING_TTL
                 await asyncio.sleep(max(0.05, min(ttl / 4, 30)))
             except asyncio.CancelledError:
@@ -408,9 +445,12 @@ class Orchestrator:
                         await self._repo.mark_expired(rid)
                     except Exception:
                         logger.warning("mark_expired failed req=%s", rid, exc_info=True)
-                await self._emit_event(AnalysisDismissed(
-                    request_id=rid, reason="expired",
-                ))
+                await self._emit_event(
+                    AnalysisDismissed(
+                        request_id=rid,
+                        reason="expired",
+                    )
+                )
 
     # ------------------------------------------------------------------
     # plumbing
@@ -433,4 +473,3 @@ class Orchestrator:
             await self._emitter(evt)
         except Exception:
             logger.warning("emit_event failed for %s", evt.type, exc_info=True)
-

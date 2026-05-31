@@ -9,12 +9,21 @@ function stripQuickReply(text: string): string {
   return text.replace(/^\*{0,2}快答\*{0,2}[：:]\s*/u, '')
 }
 
+function formatTimeLabel(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 export default function InsightCard({ insight }: InsightCardProps) {
   return (
-    <div className="py-4 border-t border-border-color first:border-t-0">
+    <div className="">
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-3 h-3 text-accent" />
         <span className="text-xs font-medium text-accent">实时洞察</span>
+        <span className="text-[10px] text-ink-muted font-mono ml-auto">
+          {formatTimeLabel(insight.createdAt)}
+        </span>
       </div>
       <MarkdownText>{stripQuickReply(insight.text)}</MarkdownText>
       <span className="text-[10px] text-ink-muted font-mono mt-2 block">

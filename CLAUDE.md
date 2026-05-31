@@ -21,7 +21,7 @@
 - **目录结构:**
   - `backend/` — Python FastAPI 后端（Agent 服务、音频管道、WebSocket）
     - `src/agent/` — Agent 核心：IntentRouter、ProfileAgent、HeavyAgent、Orchestrator、技能集
-    - `src/session/` — 会话管理：SessionManager、SQLite 持久化、序列化、AI 摘要生成
+    - `src/session/` — 会话管理：SessionManager、PostgreSQL 持久化（通过 SQLAlchemy async）、序列化、AI 摘要生成
     - `src/diarization/` — 说话人分离：声纹注册、匹配、voiceprint 工具
     - `src/stt/` — 语音转文字：FunASR 流式处理
     - `src/models/` — Pydantic 数据模型
@@ -234,7 +234,13 @@ Key routing rules:
 律师声纹在进程启动时通过 `_get_lawyer_enrollment()` 加载一次（基于 `tests/fixtures/律师声纹注册.wav`），后续每个 WebSocket 会话通过 `copy.deepcopy()` 获得独立副本，避免会话间的 client_embedding 污染。
 
 ### Session 恢复机制
-`SessionManager` 在启动时从 SQLite 恢复未过期的会话状态。WebSocket 连接建立时，若 `session_id` 对应的状态已存在，则直接续接；若不存在但数据库有快照，则自动恢复。会话每 60 秒自动快照，TTL 600 秒。
+`SessionManager` 运行时状态驻留内存，持久化通过 `SessionRepository` 写入 PostgreSQL。`DATABASE_URL` 见 `.env.example`。WebSocket 连接建立时，若 `session_id` 对应的状态已存在，则直接续接；若不存在但数据库有快照，则自动恢复。会话每 60 秒自动快照，TTL 600 秒。
+
+### 前后端事件类型同步
+后端 `backend/src/agent/events.py` 的 schema 变更必须同步到前端 `frontend/src/types/events.ts`。`sessionReducer.ts` 处理事件时只映射显式列出的字段，未映射字段会被静默丢弃。
+
+### ScrollArea 组件来源
+前端使用 `@base-ui/react-scroll-area` 的 `ScrollArea`，不是 Radix。其 `Viewport` 不默认暴露 ref，需通过组件封装透传。
 
 <!-- SPECKIT START -->
 当前 feature 计划: [specs/001-frontend-v3-redesign/plan.md](specs/001-frontend-v3-redesign/plan.md)

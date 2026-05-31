@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const ALLOWED = [
-  'p', 'strong', 'em', 'code', 'ul', 'ol', 'li', 'blockquote', 'a', 'br', 'pre',
+  'p', 'strong', 'em', 'code', 'ul', 'ol', 'li', 'blockquote', 'a', 'br', 'pre', 'hr',
 ]
 
 const COMPONENTS = {
@@ -19,6 +19,7 @@ const COMPONENTS = {
     return <a href={safe ? href : '#'} className="text-accent underline" target="_blank" rel="noopener noreferrer">{children}</a>
   },
   pre: ({ children }: { children?: React.ReactNode }) => <pre className="text-xs font-mono bg-bg-tertiary p-2 rounded my-1 overflow-x-auto">{children}</pre>,
+  hr: () => <hr className="border-border-color my-2" />,
   br: () => <br />,
 }
 

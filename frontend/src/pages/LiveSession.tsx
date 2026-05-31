@@ -318,11 +318,10 @@ function LiveSessionInner() {
     () => (
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-1.5 px-2 h-8 text-sm text-ink-primary rounded-md border border-border-color bg-transparent hover:bg-bg-tertiary transition-colors"
+        className="flex items-center justify-center gap-1.5 w-11 h-11 text-sm text-ink-primary rounded-md border border-border-color bg-transparent hover:bg-bg-tertiary transition-colors"
         aria-label="返回首页"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span className="hidden sm:inline">首页</span>
       </button>
     ),
     [navigate],

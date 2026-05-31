@@ -68,6 +68,7 @@ class HeavyAgent:
             trigger_speaker=trigger_utt.speaker or "unknown",
             profile_summary=self._ctx.get_profile_summary(),
             recent_window=self._ctx.get_recent_window(PROFILE_WINDOW_SIZE_FOR_CHILD),
+            previous_suggestions=self._ctx.get_recent_suggestions(3),
         )
         return await self._agent.arun(prompt)
 

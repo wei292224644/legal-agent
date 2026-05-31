@@ -46,6 +46,8 @@ export type ProfileEntryPayload = {
   key: string
   value: string
   subject: string
+  timestamp: number
+  source_utt_id: string
 }
 
 export type ProfileUpdated = {
