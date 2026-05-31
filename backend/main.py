@@ -17,10 +17,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from agent.bus import UtteranceBus  # noqa: E402
 from agent.context_store import ContextStore  # noqa: E402
+from agent.events import (  # noqa: E402
+    OutboundEvent, TranscriptDelta, ConfirmAck, ErrorEvent, Pong,
+)
 from agent.relevance_gate import load_relevance_model  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
 from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
 from db.engine import create_engine_from_env, get_sessionmaker  # noqa: E402
+from repositories.suggestions import SuggestionRepository  # noqa: E402
 from session.manager import SessionManager  # noqa: E402
 from session.summary import generate_summary  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
@@ -118,6 +122,7 @@ async def get_history(session_id: str):
                 "key": e.key,
                 "value": e.value,
                 "subject": e.subject,
+                "category": e.category or "fact",
             }
             for e in profile_entries
         ],
@@ -159,6 +164,10 @@ async def _safe_send_json(ws: WebSocket, payload: dict) -> None:
         logger.warning("WS send failed: %s", exc)
 
 
+async def _send_event(ws: WebSocket, evt: OutboundEvent) -> None:
+    await _safe_send_json(ws, evt.model_dump())
+
+
 async def _safe_ws_close(ws: WebSocket, code: int = 1000, reason: str = "") -> None:
     with contextlib.suppress(AttributeError, RuntimeError):
         await ws.close(code=code, reason=reason)
@@ -167,6 +176,48 @@ async def _safe_ws_close(ws: WebSocket, code: int = 1000, reason: str = "") -> N
 async def _generate_summary_and_save(session_id: uuid.UUID, ctx: ContextStore) -> None:
     summary = await generate_summary(ctx)
     await session_manager.set_summary(session_id, summary)
+
+
+class _DbRepoWriter:
+    """绑定 sessionmaker + session_id 的 SuggestionRepository facade,
+    给 Orchestrator 注入。每次调用打开一个独立 session,与 ws 生命周期解耦。"""
+
+    def __init__(self, sessionmaker, session_id: uuid.UUID) -> None:
+        self._sm = sessionmaker
+        self._sid = session_id
+
+    async def insert_direct(self, *, utt_id: str, text: str) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).insert_direct(
+                self._sid, utt_id=utt_id, text=text,
+            )
+
+    async def upsert_pending(self, *, utt_id: str, request_id: str,
+                              preview_topic, preview_rationale) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).upsert_pending(
+                self._sid, utt_id=utt_id, request_id=request_id,
+                preview_topic=preview_topic, preview_rationale=preview_rationale,
+            )
+
+    async def mark_running(self, request_id: str) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).mark_running(self._sid, request_id)
+
+    async def upsert_ready(self, *, request_id: str, text: str,
+                            utt_id: str | None) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).upsert_ready(
+                self._sid, request_id=request_id, text=text, utt_id=utt_id,
+            )
+
+    async def mark_dismissed(self, request_id: str) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).mark_dismissed(self._sid, request_id)
+
+    async def mark_expired(self, request_id: str) -> None:
+        async with self._sm() as s:
+            await SuggestionRepository(s).mark_expired(self._sid, request_id)
 
 
 async def _handle_text_message(
@@ -181,21 +232,19 @@ async def _handle_text_message(
     msg_type = msg.get("type")
 
     if msg_type == "ping":
-        await _safe_send_json(ws, {"type": "pong"})
+        await _send_event(ws, Pong())
         return False
 
     if msg_type == "confirm":
         request_id = msg.get("request_id")
         if request_id:
-            # running 不存 DB（中间状态），只调 orchestrator
             ok = await orch.confirm_analysis(request_id)
-            await _safe_send_json(ws, {"type": "confirm_ack", "request_id": request_id, "ok": ok})
+            await _send_event(ws, ConfirmAck(request_id=request_id, ok=ok))
         return False
 
     if msg_type == "dismiss":
         request_id = msg.get("request_id")
         if request_id:
-            # dismissed 不存 DB（中间状态），只调 orchestrator
             await orch.dismiss_pending(request_id)
         return False
 
@@ -263,72 +312,8 @@ async def legal_session(ws: WebSocket, session_id: str):
         bus = UtteranceBus(maxsize=10)
         orch.attach_bus(bus)
 
-        async def on_suggestion(text, meta):
-            utt_id = meta.get("utt_id")
-            request_id = meta.get("request_id")
-            try:
-                if meta.get("kind") == "pending":
-                    # pending 只推 WS，不存 DB（中间状态，刷新后不恢复）
-                    await ws.send_json({
-                        "type": "suggestion.pending",
-                        "text": None,
-                        "meta": {
-                            "utt_id": utt_id,
-                            "request_id": request_id,
-                            "preview": meta.get("preview", {}),
-                        },
-                    })
-                elif request_id:
-                    # gated ready：深度分析结果就绪
-                    if text:
-                        async with _maker() as s:
-                            from repositories.suggestions import SuggestionRepository
-                            await SuggestionRepository(s).upsert_ready(
-                                sid_uuid, request_id=request_id, text=text, utt_id=utt_id,
-                            )
-                    await ws.send_json({
-                        "type": "suggestion.ready",
-                        "text": text,
-                        "meta": {
-                            "utt_id": utt_id,
-                            "request_id": request_id,
-                        },
-                    })
-                else:
-                    # direct 洞察：HeavyAgent 非 gated 直接输出,无 request_id
-                    if utt_id and text:
-                        async with _maker() as s:
-                            from repositories.suggestions import SuggestionRepository
-                            await SuggestionRepository(s).insert_direct(
-                                sid_uuid, utt_id=utt_id, text=text,
-                            )
-                    await ws.send_json({
-                        "type": "suggestion.ready",
-                        "text": text,
-                        "meta": {"utt_id": utt_id},
-                    })
-            except (WebSocketDisconnect, RuntimeError):
-                # WS 已断开,不应崩溃也不必告警(常规连接关闭)
-                pass
-            except Exception as exc:
-                logger.warning("Suggestion callback failed: %s", exc)
-
-        orch.set_suggestion_callback(on_suggestion)
-
-        async def on_profile_update(entries):
-            await _safe_send_json(ws, {
-                "type": "profile_update",
-                "entries": [
-                    {
-                        "key": e.key,
-                        "value": e.value,
-                        "subject": e.subject,
-                    }
-                    for e in entries
-                ],
-            })
-
-        orch.set_profile_callback(on_profile_update)
+        orch.set_event_emitter(lambda evt: _send_event(ws, evt))
+        orch.set_repo_writer(_DbRepoWriter(_maker, sid_uuid))
         await orch.start()
 
         # --- 音频管道 ---
@@ -349,19 +334,14 @@ async def legal_session(ws: WebSocket, session_id: str):
             try:
                 async for utt in stream_stt(audio_iter(), enrollment=enrollment):
                     logger.info("STT produced utt: %s", utt.text[:50])
-                    await _safe_send_json(
-                        ws,
-                        {
-                            "type": "transcript",
-                            "id": utt.id,
-                            "text": utt.text,
-                            "t_start": utt.t_start,
-                            "t_end": utt.t_end,
-                            "speaker": utt.speaker,
-                            "closed_by": utt.closed_by,
-                            "is_final": True,
-                        },
-                    )
+                    await _send_event(ws, TranscriptDelta(
+                        utt_id=utt.id,
+                        speaker=utt.speaker or "uncertain",
+                        text=utt.text,
+                        t_start=utt.t_start,
+                        t_end=utt.t_end,
+                        closed_by=utt.closed_by,
+                    ))
                     ok = await bus.put(utt)
                     if not ok:
                         logger.warning("Utterance bus full, dropping utt %s", utt.id)
@@ -394,7 +374,7 @@ async def legal_session(ws: WebSocket, session_id: str):
                 try:
                     msg = json.loads(data["text"])
                 except json.JSONDecodeError:
-                    await _safe_send_json(ws, {"type": "error", "message": "Invalid JSON"})
+                    await _send_event(ws, ErrorEvent(message="Invalid JSON"))
                     continue
                 should_close = await _handle_text_message(ws, msg, orch, sid_uuid, ctx, audio_q)
                 if should_close:
