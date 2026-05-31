@@ -34,6 +34,8 @@ export type ProfileEntryItem = {
   value: string;
   subject: string;
   category: ProfileCategory;
+  timestamp?: number;
+  sourceUttId?: string;
 };
 
 export type Profile = {
