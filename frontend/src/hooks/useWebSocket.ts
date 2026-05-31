@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import type { ServerEvent } from '@/types/events'
 
 export function useWebSocket(
@@ -15,7 +15,7 @@ export function useWebSocket(
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 3
 
-  const wsUrl = `ws://localhost:8000/ws/${sessionId}`
+  const wsUrl = useMemo(() => `ws://localhost:8000/ws/${sessionId}`, [sessionId])
 
   const cleanup = useCallback(() => {
     if (reconnectRef.current) clearTimeout(reconnectRef.current)
@@ -66,6 +66,7 @@ export function useWebSocket(
     ws.onmessage = (e: MessageEvent) => {
       try {
         const evt = JSON.parse(e.data) as ServerEvent
+        if (evt.type === 'pong') return
         onEventRef.current(evt)
       } catch {
         // 无效 JSON 直接丢弃,后端理论上不会发
