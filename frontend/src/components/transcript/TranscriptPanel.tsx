@@ -17,6 +17,12 @@ const speakerLabel: Record<TranscriptLine['speaker'], { label: string; color: st
 
 const SCROLL_BOTTOM_THRESHOLD = 40
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
 export default function TranscriptPanel({ transcripts, isOpen, onToggle }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
@@ -67,6 +73,9 @@ export default function TranscriptPanel({ transcripts, isOpen, onToggle }: Trans
               const spk = speakerLabel[line.speaker];
               return (
                 <div key={line.id} className="flex gap-2">
+                  <span className="text-[10px] text-ink-muted font-mono w-10 shrink-0 text-right">
+                    {formatTime(line.timestamp)}
+                  </span>
                   <span className={`text-xs font-mono shrink-0 ${spk.color}`}>{spk.label}</span>
                   <p className="text-xs text-ink-secondary leading-relaxed">{line.text}</p>
                 </div>
