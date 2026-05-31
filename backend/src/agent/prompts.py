@@ -52,6 +52,20 @@ def build_profile_prompt(
 - 对方：与当事人利益对立的一方（公司、卖家、债务人、肇事方、受害方等）。
 - 第三方：既非当事人也非对方的其他人（子女、同伙、证人；来访者替他人咨询时，来访者自身的信息也归第三方）。
 
+## 分析类别（category）
+每条事实必须标注所属类别，用于前端分类展示。类别定义：
+
+- basic_info：当事人或相关方的基本身份信息（姓名、年龄、职业、收入、家庭成员、住址等客观身份数据）
+- emotion：当事人的情绪状态或心理表现（焦虑、愤怒、无助、紧张、委屈、恐惧等；从语气词、用词强度、重复强调等信息中推断）
+- risk：案件中的法律风险暴露（证据不足、时效临近、合同漏洞、对方可能反诉、不利条款、程序风险等）
+- claim：当事人的关键主张或诉求（"我要讨回工资""对方必须赔偿""公司违法开除"等主观立场和期望）
+- fact：对话中已确认的客观事实（时间节点、金额数字、合同条款、事件经过、已发生的具体行为等可验证信息）
+
+类别选择原则：
+- 同一句话可能包含多条不同类别的事实，每条独立标注
+- 客观身份信息 → basic_info；情绪心理表现 → emotion；法律风险 → risk；主观诉求 → claim；可验证的客观事实 → fact
+- 不确定时选 fact，不要捏造类别
+
 ## 提取规则
 1. 只提取 [client] 陈述的事实，不提取律师的话
 2. 当前对话中若无新事实，输出空数组
@@ -63,19 +77,31 @@ def build_profile_prompt(
 ## 示例
 输入（client，来访者替被羁押的老公咨询）：他涉嫌盗窃，三年前也判过半年，已经释放了。
 输出：{{"entries": [
-  {{"subject": "当事人", "key": "涉嫌罪名", "value": "盗窃"}},
-  {{"subject": "当事人", "key": "前科", "value": "三年前因盗窃被判半年，已刑满释放"}}
+  {{"subject": "当事人", "key": "涉嫌罪名", "value": "盗窃", "category": "fact"}},
+  {{"subject": "当事人", "key": "前科", "value": "三年前因盗窃被判半年，已刑满释放", "category": "risk"}}
 ]}}
 
 输入（client）：我是超市收银员，对方是工地老板，我们有个孩子 5 岁。
 输出：{{"entries": [
-  {{"subject": "当事人", "key": "职业", "value": "超市收银员"}},
-  {{"subject": "对方", "key": "职业", "value": "工地老板"}},
-  {{"subject": "第三方", "key": "年龄", "value": "5岁"}}
+  {{"subject": "当事人", "key": "职业", "value": "超市收银员", "category": "basic_info"}},
+  {{"subject": "对方", "key": "职业", "value": "工地老板", "category": "basic_info"}},
+  {{"subject": "第三方", "key": "年龄", "value": "5岁", "category": "basic_info"}}
+]}}
+
+输入（client）：我现在每天晚上都睡不着，特别焦虑，他们公司连个说法都不给。
+输出：{{"entries": [
+  {{"subject": "当事人", "key": "情绪状态", "value": "焦虑失眠", "category": "emotion"}},
+  {{"subject": "当事人", "key": "诉求", "value": "要求公司给说法", "category": "claim"}}
+]}}
+
+输入（client）：合同是去年3月签的，但现在找不到原件了，只有微信聊天记录。
+输出：{{"entries": [
+  {{"subject": "当事人", "key": "合同签订日期", "value": "去年3月", "category": "fact"}},
+  {{"subject": "当事人", "key": "证据情况", "value": "合同原件丢失，仅有微信聊天记录", "category": "risk"}}
 ]}}
 
 只输出 JSON，不要任何解释：
-{{"entries": [{{"subject": "...", "key": "...", "value": "..."}}]}}
+{{"entries": [{{"subject": "...", "key": "...", "value": "...", "category": "basic_info|emotion|risk|claim|fact"}}]}}
 
 当前句子（{speaker}）：{text}
 """
@@ -105,6 +131,9 @@ def get_child_system_prompt() -> str:
 # 工具
 - `fetch_more_transcript(start, end)`:默认窗口看不到的早期内容确有必要时拉取。
 - `deep_analysis(topic, rationale)`:切到深析模式。topic 直白,rationale 让律师能判断此刻是否要切。
+
+# 快答格式
+不要在你的快答回复中加"快答"标题或任何前缀,直接说出对律师有用的内容即可。
 
 # 风格
 对律师直接说话,专业紧凑;引法条带编号;计算展示公式;不绕弯子。
