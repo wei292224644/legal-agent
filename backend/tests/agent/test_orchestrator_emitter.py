@@ -267,3 +267,48 @@ async def test_run_child_emits_analysis_proposed_and_persists(orch):
 
     # PendingRequest 必须仍在内存以便后续 confirm
     assert evt.request_id in orch._pending
+
+
+@pytest.mark.asyncio
+async def test_confirm_analysis_emits_ready_and_persists(orch):
+    """confirm → continue_run 返回 → AnalysisReady + mark_running + upsert_ready。
+    业务意图:律师等了卡片确认深析,结果必须实时回到 UI 同时落 DB 便于刷新恢复。"""
+    from unittest.mock import AsyncMock
+    from agent.events import AnalysisReady
+    from agent.orchestrator import PendingRequest
+
+    fake_emitter = FakeEmitter()
+    fake_repo = FakeRepoWriter()
+    orch.set_event_emitter(fake_emitter)
+    orch.set_repo_writer(fake_repo)
+
+    class _FakeReq:
+        def confirm(self): pass
+        def reject(self, _): pass
+
+    class _FakeRun:
+        is_paused = False
+        content = "深度分析结论"
+        run_id = "agno_run_1"
+        active_requirements = [_FakeReq()]
+        requirements = active_requirements
+
+    orch._pending["req_abc"] = PendingRequest(
+        request_id="req_abc", run_id="agno_run_1", utt_id="u1",
+        generation=0, preview={"topic": "", "rationale": ""},
+        run_output=_FakeRun(),
+    )
+    orch._ha.acontinue_run = AsyncMock(return_value=_FakeRun())
+
+    ok = await orch.confirm_analysis("req_abc")
+    assert ok is True
+
+    ready = [e for e in fake_emitter.received if isinstance(e, AnalysisReady)]
+    assert len(ready) == 1
+    assert ready[0].request_id == "req_abc"
+    assert ready[0].utt_id == "u1"
+    assert ready[0].text == "深度分析结论"
+
+    op_names = [c[0] for c in fake_repo.calls]
+    assert "mark_running" in op_names
+    assert "upsert_ready" in op_names

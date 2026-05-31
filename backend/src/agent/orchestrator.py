@@ -22,7 +22,7 @@ from typing import Any, Protocol
 
 from agent.events import (
     OutboundEvent, ProfileUpdated, ProfileEntryPayload, InsightReady,
-    AnalysisProposed,
+    AnalysisProposed, AnalysisReady, AnalysisDismissed,
 )
 
 from agno.run.base import RunStatus
@@ -323,6 +323,13 @@ class Orchestrator:
             except Exception:
                 logger.warning("requirement.confirm() failed", exc_info=True)
 
+        # 先标 running(让 DB 反映"已点确认"状态),续跑完成后再 ready
+        if self._repo is not None:
+            try:
+                await self._repo.mark_running(pending.request_id)
+            except Exception:
+                logger.warning("mark_running failed req=%s", pending.request_id, exc_info=True)
+
         try:
             run = await asyncio.wait_for(
                 self._ha.acontinue_run(
@@ -334,10 +341,22 @@ class Orchestrator:
         except Exception:
             logger.exception("continue_run failed for run_id=%s", pending.run_id)
             await self._abandon_run(pending)
+            await self._emit_event(AnalysisDismissed(
+                request_id=pending.request_id, reason="abandoned",
+            ))
             return False
 
-        text = getattr(run, "content", None)
-        await self._emit({"kind": "ready", "utt_id": pending.utt_id, "request_id": request_id}, text=text)
+        text = (getattr(run, "content", None) or "").strip()
+        if self._repo is not None:
+            try:
+                await self._repo.upsert_ready(
+                    request_id=pending.request_id, text=text, utt_id=pending.utt_id,
+                )
+            except Exception:
+                logger.warning("upsert_ready failed req=%s", pending.request_id, exc_info=True)
+        await self._emit_event(AnalysisReady(
+            request_id=pending.request_id, utt_id=pending.utt_id, text=text,
+        ))
         return True
 
     async def dismiss_pending(self, request_id: str) -> None:
