@@ -6,7 +6,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from agent.context_store import ContextStore
+    from agent.orchestrator import Orchestrator
 
 SessionStatus = Literal["active", "disconnected", "closed"]
 
@@ -16,5 +20,5 @@ class SessionRuntime:
     """单个 session 的进程内 runtime 状态。"""
     session_id: uuid.UUID
     status: SessionStatus = "active"
-    ctx: object | None = None       # ContextStore 实例
-    orchestrator: object | None = None
+    ctx: ContextStore | None = None
+    orchestrator: Orchestrator | None = None

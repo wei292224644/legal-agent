@@ -119,10 +119,8 @@ class ContextStore:
         """优雅关闭 profile worker。"""
         self._shutdown = True
         if self._worker_task:
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._profile_queue.join(), timeout=2.0)
-            except TimeoutError:
-                pass
             self._worker_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
@@ -148,5 +146,5 @@ class ContextStore:
                     )
                 self._profile.extend(entries)
             except Exception as exc:
-                logger.warning("Profile worker dropped entry: %s", exc)
+                logger.warning("Profile worker dropped entry: %s", exc, exc_info=True)
             self._profile_queue.task_done()

@@ -73,11 +73,11 @@ export default function TranscriptPanel({ transcripts, isOpen, onToggle }: Trans
               const spk = speakerLabel[line.speaker];
               return (
                 <div key={line.id} className="flex gap-2">
-                  <span className="text-[10px] text-ink-muted font-mono w-10 shrink-0 text-right">
-                    {formatTime(line.timestamp)}
-                  </span>
-                  <span className={`text-xs font-mono shrink-0 ${spk.color}`}>{spk.label}</span>
-                  <p className="text-xs text-ink-secondary leading-relaxed">{line.text}</p>
+                  <div className="flex flex-col items-end w-10 shrink-0 gap-0.5">
+                    <span className="text-[10px] text-ink-muted font-mono">{formatTime(line.timestamp)}</span>
+                    <span className={`text-xs font-mono ${spk.color}`}>{spk.label}</span>
+                  </div>
+                  <p className="text-xs text-ink-secondary leading-relaxed flex-1">{line.text}</p>
                 </div>
               );
             })}

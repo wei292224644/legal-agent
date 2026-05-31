@@ -104,6 +104,13 @@ async def stream_stt_v2(
         nonlocal yielded_until_ms
         if len(snapshot) == 0:
             return
+        # 清理超过 10 秒未 yield 的陈旧 spec task，避免长会话中累积
+        stale_threshold_ms = yielded_until_ms - 10000
+        for k in list(spec_asr.keys()):
+            if k[1] < stale_threshold_ms:
+                old_task = spec_asr.pop(k, None)
+                if old_task is not None and not old_task.done():
+                    old_task.cancel()
         total_ms = int(len(snapshot) * 1000 / SR)
         window_start_ms = max(0, yielded_until_ms - 500)
         window_start_sample = int(window_start_ms * SR / 1000)

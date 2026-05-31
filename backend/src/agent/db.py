@@ -1,10 +1,11 @@
 """Agno PostgresDb 单例。
 
-生产用 Postgres,因为 HITL run 状态 + 多会话画像写并发量超过 SQLite 单写锁能扛的量级。
 测试通过 reset_agno_db_for_tests(replacement=InMemoryDb()) 注入内存替身,不依赖 Postgres。
 """
 
 from __future__ import annotations
+
+import contextlib
 
 from agno.db.base import BaseDb
 from agno.db.postgres import PostgresDb
@@ -30,8 +31,6 @@ def reset_agno_db_for_tests(replacement: BaseDb | None = None) -> None:
     """
     global _db
     if _db is not None and hasattr(_db, "db_engine"):
-        try:
+        with contextlib.suppress(Exception):
             _db.db_engine.dispose()
-        except Exception:
-            pass
     _db = replacement

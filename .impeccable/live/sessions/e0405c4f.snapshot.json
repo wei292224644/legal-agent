@@ -1,0 +1,25 @@
+{
+  "id": "e0405c4f",
+  "phase": "agent_error",
+  "pageUrl": "/session/23c54532-7030-4f4e-8399-ea6cef032ad6",
+  "sourceFile": null,
+  "expectedVariants": 3,
+  "arrivedVariants": 0,
+  "visibleVariant": 0,
+  "paramValues": {},
+  "pendingEventSeq": null,
+  "pendingEvent": null,
+  "deliveryLease": null,
+  "checkpointRevision": 1,
+  "activeOwner": "47c3cb60",
+  "sourceMarkers": {},
+  "fallbackMode": null,
+  "annotationArtifacts": [],
+  "diagnostics": [
+    {
+      "error": "agent_error",
+      "message": "用户通过聊天直接下达了修改指令，停止 live 模式"
+    }
+  ],
+  "updatedAt": "2026-05-31T04:05:17.607Z"
+}

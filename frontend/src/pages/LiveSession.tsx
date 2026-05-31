@@ -99,8 +99,17 @@ function LiveSessionInner() {
           timestamp: u.t_start,
         }))
 
-        const suggestions = h.suggestions
-          .filter((s) => s.status !== 'expired' && s.status !== 'dismissed')
+        const historyInsights = h.suggestions
+          .filter((s) => s.source === 'direct' && s.status !== 'expired' && s.status !== 'dismissed')
+          .map((s) => ({
+            id: s.id,
+            uttId: s.utt_id,
+            text: s.text ?? '',
+            createdAt: s.created_at,
+          }))
+
+        const historySuggestions = h.suggestions
+          .filter((s) => s.source === 'gated' && s.status !== 'expired' && s.status !== 'dismissed')
           .map((s) => ({
             id: s.id,
             requestId: s.request_id ?? `req-${s.id}`,
@@ -108,6 +117,7 @@ function LiveSessionInner() {
             topic: s.preview_topic ?? '',
             rationale: s.preview_rationale ?? '',
             text: s.text ?? null,
+            source: s.source as 'direct' | 'gated',
             createdAt: s.created_at,
           }))
 
@@ -122,7 +132,8 @@ function LiveSessionInner() {
 
         hydrate({
           transcripts,
-          suggestions,
+          insights: historyInsights,
+          suggestions: historySuggestions,
           profile: profileEntries.length > 0 ? entriesToProfile(profileEntries) : null,
         })
         setHydrated(true)

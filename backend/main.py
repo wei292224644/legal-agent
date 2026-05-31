@@ -18,18 +18,22 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from agent.bus import UtteranceBus  # noqa: E402
 from agent.context_store import ContextStore  # noqa: E402
 from agent.events import (  # noqa: E402
-    OutboundEvent, TranscriptDelta, ConfirmAck, ErrorEvent, Pong,
+    ConfirmAck,
+    ErrorEvent,
+    OutboundEvent,
+    Pong,
+    TranscriptDelta,
 )
-from agent.relevance_gate import load_relevance_model  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
-from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
+from agent.relevance_gate import load_relevance_model  # noqa: E402
 from db.engine import create_engine_from_env, get_sessionmaker  # noqa: E402
+from diarization.enrollment import Enrollment, enroll_speaker  # noqa: E402
 from repositories.suggestions import SuggestionRepository  # noqa: E402
 from session.manager import SessionManager  # noqa: E402
 from session.summary import generate_summary  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
 
-ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册.wav"
+ENROLLMENT_WAV = Path(__file__).parent / "tests" / "fixtures" / "律师声纹注册_30s.wav"
 
 # uvicorn 默认只给 uvicorn.* 系列 logger 加 handler,不给应用 logger。
 # 不调 basicConfig 的话,main.py 与 src/* 里的 logger.info 全静默,
@@ -45,7 +49,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -137,8 +141,8 @@ async def _startup() -> None:
     load_relevance_model()
 
     global session_manager, _maker
-    from db.base import Base  # noqa: E402
     import db.models  # noqa: E402, F401
+    from db.base import Base  # noqa: E402
 
     engine = create_engine_from_env()
     # 确保表存在——测试套件跑完后可能已 drop_all
@@ -184,7 +188,7 @@ class _DbRepoWriter:
     """绑定 sessionmaker + session_id 的 SuggestionRepository facade,
     给 Orchestrator 注入。每次调用打开一个独立 session,与 ws 生命周期解耦。"""
 
-    def __init__(self, sessionmaker, session_id: uuid.UUID) -> None:
+    def __init__(self, sessionmaker: async_sessionmaker, session_id: uuid.UUID) -> None:
         self._sm = sessionmaker
         self._sid = session_id
 
@@ -195,7 +199,7 @@ class _DbRepoWriter:
             )
 
     async def upsert_pending(self, *, utt_id: str, request_id: str,
-                              preview_topic, preview_rationale) -> None:
+                              preview_topic: str | None, preview_rationale: str | None) -> None:
         async with self._sm() as s:
             await SuggestionRepository(s).upsert_pending(
                 self._sid, utt_id=utt_id, request_id=request_id,
@@ -228,7 +232,7 @@ async def _handle_text_message(
     orch: Orchestrator,
     session_id: uuid.UUID,
     ctx: ContextStore,
-    audio_q: asyncio.Queue | None,
+    audio_q: asyncio.Queue[tuple[np.ndarray, float] | None] | None,
 ) -> bool:
     """处理客户端文本消息。返回 True 表示会话应该关闭。"""
     msg_type = msg.get("type")
@@ -267,33 +271,33 @@ async def _handle_text_message(
 @app.websocket("/ws/{session_id}")
 async def legal_session(ws: WebSocket, session_id: str):
     await ws.accept()
-    print(f"[WS] accepted sid={session_id}")
+    logger.info("[WS] accepted sid=%s", session_id)
 
     # --- Session 验证 ---
     try:
         sid_uuid = uuid.UUID(session_id)
     except ValueError:
-        print(f"[WS] invalid session_id sid={session_id} (4002)")
+        logger.warning("[WS] invalid session_id sid=%s (4002)", session_id)
         await _safe_ws_close(ws, code=4002, reason="会话不存在")
         return
 
     runtime = await session_manager.get_runtime(sid_uuid) or await session_manager.restore_session(sid_uuid)
     if runtime is None:
-        print(f"[WS] session not found sid={session_id} (4002)")
+        logger.warning("[WS] session not found sid=%s (4002)", session_id)
         await _safe_ws_close(ws, code=4002, reason="会话不存在")
         return
     if runtime.status == "closed":
-        print(f"[WS] session closed sid={session_id} (4001)")
+        logger.warning("[WS] session closed sid=%s (4001)", session_id)
         await _safe_ws_close(ws, code=4001, reason="会话已结束")
         return
-    print(f"[WS] session loaded sid={session_id} status={runtime.status}")
+    logger.info("[WS] session loaded sid=%s status=%s", session_id, runtime.status)
 
     # 后来者接管：关掉旧 WS（若存在），本连接接管
     old_ws = await session_manager.attach_ws(sid_uuid, ws)
     if old_ws is not None:
-        print(f"[WS] replacing old ws sid={session_id}")
+        logger.info("[WS] replacing old ws sid=%s", session_id)
         await _safe_ws_close(old_ws, code=4000, reason="已被新连接接管")
-    print(f"[WS] attached sid={session_id}")
+    logger.info("[WS] attached sid=%s", session_id)
 
     # attach 成功后所有路径都必须保证 detach_ws 被调用。
     # 传入 ws 防止竞态：若新连接已替换 _ws_map 引用，旧 finally 不应误删新连接。
@@ -352,14 +356,14 @@ async def legal_session(ws: WebSocket, session_id: str):
                 raise
 
         stt_task = asyncio.create_task(consume_stt())
-        print(f"[WS] entering receive loop sid={session_id}")
+        logger.info("[WS] entering receive loop sid=%s", session_id)
 
         # --- 主循环 ---
         while True:
             data = await ws.receive()
 
             if data["type"] == "websocket.disconnect":
-                print(f"[WS] disconnect received sid={session_id} code={data.get('code')}")
+                logger.info("[WS] disconnect received sid=%s code=%s", session_id, data.get("code"))
                 break
 
             if "bytes" in data:
@@ -388,20 +392,22 @@ async def legal_session(ws: WebSocket, session_id: str):
         logger.exception("WS handler error sid=%s", session_id)
     finally:
         # 按"启动反序"清理,且每段独立 guard —— setup 异常时只清理已建立的部分。
+        # suppress 范围收窄:只忽略预期异常,编程错误(Na​​meError/SyntaxError 等)仍暴露。
+        _cleanup_exc = (RuntimeError, asyncio.CancelledError, OSError, AttributeError)
         if audio_q is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(*_cleanup_exc):
                 await audio_q.put(None)
         if stt_task is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(*_cleanup_exc):
                 await stt_task
         if orch is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(*_cleanup_exc):
                 await orch.shutdown()
         if ctx is not None and orch is not None:
             cur = await session_manager.get_runtime(sid_uuid)
             if cur is not None and cur.status != "closed":
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(*_cleanup_exc):
                     await session_manager.bind_runtime(sid_uuid, ctx=ctx, orchestrator=orch)
         # detach_ws 必须执行，传入 ws 防止竞态。
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(*_cleanup_exc):
             await session_manager.detach_ws(sid_uuid, ws)

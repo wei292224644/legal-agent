@@ -1,3 +1,113 @@
 [      57ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:14336
 [    2574ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
 [    2582ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  912481ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  912645ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  918290ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[  927546ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 2974776ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 2974778ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3027316ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3027316ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3027324ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3027324ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3033952ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3033952ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3033964ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3033964ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3038921ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3038921ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3038927ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3038928ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3057672ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3057672ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3168158ms] ReferenceError: addInsight is not defined
+    at LiveSessionInner (http://localhost:5199/src/pages/LiveSession.tsx?t=1780195287254:214:6)
+    at Object.react_stack_bottom_frame (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:12867:12)
+    at renderWithHooks (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4212:19)
+    at updateFunctionComponent (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:5568:16)
+    at beginWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:6139:20)
+    at runWithFiberInDEV (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:850:66)
+    at performUnitOfWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8428:92)
+    at workLoopSync (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8324:37)
+    at renderRootSync (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8308:6)
+    at performWorkOnRoot (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:7993:27)
+[ 3168143ms] [WARNING] %s
+
+%s
+ An error occurred in the <LiveSessionInner> component. Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries. @ http://localhost:5199/@vite/client:524
+[ 3179390ms] ReferenceError: updateSuggestion is not defined
+    at LiveSessionInner (http://localhost:5199/src/pages/LiveSession.tsx?t=1780195298539:225:21)
+    at Object.react_stack_bottom_frame (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:12867:12)
+    at renderWithHooks (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4212:19)
+    at updateFunctionComponent (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:5568:16)
+    at beginWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:6139:20)
+    at runWithFiberInDEV (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:850:66)
+    at performUnitOfWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8428:92)
+    at workLoopSync (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8324:37)
+    at renderRootSync (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:8308:6)
+    at performWorkOnRoot (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:7993:27)
+[ 3179381ms] [WARNING] %s
+
+%s
+ An error occurred in the <LiveSessionInner> component. Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries. @ http://localhost:5199/@vite/client:524
+[ 3185293ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3185293ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 3185308ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 3185308ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 4399705ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 4399707ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5038261ms] [ERROR] React has detected a change in the order of Hooks called by %s. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
+
+   Previous render            Next render
+   ------------------------------------------------------
+%s   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ LiveSessionInner 1. useContext                 useContext
+2. useContext                 useContext
+3. useState                   useState
+4. useState                   useState
+5. useRef                     useRef
+6. useEffect                  useEffect
+7. useEffect                  useEffect
+8. useCallback                useCallback
+9. useState                   useState
+10. useState                  useState
+11. useRef                    useRef
+12. useRef                    useRef
+13. useRef                    useRef
+14. useRef                    useRef
+15. useRef                    useRef
+16. useRef                    useRef
+17. useCallback               useMemo
+ @ http://localhost:5199/@vite/client:524
+[ 5038450ms] Error: Rendered more hooks than during the previous render.
+    at updateWorkInProgressHook (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4326:12)
+    at updateCallback (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4920:15)
+    at Object.useCallback (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:13242:12)
+    at exports.useCallback (http://localhost:5199/node_modules/.vite/deps/react-Dyb9tW5G.js?v=b71b64c4:732:31)
+    at LiveSessionInner (http://localhost:5199/src/pages/LiveSession.tsx?t=1780197157255:223:24)
+    at Object.react_stack_bottom_frame (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:12867:12)
+    at renderWithHooks (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:4212:19)
+    at updateFunctionComponent (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:5568:16)
+    at beginWork (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:6139:20)
+    at runWithFiberInDEV (http://localhost:5199/node_modules/.vite/deps/react-dom_client.js?v=b71b64c4:850:66)
+[ 5038273ms] [WARNING] %s
+
+%s
+ An error occurred in the <LiveSessionInner> component. Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries. @ http://localhost:5199/@vite/client:524
+[ 5046561ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5046569ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5825607ms] [WARNING] WebSocket connection to 'ws://localhost:8000/ws/40aa19a7-3f5d-4cea-9c92-b44192f7eedc' failed: WebSocket is closed before the connection is established. @ http://localhost:5199/src/hooks/useWebSocket.ts?t=1780197165660:21
+[ 5846993ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5856592ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 5856592ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5869552ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 5869552ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5914135ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 5914136ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5926077ms] [ERROR] Access to fetch at 'http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5199/session/40aa19a7-3f5d-4cea-9c92-b44192f7eedc:0
+[ 5926077ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0
+[ 5953754ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/sessions/40aa19a7-3f5d-4cea-9c92-b44192f7eedc/history:0

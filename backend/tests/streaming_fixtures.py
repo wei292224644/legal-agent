@@ -50,7 +50,7 @@ async def stream_wav_realtime(
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 MAIN_WAV = FIXTURE_DIR / "劳动仲裁对话_完整版.wav"
-VOICEPRINT_WAV = FIXTURE_DIR / "律师声纹注册.wav"
+VOICEPRINT_WAV = FIXTURE_DIR / "律师声纹注册_30s.wav"
 SCRIPT_MD = FIXTURE_DIR / "劳动仲裁对话脚本_角色话版.md"
 
 SHORT_CLIENT_WAV = FIXTURE_DIR / "short_client.wav"

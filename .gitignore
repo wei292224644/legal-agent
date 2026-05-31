@@ -31,3 +31,9 @@ __modles__/
 
 # gstack (project-local, not vendored)
 # .gstack/
+
+
+# playwright
+playwright-report/
+test-results/
+.playwright-mcp/

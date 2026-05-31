@@ -51,7 +51,7 @@ def load_relevance_model() -> None:
 
     # 3. 分类头（读取独立的分类头配置，避免覆盖 BERT 的 config.json）
     cfg_path = _MODEL_DIR / "classifier_config.json"
-    with open(cfg_path, "r", encoding="utf-8") as f:
+    with open(cfg_path, encoding="utf-8") as f:
         cfg = json.load(f)
     num_classes = cfg.get("num_classes", 2)
     _classifier = nn.Linear(_bert_model.config.hidden_size, num_classes).to(_device)

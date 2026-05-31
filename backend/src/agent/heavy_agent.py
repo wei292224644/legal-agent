@@ -10,6 +10,8 @@ HeavyAgent 不再有 analyze/analyze_quick 两条分支。
 
 from __future__ import annotations
 
+from typing import Any
+
 from agno.agent import Agent
 from agno.models.deepseek import DeepSeek
 
@@ -69,6 +71,6 @@ class HeavyAgent:
         )
         return await self._agent.arun(prompt)
 
-    async def acontinue_run(self, run_id: str, requirements):
+    async def acontinue_run(self, run_id: str, requirements: list[Any] | None = None):
         """续跑同一个 paused run。requirements 由调用方在 confirm 前用 .confirm() 标记好。"""
         return await self._agent.acontinue_run(run_id=run_id, requirements=requirements)

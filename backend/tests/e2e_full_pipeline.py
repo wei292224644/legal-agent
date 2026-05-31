@@ -48,9 +48,9 @@ from streaming_fixtures import MAIN_WAV, VOICEPRINT_WAV, stream_wav_realtime  # 
 from agent.bus import UtteranceBus  # noqa: E402
 from agent.context_store import ContextStore  # noqa: E402
 from agent.heavy_agent import HeavyAgent  # noqa: E402
-from agent.intent_router import IntentRouter  # noqa: E402
 from agent.orchestrator import Orchestrator  # noqa: E402
 from agent.profile_agent import ProfileAgent  # noqa: E402
+from agent.relevance_gate import RelevanceGate  # noqa: E402
 from diarization.enrollment import enroll_speaker  # noqa: E402
 from stt.funasr_stream import stream_stt  # noqa: E402
 
@@ -101,14 +101,24 @@ async def main():
 
     enrollment = _load_enrollment()
 
-    ctx = ContextStore()
+    import uuid as _uuid
+
+    from db.base import Base
+    from db.engine import create_engine_from_env, get_sessionmaker
+
+    engine = create_engine_from_env()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    sm = get_sessionmaker(engine)
+    ctx = ContextStore(session_id=_uuid.uuid4(), sessionmaker=sm)
+
     orch = bus = None
     if not NO_AGENT:
         orch = Orchestrator(
             ctx,
-            ir=jlogger.wrap_ir(IntentRouter()),
+            gate=jlogger.wrap_ir(RelevanceGate()),
             pa=jlogger.wrap_pa(ProfileAgent()),
-            ha=jlogger.wrap_ha(HeavyAgent(ctx)),
+            ha=jlogger.wrap_ha(HeavyAgent(ctx, session_id="e2e-test", user_id="lawyer-default")),
         )
         bus = UtteranceBus(maxsize=10)
         orch.attach_bus(bus)

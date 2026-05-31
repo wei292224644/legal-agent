@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import numpy as np
 import torch
 import torchaudio.functional as torchaudio_f
@@ -13,12 +15,15 @@ from funasr import AutoModel
 from config import SR as CAMPP_SR
 
 _model: AutoModel | None = None
+_model_lock = threading.Lock()
 
 
 def _get_model() -> AutoModel:
     global _model
     if _model is None:
-        _model = AutoModel(model="cam++", hub="ms", disable_update=True)
+        with _model_lock:
+            if _model is None:
+                _model = AutoModel(model="cam++", hub="ms", disable_update=True)
     return _model
 
 

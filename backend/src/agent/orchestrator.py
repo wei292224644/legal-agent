@@ -362,7 +362,7 @@ class Orchestrator:
     async def _abandon_run(self, pending: PendingRequest) -> None:
         """放弃挂起 run:reject 内存中的 requirements + 把 Agno db 的 run 状态标 CANCELLED。
 
-        注意:Agno SqliteDb/PostgresDb 没有 get_run/delete_run 这类 API。
+        注意:Agno PostgresDb 没有 get_run/delete_run 这类 API。
         真实可用 API 是 update_approval_run_status(run_id, RunStatus.*) 与
         delete_approval(approval_id)。这里只动 run_status,approvals 行让
         Agno 内部 GC,避免我们替它管 approval_id 生命周期。

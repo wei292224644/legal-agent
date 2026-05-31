@@ -45,7 +45,10 @@ def match_speaker(
             return "client"
         # uncertain 区间: 时长足够且 cos 偏低 → 取为 client seed
         duration_s = len(audio) / sr
-        if duration_s >= enrollment.seed_min_duration_s and s_l < enrollment.seed_threshold:
+        if (
+            duration_s >= enrollment.seed_min_duration_s
+            and s_l < enrollment.seed_threshold
+        ):
             enrollment.client_embedding = emb
             return "client"
         return "uncertain"

@@ -14,6 +14,8 @@ from __future__ import annotations
 import array
 import asyncio
 import hashlib
+import logging
+import threading
 from collections.abc import AsyncIterator
 
 import numpy as np
@@ -32,16 +34,21 @@ from diarization.enrollment import Enrollment
 from diarization.matcher import match_speaker
 from models.utterance import ClosedBy, Utterance
 
+logger = logging.getLogger(__name__)
+
 _vad_model: AutoModel | None = None
 _asr_model: AutoModel | None = None
+_models_lock = threading.Lock()
 
 
 def _get_models() -> tuple[AutoModel, AutoModel]:
     global _vad_model, _asr_model
-    if _vad_model is None:
-        _vad_model = AutoModel(model="fsmn-vad", hub="ms", disable_update=True)
-    if _asr_model is None:
-        _asr_model = AutoModel(model="paraformer-zh", hub="ms", disable_update=True)
+    if _vad_model is None or _asr_model is None:
+        with _models_lock:
+            if _vad_model is None:
+                _vad_model = AutoModel(model="fsmn-vad", hub="ms", disable_update=True)
+            if _asr_model is None:
+                _asr_model = AutoModel(model="paraformer-zh", hub="ms", disable_update=True)
     return _vad_model, _asr_model
 
 
@@ -241,6 +248,13 @@ async def stream_stt(
         nonlocal yielded_until_ms
         if len(snapshot) == 0:
             return
+        # 清理超过 10 秒未 yield 的陈旧 spec task，避免长会话中累积
+        stale_threshold_ms = yielded_until_ms - 10000
+        for k in list(spec_asr.keys()):
+            if k[1] < stale_threshold_ms:
+                old_task = spec_asr.pop(k, None)
+                if old_task is not None and not old_task.done():
+                    old_task.cancel()
         total_ms = int(len(snapshot) * 1000 / SR)
         # 只对"未确认尾段"跑 VAD,避免 O(n²) 重复扫已 yield 的历史音频。
         # 留 500ms overlap 兜底边界抖动。
@@ -252,7 +266,7 @@ async def stream_stt(
         # 把相对窗口的时间戳翻译回绝对时间轴
         raw_segs = [(s + window_start_ms, e + window_start_ms) for s, e in raw_segs_rel]
         bounds = merge_with_close_reason(raw_segs, snapshot)
-        print(f"[STT] total_ms={total_ms}, window={len(window_audio)}, raw_segs={raw_segs}, bounds={bounds}, final={final}")
+        logger.debug("[STT] total_ms=%d, window=%d, raw_segs=%s, bounds=%s, final=%s", total_ms, len(window_audio), raw_segs, bounds, final)
 
         for s_ms, e_ms, closed_by in bounds:
             if e_ms <= yielded_until_ms + 100:
@@ -310,7 +324,7 @@ async def stream_stt(
             t0 = t_rel
         audio_buffer.frombytes(chunk.astype(np.float32).tobytes())
         total_ms = int(len(audio_buffer) * 1000 / SR)
-        print(f"[STT] chunk received: len={len(chunk)}, buffer_ms={total_ms}")
+        logger.debug("[STT] chunk received: len=%d, buffer_ms=%d", len(chunk), total_ms)
 
         if total_ms - last_vad_audio_ms < VAD_RECHECK_INTERVAL_MS:
             continue
@@ -322,14 +336,14 @@ async def stream_stt(
         # 而异常会被 WS handler 的 contextlib.suppress(Exception) 吞掉,无任何提示。
         snapshot = np.array(audio_buffer, dtype=np.float32)
         async for utt in _emit_stable_or_final(snapshot, final=False):
-            print(f"[STT] yield utt: {utt.text[:30]}...")
+            logger.info("[STT] yield utt: %s...", utt.text[:30])
             yield utt
 
     # 流末尾 flush
-    print("[STT] flush remaining audio")
+    logger.info("[STT] flush remaining audio")
     snapshot = np.array(audio_buffer, dtype=np.float32)
     async for utt in _emit_stable_or_final(snapshot, final=True):
-        print(f"[STT] yield utt (final): {utt.text[:30]}...")
+        logger.info("[STT] yield utt (final): %s...", utt.text[:30])
         yield utt
 
     # 取消未消费的 spec task(避免资源泄漏)

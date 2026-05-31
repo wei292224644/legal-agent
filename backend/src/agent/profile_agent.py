@@ -13,11 +13,14 @@ from agent.llm_client import build_qwen_client
 from agent.prompts import build_profile_prompt
 from agent.utils import extract_json_from_markdown
 from config import QWEN_MODEL
+from models.utterance import Utterance
 
 logger = logging.getLogger(__name__)
 
 # subject 只接受这三个值；模型偶尔会输出字段名等噪声，统一兜底。
 _VALID_SUBJECTS = frozenset(("当事人", "对方", "第三方"))
+
+_VALID_CATEGORIES = frozenset(("basic_info", "emotion", "risk", "claim", "fact"))
 
 
 class ProfileAgent:
@@ -35,7 +38,7 @@ class ProfileAgent:
         self,
         text: str,
         speaker: str | None,
-        history: list,
+        history: list[Utterance],
         existing_profile: dict[str, dict[str, str]],
         utt_id: str = "",
     ) -> list[ProfileEntry]:
@@ -107,6 +110,12 @@ class ProfileAgent:
                             "丢弃非法 subject %r（key=%r）", subject, e["key"]
                         )
                         subject = ""
+                    category = str(e.get("category", ""))
+                    if category not in _VALID_CATEGORIES:
+                        logger.warning(
+                            "丢弃非法 category %r（key=%r）", category, e["key"]
+                        )
+                        category = "fact"  # 默认归类为已确定事实
                     entries.append(
                         ProfileEntry(
                             key=e["key"],
@@ -115,6 +124,7 @@ class ProfileAgent:
                             source_utt_id=utt_id or "llm",
                             confidence=0.9,
                             subject=subject,
+                            category=category,
                         )
                     )
             return entries

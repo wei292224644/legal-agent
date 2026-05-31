@@ -25,10 +25,9 @@ def _setup_env_and_maker():
 
 @pytest_asyncio.fixture
 async def db_session():
-    """每个测试用新的 engine + drop_all/create_all，避免污染。"""
+    """提供 db_session；复用已有表，不 drop_all。"""
     engine = create_engine_from_env()
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     session_local = get_sessionmaker(engine)
 
@@ -39,6 +38,4 @@ async def db_session():
     async with session_local() as session:
         yield session
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
