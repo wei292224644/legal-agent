@@ -1,10 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 
+type ProfileEntryData = {
+  key: string
+  value: string
+  subject: string
+}
+
 type Callbacks = {
   onTranscript?: (data: TranscriptData) => void
   onAnalysis?: (data: AnalysisData) => void
   onSuggestion?: (data: SuggestionData) => void
   onConfirmAck?: (data: { request_id: string; ok: boolean }) => void
+  onProfileUpdate?: (entries: ProfileEntryData[]) => void
 }
 
 type TranscriptData = {
@@ -104,6 +111,12 @@ export function useWebSocket(sessionId: string, callbacks: Callbacks = {}) {
 
       if (msg.type === 'pong') return
 
+      if (msg.type === 'profile_update') {
+        const entries = (msg.entries as ProfileEntryData[]) ?? []
+        callbacksRef.current.onProfileUpdate?.(entries)
+        return
+      }
+
       if (msg.type === 'transcript') {
         callbacksRef.current.onTranscript?.(msg as unknown as TranscriptData)
         return
@@ -126,7 +139,7 @@ export function useWebSocket(sessionId: string, callbacks: Callbacks = {}) {
     }
 
     wsRef.current = ws
-  }, [wsUrl, cleanup])
+  }, [wsUrl, cleanup, sessionId])
 
   useEffect(() => {
     callbacksRef.current = callbacks

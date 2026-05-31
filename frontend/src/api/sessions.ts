@@ -21,11 +21,18 @@ export type HistorySuggestion = {
   created_at: string;
 };
 
+export type HistoryProfileEntry = {
+  key: string;
+  value: string;
+  subject: string;
+};
+
 export type SessionHistory = {
   session_id: string;
   status: string;
   utterances: HistoryUtterance[];
   suggestions: HistorySuggestion[];
+  profile_entries: HistoryProfileEntry[];
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";

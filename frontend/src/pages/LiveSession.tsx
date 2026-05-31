@@ -1,612 +1,333 @@
-import { useState, useCallback, useEffect, useRef, memo } from "react";
-import { useParams } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { fetchHistory } from "@/api/sessions";
-import { useWebSocket, type SuggestionData } from "@/hooks/useWebSocket";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import AudioControls from "@/components/AudioControls";
-import {
-  Activity,
-  MessageSquare,
-  ChevronUp,
-  ChevronDown,
-  BookOpen,
-  FileText,
-  ShieldAlert,
-  User,
-  Users,
-  HelpCircle,
-  CheckCircle2,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { SessionProvider } from '@/context/SessionContext'
+import { useSession } from '@/hooks/useSession'
+import { fetchHistory } from '@/api/sessions'
+import { useWebSocket, type SuggestionData } from '@/hooks/useWebSocket'
+import DesktopLayout from '@/components/layout/DesktopLayout'
+import MobileLayout from '@/components/layout/MobileLayout'
+import PortraitLock from '@/components/layout/PortraitLock'
+import InsightStream from '@/components/insights/InsightStream'
+import TranscriptPanel from '@/components/transcript/TranscriptPanel'
+import AudioControls from '@/components/AudioControls'
+import { entriesToProfile, type Insight, type ProfileEntryItem, type TranscriptLine } from '@/types'
 
-type TranscriptLine = { speaker: string; text: string };
-type Analysis = {
-  id: string;
-  category: "statute" | "contract" | "risk";
-  title: string;
-  content: string;
-  citation?: string;
-  level?: string;
-};
+function ConnectionIndicator() {
+  const { state } = useSession()
+  const { connectionStatus } = state
 
-type Suggestion =
-  | {
-      kind: "pending";
-      requestId: string;
-      topic: string;
-      rationale: string;
-    }
-  | {
-      kind: "running";
-      requestId: string;
-      topic: string;
-    }
-  | {
-      kind: "ready";
-      id: string;
-      requestId?: string;
-      text: string;
-      topic: string;
-    };
+  const config = {
+    connecting: { dot: 'bg-primary', text: 'text-primary', label: '连接中…' },
+    connected: { dot: 'bg-success', text: 'text-success', label: '已连接' },
+    disconnected: { dot: 'bg-danger', text: 'text-danger', label: '离线' },
+    reconnecting: { dot: 'bg-warning', text: 'text-warning', label: '重连中…' },
+  }
 
-type TranscriptData = {
-  text: string;
-  speaker: string;
-  is_final: boolean;
-};
-type AnalysisData = {
-  category: string;
-  title: string;
-  content: string;
-  citation?: string;
-  level?: string;
-};
+  const cfg = config[connectionStatus]
 
-const categoryConfig = {
-  statute: { label: "法规引用", icon: BookOpen, color: "text-primary" as const, bg: "bg-primary/10" as const, border: "border-primary/20" as const },
-  contract: { label: "合同条款", icon: FileText, color: "text-contract" as const, bg: "bg-contract/10" as const, border: "border-contract/20" as const },
-  risk: { label: "风险提示", icon: ShieldAlert, color: "text-danger" as const, bg: "bg-danger/10" as const, border: "border-danger/20" as const },
-} as const;
-
-const riskLevelColor = { 高: "text-danger", 中: "text-primary", 低: "text-success" } as const;
-
-const emptyAnalysis = (
-  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-    <Activity className="w-8 h-8 opacity-20" />
-    <p className="text-sm italic">系统正在监听并分析对话内容…</p>
-    <p className="text-xs text-muted-foreground">分析结果将随对话自动呈现</p>
-  </div>
-);
-
-const emptyTranscript = (
-  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-    <MessageSquare className="w-6 h-6 opacity-20" />
-    <p className="text-xs italic">开始说话，转写文本将实时显示…</p>
-    <p className="text-xs text-muted-foreground">录音开始后，对话内容将出现在此处</p>
-  </div>
-);
-
-const TranscriptItem = memo(function TranscriptItem({
-  line,
-}: {
-  line: TranscriptLine;
-}) {
-  const isLawyer = line.speaker === "律师";
   return (
-    <div className="flex gap-3">
-      <span
-        className={`shrink-0 text-xs font-mono mt-1 px-2 py-0.5 rounded ${
-          isLawyer
-            ? "bg-primary/10 text-primary border border-primary/20"
-            : "bg-muted text-muted-foreground border border-border"
-        }`}
-      >
-        {isLawyer ? <User className="w-3 h-3 inline" /> : <Users className="w-3 h-3 inline" />} {line.speaker}
-      </span>
-      <p className="text-foreground/90 leading-relaxed text-sm">{line.text}</p>
+    <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide">
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+      <span className={cfg.text}>{cfg.label}</span>
     </div>
-  );
-});
+  )
+}
 
-const AnalysisItem = memo(function AnalysisItem({
-  a,
-}: {
-  a: Analysis;
-}) {
-  const cfg = categoryConfig[a.category];
-  return (
-    <div className="py-3 border-t border-border first:border-t-0">
-      <div className="flex items-center gap-2 mb-1">
-        <span
-          className={`text-xs font-mono uppercase tracking-wide ${cfg.color}`}
-        >
-          <cfg.icon className="w-3 h-3 inline" /> {cfg.label}
-        </span>
-        {a.category === "risk" && a.level && (
-          <span
-            className={`text-xs font-mono uppercase tracking-wide ${riskLevelColor[a.level as keyof typeof riskLevelColor]}`}
-          >
-            {a.level}
-          </span>
-        )}
-      </div>
-      <h3 className="text-sm font-semibold text-foreground mb-1">{a.title}</h3>
-      <p className="text-sm text-foreground/80 leading-relaxed">{a.content}</p>
-      {a.citation && (
-        <p className="text-xs text-primary/80 mt-2 font-mono">{a.citation}</p>
-      )}
-    </div>
-  );
-});
+function LiveSessionInner() {
+  const { id: sessionId } = useParams<{ id: string }>()
+  const {
+    state,
+    addInsight,
+    addSuggestion,
+    updateSuggestion,
+    dismissSuggestion,
+    addTranscript,
+    setConnectionStatus,
+    setSessionId,
+    setProfile,
+    hydrate,
+    toggleTranscriptPanel,
+  } = useSession()
 
-const PENDING_TIMEOUT_SECONDS = 30;
-
-const SuggestionCard = memo(function SuggestionCard({
-  s,
-  onConfirm,
-  onDismiss,
-}: {
-  s: Suggestion;
-  onConfirm: (requestId: string) => void;
-  onDismiss: (requestId: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(PENDING_TIMEOUT_SECONDS);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [hydrated, setHydrated] = useState(false)
+  const disconnectTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (s.kind !== "pending") {
-      const iv = intervalRef.current;
-      if (iv) {
-        clearInterval(iv);
-        intervalRef.current = null;
-      }
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          const current = intervalRef.current;
-          if (current) {
-            clearInterval(current);
-            intervalRef.current = null;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    const timeout = setTimeout(() => {
-      onDismiss(s.requestId);
-    }, PENDING_TIMEOUT_SECONDS * 1000);
-    return () => {
-      clearTimeout(timeout);
-      const iv = intervalRef.current;
-      if (iv) {
-        clearInterval(iv);
-        intervalRef.current = null;
-      }
-    };
-  }, [s.kind, s.requestId, onDismiss]);
+    if (sessionId) setSessionId(sessionId)
+  }, [sessionId, setSessionId])
 
-  if (s.kind === "pending") {
-    const progress = (timeLeft / PENDING_TIMEOUT_SECONDS) * 100;
-    return (
-      <div className="py-3 border-t border-border first:border-t-0">
-        <span className="text-xs font-mono uppercase tracking-wide text-primary">
-          <HelpCircle className="w-3 h-3 inline" /> {s.topic || "检测到可分析意图"}
-        </span>
-        {s.rationale && (
-          <p className="text-sm text-foreground/80 leading-relaxed my-2">
-            {s.rationale}
-          </p>
-        )}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-1000 ease-linear"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className="text-xs text-muted-foreground font-mono w-12 text-right">
-            {timeLeft}s
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => onConfirm(s.requestId)}>
-            生成深度分析
-          </Button>
-          <Button variant="outline" onClick={() => onDismiss(s.requestId)}>
-            忽略
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  if (s.kind === "running") {
-    return (
-      <div className="py-3 border-t border-border first:border-t-0">
-        <span className="text-xs font-mono uppercase tracking-wide text-primary motion-safe:animate-pulse">
-          <Activity className="w-3 h-3 inline" /> 分析中…{s.topic ? ` · ${s.topic}` : ""}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="py-3 border-t border-border first:border-t-0">
-      <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-mono uppercase tracking-wide text-contract">
-            <CheckCircle2 className="w-3 h-3 inline" /> {s.topic || "深度分析"}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1 text-xs h-auto py-1 px-2 shrink-0"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp className="w-3 h-3" /> 收起
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-3 h-3" /> 展开
-              </>
-            )}
-          </Button>
-        </div>
-        <CollapsibleContent>
-          <div className="text-sm text-foreground/90 leading-relaxed mt-2 prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {s.text ?? ""}
-            </ReactMarkdown>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
-});
-
-export default function LiveSession() {
-  const { id: sessionId } = useParams<{ id: string }>();
-  const [hydrated, setHydrated] = useState(false);
-
-  // 页面加载时先从后端拉历史数据，再连 WS
+  // Hydrate from history on mount
   useEffect(() => {
     if (!sessionId) {
-      setHydrated(true);
-      return;
+      Promise.resolve().then(() => setHydrated(true))
+      return
     }
-    let cancelled = false;
+    let cancelled = false
     fetchHistory(sessionId)
       .then((h) => {
-        if (cancelled || !h) {
-          setHydrated(true);
-          return;
+        if (cancelled) {
+          setHydrated(true)
+          return
         }
-        // 回填 transcript
-        setTranscript(
-          h.utterances.map((u) => ({
-            speaker: u.speaker ?? "uncertain",
-            text: u.text,
+        if (!h) {
+          setHydrated(true)
+          return
+        }
+        const transcripts: TranscriptLine[] = h.utterances.map((u) => ({
+          id: u.id,
+          speaker: (u.speaker ?? 'uncertain') as TranscriptLine['speaker'],
+          text: u.text,
+          timestamp: u.t_start,
+        }))
+
+        const suggestions = h.suggestions
+          .filter((s) => s.status !== 'expired' && s.status !== 'dismissed')
+          .map((s) => ({
+            id: s.id,
+            requestId: s.request_id ?? `req-${s.id}`,
+            status: s.status as 'pending' | 'running' | 'ready',
+            topic: s.preview_topic ?? '',
+            rationale: s.preview_rationale ?? '',
+            text: s.text ?? null,
+            createdAt: s.created_at,
           }))
-        );
-        // 回填 suggestions
-        setSuggestions(
-          h.suggestions
-            .filter((s) => s.status !== "expired" && s.status !== "dismissed")
-            .map((s): Suggestion => {
-            if (s.status === "pending") {
-              return {
-                kind: "pending",
-                requestId: s.request_id ?? "",
-                topic: s.preview_topic ?? "",
-                rationale: s.preview_rationale ?? "",
-              };
-            }
-            if (s.status === "running") {
-              return {
-                kind: "running",
-                requestId: s.request_id ?? "",
-                topic: s.preview_topic ?? "",
-              };
-            }
-            return {
-              kind: "ready",
-              id: s.id,
-              requestId: s.request_id ?? undefined,
-              text: s.text ?? "",
-              topic: s.preview_topic ?? "",
-            };
+
+        const profileEntries: ProfileEntryItem[] = (h.profile_entries ?? []).map(
+          (e) => ({
+            key: e.key,
+            value: e.value,
+            subject: e.subject,
           })
-        );
-        setHydrated(true);
+        )
+
+        hydrate({
+          transcripts,
+          suggestions,
+          profile: profileEntries.length > 0 ? entriesToProfile(profileEntries) : null,
+        })
+        setHydrated(true)
       })
-      .catch(() => setHydrated(true));
+      .catch(() => setHydrated(true))
+
     return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
+      cancelled = true
+    }
+  }, [sessionId, hydrate])
 
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [activeTab, setActiveTab] = useState<"analysis" | "transcript">(
-    "analysis"
-  );
+  // Backfill history after reconnect
+  const backfillHistory = useCallback(
+    async (sid: string) => {
+      try {
+        const h = await fetchHistory(sid)
+        if (!h) return
+        const existingIds = new Set(state.transcripts.map((t) => t.id))
+        const newTranscripts: TranscriptLine[] = h.utterances
+          .filter((u) => !existingIds.has(u.id))
+          .map((u) => ({
+            id: u.id,
+            speaker: (u.speaker ?? 'uncertain') as TranscriptLine['speaker'],
+            text: u.text,
+            timestamp: u.t_start,
+          }))
+        newTranscripts.forEach((t) => addTranscript(t))
 
-  const onTranscript = useCallback((data: TranscriptData) => {
-    setTranscript((prev) => [
-      ...prev,
-      { speaker: data.speaker, text: data.text },
-    ]);
-  }, []);
+        const existingSuggestionIds = new Set(state.suggestions.map((s) => s.id))
+        const newSuggestions = h.suggestions
+          .filter((s) => s.status !== 'expired' && s.status !== 'dismissed' && !existingSuggestionIds.has(s.id))
+          .map((s) => ({
+            id: s.id,
+            requestId: s.request_id ?? `req-${s.id}`,
+            status: s.status as 'pending' | 'running' | 'ready',
+            topic: s.preview_topic ?? '',
+            rationale: s.preview_rationale ?? '',
+            text: s.text ?? null,
+            createdAt: s.created_at,
+          }))
+        newSuggestions.forEach((s) => addSuggestion(s))
 
-  const onAnalysis = useCallback((data: AnalysisData) => {
-    setAnalyses((prev) => [
-      {
+        const profileEntries: ProfileEntryItem[] = (h.profile_entries ?? []).map(
+          (e) => ({
+            key: e.key,
+            value: e.value,
+            subject: e.subject,
+          })
+        )
+        if (profileEntries.length > 0) {
+          setProfile(entriesToProfile(profileEntries))
+        }
+      } catch {
+        // ignore backfill errors
+      }
+    },
+    [state.transcripts, state.suggestions, addTranscript, addSuggestion, setProfile]
+  )
+
+  const onTranscript = useCallback(
+    (data: { text: string; speaker: string }) => {
+      addTranscript({
         id: crypto.randomUUID(),
-        category: data.category as Analysis["category"],
+        speaker: (data.speaker as TranscriptLine['speaker']) ?? 'uncertain',
+        text: data.text,
+        timestamp: Date.now(),
+      })
+    },
+    [addTranscript]
+  )
+
+  const onAnalysis = useCallback(
+    (data: { category: string; title: string; content: string; citation?: string }) => {
+      const insight: Insight = {
+        id: crypto.randomUUID(),
+        category: data.category as Insight['category'],
         title: data.title,
         content: data.content,
         citation: data.citation,
-        level: data.level,
-      },
-      ...prev,
-    ]);
-  }, []);
-
-  const onSuggestion = useCallback((data: SuggestionData) => {
-    setSuggestions((prev) => {
-      if (data.type === "suggestion.pending") {
-        const pending: Suggestion = {
-          kind: "pending",
-          requestId: data.meta.request_id ?? "",
-          topic: data.meta.preview?.topic ?? "",
-          rationale: data.meta.preview?.rationale ?? "",
-        };
-        return [pending, ...prev];
+        createdAt: new Date().toISOString(),
       }
-      const rid = data.meta.request_id;
-      if (rid) {
-        return prev.map((s) => {
-          if ((s.kind !== "pending" && s.kind !== "running") || s.requestId !== rid) return s;
-          const ready: Suggestion = {
-            kind: "ready",
-            id: `ready-${rid}`,
-            requestId: rid,
-            text: data.text ?? "",
-            topic: s.topic,
-          };
-          return ready;
-        });
-      }
-      const ready: Suggestion = {
-        kind: "ready",
-        id: `ready-${Date.now()}`,
-        text: data.text ?? "",
-        topic: "",
-      };
-      return [ready, ...prev];
-    });
-  }, []);
+      addInsight(insight)
+    },
+    [addInsight]
+  )
 
-  const { isConnected, error: wsError, sendAudioChunk, confirmIntent, dismissIntent, notifyAudioEnd } =
-    useWebSocket(hydrated ? (sessionId ?? "") : "", {
-      onTranscript,
-      onAnalysis,
-      onSuggestion,
-      onConfirmAck: ({ ok, request_id }) => {
-        if (!ok) {
-          setSuggestions((prev) =>
-            prev.filter(
-              (s) => !((s.kind === "pending" || s.kind === "running") && s.requestId === request_id)
-            )
-          );
+  const onSuggestion = useCallback(
+    (data: SuggestionData) => {
+      if (data.type === 'suggestion.pending') {
+        addSuggestion({
+          id: crypto.randomUUID(),
+          requestId: data.meta.request_id ?? `req-${Date.now()}`,
+          status: 'pending',
+          topic: data.meta.preview?.topic ?? '',
+          rationale: data.meta.preview?.rationale ?? '',
+          text: null,
+          createdAt: new Date().toISOString(),
+        })
+        return
+      }
+      if (data.type === 'suggestion.ready') {
+        const rid = data.meta.request_id
+        if (rid) {
+          updateSuggestion(rid, {
+            status: 'ready',
+            text: data.text,
+            topic: data.meta.preview?.topic ?? '',
+          })
         }
-      },
-    });
+      }
+    },
+    [addSuggestion, updateSuggestion]
+  )
+
+  const {
+    isConnected,
+    error: wsError,
+    sendAudioChunk,
+    confirmIntent,
+    dismissIntent,
+    notifyAudioEnd,
+  } = useWebSocket(hydrated ? (sessionId ?? '') : '', {
+    onTranscript,
+    onAnalysis,
+    onSuggestion,
+    onConfirmAck: ({ ok, request_id }) => {
+      if (!ok) {
+        dismissSuggestion(request_id)
+      }
+    },
+    onProfileUpdate: (entries: ProfileEntryItem[]) => {
+      const merged = [...(state.profile?.entries ?? []), ...entries]
+      setProfile(entriesToProfile(merged))
+    },
+  })
+
+  useEffect(() => {
+    if (wsError) {
+      if (!disconnectTimeRef.current) {
+        disconnectTimeRef.current = Date.now()
+      }
+      setConnectionStatus('disconnected')
+    } else if (isConnected) {
+      if (disconnectTimeRef.current && sessionId) {
+        backfillHistory(sessionId)
+        disconnectTimeRef.current = null
+      }
+      setConnectionStatus('connected')
+    } else {
+      setConnectionStatus('connecting')
+    }
+  }, [isConnected, wsError, setConnectionStatus, sessionId, backfillHistory])
 
   const handleConfirm = useCallback(
     (requestId: string) => {
-      confirmIntent(requestId);
-      setSuggestions((prev) =>
-        prev.map((s) =>
-          s.kind === "pending" && s.requestId === requestId
-            ? { kind: "running" as const, requestId, topic: s.topic }
-            : s
-        )
-      );
+      confirmIntent(requestId)
+      updateSuggestion(requestId, { status: 'running', progress: 0 })
     },
-    [confirmIntent]
-  );
+    [confirmIntent, updateSuggestion]
+  )
 
   const handleDismiss = useCallback(
     (requestId: string) => {
-      dismissIntent(requestId);
-      setSuggestions((prev) =>
-        prev.filter(
-          (s) => !(s.kind === "pending" && s.requestId === requestId)
-        )
-      );
+      dismissIntent(requestId)
+      dismissSuggestion(requestId)
     },
-    [dismissIntent]
-  );
+    [dismissIntent, dismissSuggestion]
+  )
 
-  const analysisContent =
-    suggestions.length === 0 && analyses.length === 0 ? (
-      emptyAnalysis
-    ) : (
-      <div className="divide-y divide-border">
-        {suggestions.map((s) => (
-          <SuggestionCard
-            key={s.kind === "running" ? `running-${s.requestId}` : s.kind === "pending" ? s.requestId : s.id}
-            s={s}
-            onConfirm={handleConfirm}
-            onDismiss={handleDismiss}
-          />
-        ))}
-        {analyses.map((a) => (
-          <AnalysisItem key={a.id} a={a} />
-        ))}
-      </div>
-    );
+  const insightStreamNode = (
+    <InsightStream
+      insights={state.insights}
+      suggestions={state.suggestions}
+      onConfirm={handleConfirm}
+      onDismiss={handleDismiss}
+    />
+  )
 
-  const transcriptContent =
-    transcript.length === 0 ? (
-      emptyTranscript
-    ) : (
-      <div className="space-y-4">
-        {transcript.map((line, i) => (
-          <TranscriptItem key={i} line={line} />
-        ))}
-      </div>
-    );
+  const transcriptPanelNode = (
+    <TranscriptPanel
+      transcripts={state.transcripts}
+      isOpen={state.isTranscriptPanelOpen}
+      onToggle={toggleTranscriptPanel}
+    />
+  )
+
+  const connectionIndicatorNode = <ConnectionIndicator />
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
-      {/* Desktop header */}
-      <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-border bg-background shrink-0">
+    <>
+      <PortraitLock />
+      <div className="flex flex-col h-screen bg-background text-foreground">
+      {/* Desktop Header */}
+      <header className="hidden md:flex items-center justify-between px-6 h-12 border-b border-border-color bg-bg-primary shrink-0">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-foreground">
-            实时会谈
-          </h1>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                wsError
-                  ? "bg-danger"
-                  : isConnected
-                  ? "bg-success"
-                  : "bg-primary"
-              }`}
-            />
-            <span
-              className={
-                wsError
-                  ? "text-danger"
-                  : isConnected
-                  ? "text-success"
-                  : "text-primary"
-              }
-            >
-              {wsError ? `连接失败:${wsError}` : isConnected ? "已连接" : "连接中…"}
-            </span>
-          </div>
+          <h1 className="text-base font-semibold text-ink-primary tracking-tight">实时会谈</h1>
+          {connectionIndicatorNode}
         </div>
         <AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />
       </header>
 
-      {/* Mobile header */}
-      <header className="flex md:hidden items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold text-foreground">
-            实时会谈
-          </h1>
-          <span
-            className={`w-2 h-2 rounded-full ${
-              wsError
-                ? "bg-danger"
-                : isConnected
-                ? "bg-success"
-                : "bg-primary"
-            }`}
-            title={wsError ?? (isConnected ? "已连接" : "连接中…")}
-          />
-        </div>
-        <AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />
-      </header>
+      {/* Desktop Layout */}
+      <DesktopLayout
+        profile={state.profile}
+        insightStream={insightStreamNode}
+        transcriptPanel={transcriptPanelNode}
+      />
 
-      {/* Desktop layout: Transcript left, Analysis right */}
-      <div className="hidden md:flex flex-1 overflow-hidden">
-        {/* Left: Transcript (dominant, 60%) */}
-        <div className="w-3/5 flex flex-col">
-          <div className="px-6 py-3 border-b border-border shrink-0 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">
-              转写记录
-            </h2>
-            <span className="text-xs text-muted-foreground font-mono uppercase tracking-wide">
-              {transcript.length} 条
-            </span>
-          </div>
-          <ScrollArea className="flex-1 px-4 py-4">
-            {transcriptContent}
-          </ScrollArea>
-        </div>
-
-        {/* Right: Analysis (sidebar, 40%) */}
-        <div className="w-2/5 flex flex-col bg-card border-l border-border">
-          <div className="px-6 py-3 border-b border-border shrink-0">
-            <h2 className="text-base font-semibold text-primary">
-              实时洞察
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5 font-mono uppercase tracking-wide">
-              {suggestions.length + analyses.length} 条分析结果
-            </p>
-          </div>
-          <ScrollArea className="flex-1 px-5 py-6">
-            {analysisContent}
-          </ScrollArea>
-        </div>
-      </div>
-
-      {/* Mobile layout: Tab-based */}
-      <div className="flex md:hidden flex-1 flex-col overflow-hidden">
-        <div className="flex-1 overflow-hidden">
-          {activeTab === "analysis" ? (
-            <ScrollArea className="h-full px-4 py-4 bg-card">
-              {analysisContent}
-            </ScrollArea>
-          ) : (
-            <ScrollArea className="h-full px-4 py-4">
-              {transcriptContent}
-            </ScrollArea>
-          )}
-        </div>
-
-        {/* Mobile bottom tab bar */}
-        <nav className="flex border-t border-border bg-card shrink-0">
-          <Button
-            variant="ghost"
-            onClick={() => setActiveTab("analysis")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 h-auto rounded-none text-sm ${
-              activeTab === "analysis"
-                ? "text-primary bg-muted"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            洞察
-            {suggestions.length + analyses.length > 0 && (
-              <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
-                {suggestions.length + analyses.length}
-              </span>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setActiveTab("transcript")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 h-auto rounded-none text-sm ${
-              activeTab === "transcript"
-                ? "text-primary bg-muted"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            转写
-            {transcript.length > 0 && (
-              <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-                {transcript.length}
-              </span>
-            )}
-          </Button>
-        </nav>
-      </div>
+      {/* Mobile Layout */}
+      <MobileLayout
+        profile={state.profile}
+        insightStream={insightStreamNode}
+        transcriptPanel={transcriptPanelNode}
+        connectionStatus={connectionIndicatorNode}
+        audioControls={<AudioControls onChunk={sendAudioChunk} onAudioEnd={notifyAudioEnd} />}
+      />
     </div>
-  );
+    </>
+  )
+}
+
+export default function LiveSession() {
+  return (
+    <SessionProvider>
+      <LiveSessionInner />
+    </SessionProvider>
+  )
 }
