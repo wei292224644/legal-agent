@@ -121,13 +121,15 @@ class Orchestrator:
 
     async def shutdown(self) -> None:
         await self._ctx.stop_profile_worker()
-        for task in (self._bus_task, self._ttl_task):
+        for attr in ("_bus_task", "_ttl_task"):
+            task = getattr(self, attr)
             if task is not None:
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
                     pass
+                setattr(self, attr, None)
         # 等所有在飞 child task 结束(它们已经走 logger,不会抛到这里)
         if self._inflight:
             await asyncio.gather(*self._inflight, return_exceptions=True)
