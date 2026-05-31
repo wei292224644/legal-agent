@@ -91,14 +91,6 @@ export default function EntryPage() {
               </>
             )}
           </Button>
-
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/register')}
-            className="w-full text-sm text-ink-muted hover:text-ink-primary"
-          >
-            声纹注册
-          </Button>
         </div>
       </div>
     </div>

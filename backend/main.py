@@ -189,7 +189,6 @@ async def _startup() -> None:
     from db.base import Base  # noqa: E402
 
     engine = create_engine_from_env()
-    # 确保表存在——测试套件跑完后可能已 drop_all
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     _maker = get_sessionmaker(engine)
