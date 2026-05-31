@@ -123,6 +123,8 @@ async def get_history(session_id: str):
                 "value": e.value,
                 "subject": e.subject,
                 "category": e.category or "fact",
+                "timestamp": e.timestamp,
+                "source_utt_id": e.source_utt_id or "",
             }
             for e in profile_entries
         ],

@@ -171,6 +171,8 @@ class Orchestrator:
                         entries=[
                             ProfileEntryPayload(
                                 key=e.key, value=e.value, subject=e.subject,
+                                timestamp=e.timestamp,
+                                source_utt_id=e.source_utt_id,
                             ) for e in entries
                         ],
                     ))

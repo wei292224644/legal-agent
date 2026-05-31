@@ -50,6 +50,8 @@ class ProfileEntryPayload(BaseModel):
     key: str
     value: str
     subject: str
+    timestamp: float = 0.0
+    source_utt_id: str = ""
 
 
 class ProfileUpdated(BaseModel):
