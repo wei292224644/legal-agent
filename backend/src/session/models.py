@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from agent.context_store import ContextStore
     from agent.orchestrator import Orchestrator
+    from diarization.enrollment import Enrollment
 
 SessionStatus = Literal["active", "disconnected", "closed"]
 
@@ -22,3 +23,4 @@ class SessionRuntime:
     status: SessionStatus = "active"
     ctx: ContextStore | None = None
     orchestrator: Orchestrator | None = None
+    enrollment: Enrollment | None = None

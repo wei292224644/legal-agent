@@ -8,8 +8,10 @@ import asyncio
 import contextlib
 import uuid
 
+import numpy as np
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from diarization.enrollment import Enrollment
 from repositories.sessions import SessionRepository
 from session.models import SessionRuntime
 
@@ -129,6 +131,39 @@ class SessionManager:
         """写入 AI 摘要到 DB。"""
         async with self._maker() as s:
             await SessionRepository(s).set_summary(session_id, summary)
+
+    async def set_enrollment(
+        self, session_id: uuid.UUID, enrollment: Enrollment
+    ) -> None:
+        """将 enrollment 写入 DB 并更新 runtime 缓存。"""
+        embedding_list = enrollment.embedding.tolist()
+        async with self._maker() as s:
+            await SessionRepository(s).set_enrollment(session_id, embedding_list)
+        async with self._lock:
+            runtime = self._sessions.get(session_id)
+            if runtime is not None:
+                runtime.enrollment = enrollment
+
+    async def get_enrollment(self, session_id: uuid.UUID) -> Enrollment | None:
+        """获取 enrollment；先读热缓存，未命中再查 DB。"""
+        async with self._lock:
+            runtime = self._sessions.get(session_id)
+            if runtime is not None and runtime.enrollment is not None:
+                return runtime.enrollment
+
+        async with self._maker() as s:
+            row = await SessionRepository(s).get(session_id)
+        if row is None or row.lawyer_embedding is None:
+            return None
+
+        enrollment = Enrollment(
+            embedding=np.array(row.lawyer_embedding, dtype=np.float32)
+        )
+        async with self._lock:
+            runtime = self._sessions.get(session_id)
+            if runtime is not None:
+                runtime.enrollment = enrollment
+        return enrollment
 
     async def bind_runtime(self, session_id: uuid.UUID, *, ctx, orchestrator) -> None:
         """绑定 ContextStore / Orchestrator 实例到 runtime，WS 重连时复用。"""

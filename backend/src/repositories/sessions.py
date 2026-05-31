@@ -50,6 +50,14 @@ class SessionRepository:
         row.last_active_at = datetime.now(UTC)
         await self._s.commit()
 
+    async def set_enrollment(self, session_id: uuid.UUID, embedding_list: list) -> None:
+        """写入 lawyer_embedding 到 session 记录。"""
+        row = await self._s.get(Session, session_id)
+        if row is None:
+            return
+        row.lawyer_embedding = embedding_list
+        await self._s.commit()
+
     async def list_expired_disconnected(self, ttl_seconds: float) -> list[uuid.UUID]:
         """返回 disconnected 且超过 TTL 的 session_id；供清理任务使用。"""
         from sqlalchemy import and_
